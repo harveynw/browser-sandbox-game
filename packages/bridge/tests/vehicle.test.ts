@@ -10,6 +10,7 @@ import { ServerClock } from "../../../apps/client/src/net/clock";
 import type { CollisionPackage, VehicleTemplate } from "@port-meridian/content";
 import type { OwnerState, VehicleMotor } from "@port-meridian/protocol";
 import fixture from "../../../tests/fixtures/simulation/vehicle-trace.json";
+import contentIndex from "../../../apps/client/public/content/slice.json";
 const initial = fixture.initial_motor as VehicleMotor;
 beforeAll(async () => {
   await init({
@@ -23,6 +24,49 @@ async function world() {
   w.loadCollision(fixture.collision as CollisionPackage, fixture.sim_config);
   return w;
 }
+it("keeps the real parking-to-street route flat through coasting and braking", async () => {
+  const w = await PredictionWorld.create();
+  try {
+    const root = new URL(
+      `../../../apps/client/public/content/packages/${contentIndex.content_hash}/`,
+      import.meta.url,
+    );
+    const collision = JSON.parse(
+      await readFile(new URL("collision.json", root), "utf8"),
+    ) as CollisionPackage;
+    w.loadCollision(collision, fixture.sim_config);
+    const motor: VehicleMotor = {
+      ...initial,
+      position: [-152, 0, 176],
+      velocity: [0, 0, 0],
+      speed: 0,
+      yaw: 0,
+      steering: 0,
+    };
+    w.reset({
+      version: 1,
+      tick: 0,
+      control_epoch: 2,
+      controlled_entity_id: 9,
+      motor: actorMotor(motor),
+      vehicle: { motor, template: fixture.template as VehicleTemplate },
+    });
+    for (let tick = 1; tick <= 300; tick++) {
+      const frame = w.step({
+        tick,
+        move_x: 0,
+        move_z: tick <= 45 ? 32767 : 0,
+        buttons: tick >= 90 ? 4 : 0,
+        look_yaw: 0,
+        look_pitch: 0,
+      });
+      expect(frame.motor.position[1]).toBe(0);
+    }
+    expect(Math.abs(w.currentState().vehicle?.motor.speed ?? NaN)).toBe(0);
+  } finally {
+    w.free();
+  }
+});
 const carOwner = (tick: number, epoch = 2): OwnerState => ({
   server_tick: tick,
   consumed_through_tick: tick,
@@ -44,6 +88,7 @@ it("matches 60 frozen native car checkpoints within one centimetre over 1800 rea
   const w = await world();
   let tick = 0;
   let maxError = 0;
+  let maxSpeedError = 0;
   try {
     w.reset({
       version: 1,
@@ -75,18 +120,21 @@ it("matches 60 frozen native car checkpoints within one centimetre over 1800 rea
             ),
           );
           maxError = Math.max(maxError, error);
-          expect(error).toBeLessThan(0.01);
-          expect(frame.vehicle?.motor.speed).toBeCloseTo(
-            expected.motor.speed,
-            3,
+          maxSpeedError = Math.max(
+            maxSpeedError,
+            Math.abs(
+              (frame.vehicle?.motor.speed ?? NaN) - expected.motor.speed,
+            ),
           );
         }
       }
     expect(tick).toBe(1800);
     expect(fixture.checkpoints).toHaveLength(60);
     console.info(
-      `Vehicle native/WASM trace: ${tick} ticks / 60 checkpoints, maximum position error ${maxError.toFixed(6)} m`,
+      `Vehicle native/WASM trace: ${tick} ticks / 60 checkpoints, maximum position error ${maxError.toFixed(6)} m, speed error ${maxSpeedError}`,
     );
+    expect(maxError).toBeLessThan(0.01);
+    expect(maxSpeedError).toBeLessThan(0.0005);
   } finally {
     w.free();
   }

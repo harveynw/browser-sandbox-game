@@ -419,7 +419,11 @@ impl CollisionQueries for CollisionWorld {
         delta: [f32; 3],
     ) -> Result<MoveResult> {
         let c = vehicle_shape(position, yaw, dimensions);
-        let predicate = |_: ColliderHandle, c: &Collider| self.admitted(c, QueryFilter::MOVEMENT);
+        // Flat driving already supplies floor support. Surfaces below the car's
+        // bottom must not generate grazing GJK normals that lift/slow the car.
+        let predicate = |_: ColliderHandle, c: &Collider| {
+            self.admitted(c, QueryFilter::MOVEMENT) && c.compute_aabb().maxs.y > position[1] + 0.02
+        };
         let mut contacts = Vec::new();
         let controller = KinematicCharacterController {
             offset: CharacterLength::Absolute(0.02),
@@ -442,8 +446,17 @@ impl CollisionQueries for CollisionWorld {
                 }
             },
         );
+        // The car motor is constrained to the flat driving plane. The generic
+        // controller can add vertical sliding at curb/box edges even for a
+        // horizontal request; never commit that displacement to a car.
+        let mut applied = movement.translation.to_array();
+        applied[1] = 0.0;
+        let endpoint = std::array::from_fn(|i| position[i] + applied[i]);
+        if self.overlaps_vehicle(endpoint, yaw, dimensions)? {
+            applied = [0.0; 3];
+        }
         Ok(MoveResult {
-            applied: movement.translation.to_array(),
+            applied,
             grounded: true,
             hit_ceiling: false,
             endpoint_clamped: false,

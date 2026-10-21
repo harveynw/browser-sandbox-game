@@ -162,6 +162,12 @@ pub fn step_vehicle(
             }
         }
     }
+    // A blocked sweep can return sub-millimetre GJK contact jitter. Do not
+    // convert it into persistent speed (or reverse creep) against a wall.
+    let displacement_sq = (0..3).map(|i| (position[i] - p[i]).powi(2)).sum::<f32>();
+    if !contacts.is_empty() && displacement_sq < (0.05 * DT_SECONDS).powi(2) {
+        position = p;
+    }
     let velocity: [f32; 3] = std::array::from_fn(|i| (position[i] - p[i]) / DT_SECONDS);
     let applied_speed = -yaw.sin() * velocity[0] - yaw.cos() * velocity[2];
     if context

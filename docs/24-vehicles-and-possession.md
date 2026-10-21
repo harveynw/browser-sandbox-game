@@ -17,7 +17,7 @@ T10 adds the compact vehicle template already present in the verified slice cont
 
 The compact's dimensions, top/reverse speed, acceleration, braking and wheelbase come from the hashed content template. Rolling resistance, handbrake, steering response and query budgets come from hashed simulation configuration. Positive steering input turns right under the existing yaw convention. Opposite throttle brakes before reversing; neutral input brakes through rolling resistance. Space applies a held handbrake while driving.
 
-Translation sweeps use substeps of at most 0.25 m and rotation increments of at most 0.03 radians, capped at eight per fixed tick. Candidate rotations must be clear before translation. Swept boxes slide along obstacles; actual displacement determines velocity and remaining forward speed. Cars remain upright on the flat Y=0 plane. Impacts are observations, not client-authoritative damage reports.
+Translation sweeps use substeps of at most 0.25 m and rotation increments of at most 0.03 radians, capped at eight per fixed tick. Candidate rotations must be clear before translation. Swept boxes slide along obstacles; actual displacement determines velocity and remaining forward speed. Cars remain upright on the flat Y=0 plane. Flat-floor support surfaces below the car are excluded from horizontal sweeps, vertical controller sliding is discarded, and obstructed planar endpoints are rejected. Contact displacement below 0.05 m/s is treated as stopped to suppress numerical wall creep. Impacts are observations, not client-authoritative damage reports.
 
 ## Entry and exit
 

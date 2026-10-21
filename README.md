@@ -2,7 +2,7 @@
 
 Implementation specification for an original GTA-inspired, third-person, multiplayer 3D browser game. The server is authoritative Rust and uses [harveynw/net-crate](https://github.com/harveynw/net-crate). The browser uses TypeScript, Three.js, and a shared Rust movement library compiled to WebAssembly.
 
-**Status: T01–T09 complete — predicted local movement and synchronized multiplayer walking.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Cars and the courier loop follow in T10–T11. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
+**Status: T01–T10 complete — synchronized multiplayer walking, driving and car possession.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Press E at a compact’s left door to enter; WASD drives, Space applies the handbrake, and E exits when stopped. The courier loop follows in T11. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
 
 ## Run the walkthrough
 
@@ -25,11 +25,11 @@ The scripted connection diagnostic is now [localhost:5173/diagnostic](http://loc
 | Command | Current behavior |
 |---|---|
 | `npm run dev` | Generate bridge/build WASM, then loopback Vite on port 5173; fails if occupied |
-| `npm run check` | Generated drift, strict TS, lint/formatting, 178 TS tests (including release WASM/seeded netcode), Clippy, and 64 Rust tests |
+| `npm run check` | Generated drift, strict TS, lint/formatting, 183 TS tests (including release WASM/seeded netcode), Clippy, and 72 Rust tests |
 | `npm run build` | Generate contracts/content, compile native Rust/package WASM, type-check, bundle frontend |
 | `npm run sim:trace` | Replay the native 60-second character trace against 13 saved checkpoints |
 | `npm run build:wasm` | Package release WASM + web JS/declarations using pinned wasm-bindgen CLI |
-| `cargo test --workspace --locked` | Run 17 simulation, 1 bridge, 8 content, 9 protocol, 27 server and 2 drift tests |
+| `cargo test --workspace --locked` | Run 22 simulation, 1 bridge, 8 content, 9 protocol, 30 server and 2 drift tests |
 | `cargo run -p server --locked` | Start authoritative WS/RTC on 127.0.0.1:3000 and local HTTP issuer on 127.0.0.1:3001 |
 | `npm run protocol:generate` / `protocol:check` | Generate contracts/fixtures or detect drift without modifying files |
 | `npm run content:generate` / `content:check` | Generate content contracts or detect contract/baked-package drift |

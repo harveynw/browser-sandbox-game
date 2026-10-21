@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T09 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T10 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T10 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T11 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -15,7 +15,7 @@ Latest checkpoint: **T09 complete, 21 October 2026**. The user requested a stop/
 | T07 — Authoritative sessions/world | Complete |
 | T08 — Browser scene and controls | Complete |
 | T09 — Prediction/replication | Complete |
-| T10 — Cars and possession | Not started |
+| T10 — Cars and possession | Complete |
 | T11 — Courier vertical slice | Not started |
 | T12 — Full city and content kit | Not started |
 | T13 — Traffic and pedestrians | Not started |
@@ -345,3 +345,40 @@ Current module interfaces, exact bounds and reproduction steps are in [23 — Pr
 Limits: current entities are player characters only. Vehicle proxy replay/seat attachment, cars/possession, mission-target relevance, idle-car/population rates and gameplay remain their future milestones. Full impairment/lifecycle and actual-RTC 16-player population/soak measurements remain T19/T20. Successful native pointer lock and forced WebGL restoration remain unverified; drag-look is verified in the existing browser. No cross-network/public-hosting claim or durable profile state was added. Dependency-internal net-crate queue/health/shutdown limits remain unchanged. The repository still has no Git commits; this checkpoint remains local uncommitted source.
 
 **Next proposed chunk: T10 — cars and atomic possession.** Add the compact shared vehicle motor and proxies, server occupancy/entry/exit transactions, reliable ControlChanged handling and driving presentation; verify contention, blocked exits, stale ownership, collision tunnelling and disconnect release. Stop here for user review before starting T10. G2 remains partial until driving and the T11 courier loop are complete.
+
+## T10 — Cars and atomic possession
+
+Status: **complete, 21 October 2026**. The user authorized closing the driving milestone after the progress evaluation. T11 remains unstarted.
+
+Prerequisites and repository state: T01–T09 were reviewed against the current source and successful checks. The existing T10 implementation was already present in checkpoint `e058771` when this continuation began; the earlier evaluation's no-commit observation was superseded by that checkpoint. This entry brings the README and task tables into agreement with the implemented and verified milestone.
+
+Implemented scope:
+
+- Shared native/WASM upright compact motor, acceleration/braking/reverse, steering, handbrake, swept static/car collision, reusable bounded vehicle proxies and a frozen 1,800-tick driving trace.
+- Two authored parking slots become authoritative car entities. Reliable enter/exit transactions enforce occupancy, proximity, visibility, speed and safe exit geometry; successful possession changes control epochs and clears stale input. Cached action results, reliable replica refreshes, disconnect release, resync and idle-car replication are integrated.
+- Browser interaction prompts, E entry/exit, driving inputs, predicted vehicle control, remote car interpolation, attached driver presentation and driving camera. Walking framing and the existing drag-look fallback remain intact. Interfaces and bounds are recorded in document 24 and the module diagrams.
+
+Live regression and repair:
+
+- Initial real driving exposed `invalid vehicle motor/input`: driving north from the first parking slot, then coasting, caused the generic collision controller to add vertical displacement. A new native regression reproduced Y = **0.0021356 m at tick 51**, exceeding the flat motor's 0.001 m validity bound.
+- Horizontal car sweeps now ignore support surfaces below the car bottom, discard vertical sliding, and reject obstructed planar endpoints. Sub-millimetre contact displacement below 0.05 m/s is treated as stopped, preventing wall-contact numerical creep and native/WASM speed divergence. Character collision and motor validity checks were preserved.
+- Added native and release-WASM regressions against the actual baked parking-to-street geometry, including coasting/braking. Regenerated the frozen driving checkpoints explicitly for this deliberate collision behavior correction; fixture inputs, configuration, template and world geometry remain unchanged. Kept the existing native/WASM position threshold below 1 cm and speed threshold below 0.0005 m/s.
+
+Commands and results (Node 24.19.0, Rust 1.94.0):
+
+- `npm run check` — **PASS**, 183 TypeScript tests / 72 Rust tests, generated bridge/protocol/content drift, release WASM packaging, strict TS, lint, formatting and Clippy with warnings denied.
+- `npm run build` — **PASS**, native workspace, generated/baked assets, release WASM and production frontend. The existing Three.js chunk-size warning remains; this is not a frame-rate or capacity result.
+- Targeted native vehicle and real release-WASM tests — **PASS** after reproducing and correcting the parking-route failure and contact jitter. The complete check includes both regressions and the 60-checkpoint trace.
+
+Manual scenario evidence:
+
+- Final server and clients used real net-crate WS/RTC: development `localhost:5173` and production `127.0.0.1:4173`, with independent hostname-scoped guest cookies.
+- Development player 3 entered compact 1 at **[-152, 0, 176]**, advancing epoch **1 → 2**. Production player 4 approached the same left door and received **occupied**, retaining epoch 1. The observer showed the car plus player 3 attached at seat height.
+- Player 3 selected Leave game; the server released the car. Player 4 then entered it successfully at epoch **1 → 2**. Retrying development created player 5 and restored **Players 2**, with no old player 3 replica.
+- The production driver accelerated north, then applied the handbrake. Car 1 stopped at **[-152.00, 0.00, 141.01]**; the driver was attached at **[-152.00, 0.80, 140.76]**. The development observer independently reported those same car and seat coordinates. Both guests retained real WS/RTC receipts and displayed correction p95 **0.000 m** in these loopback samples.
+- Production E exit restored on-foot control at **[-153.50, 0.02, 141.01]**, epoch **2 → 3**. Re-entry succeeded; an explicit vehicle resync later advanced epoch **5 → 6**, retained the car/seat position, and resumed the bounded prediction history. The earlier development run also verified reverse driving, successful exit/re-entry and a vehicle-preserving resync.
+- Screenshot: `/private/tmp/port-meridian-t10-driving.png`, final production driver with two players and diagnostics. Blocked exits, simultaneous contenders, high-speed tunnelling, stale ownership and disconnect release additionally pass native/bridge regressions; no live blocked-exit obstacle fixture was injected.
+
+Known limitations: greybox compact only, two authored cars, flat upright vehicle physics, no vehicle damage/respawn gameplay, missions, NPC traffic, durable profiles or public hosting. Dynamic collisions under network impairment and 16-client capacity/soak remain T19/T20. Native pointer-lock acceptance and forced WebGL restoration remain unverified. G2 remains partial until the courier loop is implemented.
+
+Next action: **T11 — courier vertical slice**, after the user's milestone review. Stop here; no courier or broader-alpha work was added in this continuation.

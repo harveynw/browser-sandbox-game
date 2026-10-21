@@ -40,6 +40,41 @@ fn room(wall: bool) -> (SimConfig, CollisionWorld) {
     (config, world)
 }
 #[test]
+fn driving_from_slice_parking_keeps_a_valid_flat_motor() {
+    let source = source();
+    let package = content::bake::bake(&source).unwrap();
+    let config = SimConfig::from_content(&source.sim_config).unwrap();
+    let collision = serde_json::from_slice(&package.files["collision.json"]).unwrap();
+    let world = CollisionWorld::from_content(&collision, &config).unwrap();
+    let mut state = spawn_vehicle([-152.0, 0.0, 176.0], 0.0).unwrap();
+    for tick in 1..=300 {
+        let mut input = neutral_input(tick, Yaw(0.0));
+        if tick <= 45 {
+            input.move_z = InputAxis(32767);
+        }
+        let next = step_vehicle(
+            &state,
+            &input,
+            &source.vehicle_templates[0],
+            &StepContext {
+                tick,
+                collision: &world,
+                config: &config,
+            },
+        );
+        assert!(
+            next.is_ok(),
+            "tick {tick}, state {state:?}: {:?}",
+            next.err().map(|e| e.to_string())
+        );
+        state = next.unwrap().motor;
+        assert!(
+            state.position.0[1].0.abs() <= 0.001,
+            "tick {tick}: {state:?}"
+        );
+    }
+}
+#[test]
 fn throttle_brake_reverse_steering_and_handbrake_are_bounded() {
     let (config, world) = room(false);
     let template = &source().vehicle_templates[0];
