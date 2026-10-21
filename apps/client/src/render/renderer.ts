@@ -1,5 +1,9 @@
 import * as THREE from "three";
-import type { LoadedPackage, Primitive } from "@port-meridian/content";
+import {
+  findRoute,
+  type LoadedPackage,
+  type Primitive,
+} from "@port-meridian/content";
 import type { RenderActor } from "../world/replica";
 import type { CharacterMotor } from "@port-meridian/protocol";
 export class GameRenderer {
@@ -15,6 +19,8 @@ export class GameRenderer {
     transparent: true,
   });
   private low = false;
+  private readonly missionMarker = new THREE.Group();
+  private readonly courierRoute = new THREE.Group();
   private readonly carMaterials = new Map<string, THREE.MeshStandardMaterial>();
   private readonly remoteActors = new Map<number, THREE.Group>();
   private readonly remoteMaterial = new THREE.MeshStandardMaterial({
@@ -28,6 +34,12 @@ export class GameRenderer {
   private capsule: THREE.CapsuleGeometry;
   private faceMaterial: THREE.MeshStandardMaterial;
   private cube: THREE.BoxGeometry;
+  setMissionTarget(position: readonly number[] | null | undefined): void {
+    this.missionMarker.visible = !!position;
+    this.courierRoute.visible = !!position;
+    if (position)
+      this.missionMarker.position.set(position[0] ?? 0, 0, position[2] ?? 0);
+  }
   constructor(
     readonly canvas: HTMLCanvasElement,
     private readonly assets: LoadedPackage,
@@ -76,6 +88,60 @@ export class GameRenderer {
       this.scene.add(mesh);
     };
     for (const chunk of assets.chunks) for (const p of chunk.primitives) box(p);
+    const ringGeometry = new THREE.RingGeometry(0.85, 1, 48);
+    const terminalMaterial = new THREE.MeshBasicMaterial({
+      color: "#56e5e1",
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const targetMaterial = new THREE.MeshBasicMaterial({
+      color: "#ffcf4a",
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    this.geometry.add(ringGeometry);
+    this.materials.add(terminalMaterial);
+    this.materials.add(targetMaterial);
+    for (const zone of assets.manifest.zones.filter(
+      (z) => z.kind === "terminal",
+    )) {
+      const ring = new THREE.Mesh(ringGeometry, terminalMaterial);
+      ring.rotation.x = -Math.PI / 2;
+      ring.scale.setScalar(zone.radius);
+      ring.position.set(zone.center[0], 0.06, zone.center[2]);
+      this.scene.add(ring);
+      const pole = new THREE.Mesh(cube, terminalMaterial);
+      pole.position.set(zone.center[0], 1.5, zone.center[2]);
+      pole.scale.set(0.3, 3, 0.3);
+      this.scene.add(pole);
+    }
+    const targetRing = new THREE.Mesh(ringGeometry, targetMaterial);
+    targetRing.rotation.x = -Math.PI / 2;
+    targetRing.scale.setScalar(5);
+    targetRing.position.y = 0.06;
+    const targetPole = new THREE.Mesh(cube, targetMaterial);
+    targetPole.scale.set(0.4, 12, 0.4);
+    targetPole.position.y = 6;
+    this.missionMarker.add(targetRing, targetPole);
+    this.missionMarker.visible = false;
+    this.scene.add(this.missionMarker);
+    const route = findRoute(
+      assets.manifest.road_graph,
+      "terminal_access",
+      "market_access",
+    );
+    for (let i = 1; i < route.length; i++) {
+      const a = route[i - 1],
+        b = route[i];
+      if (!a || !b) continue;
+      const segment = new THREE.Mesh(cube, targetMaterial);
+      segment.position.set((a[0] + b[0]) / 2, 0.07, (a[2] + b[2]) / 2);
+      segment.scale.set(0.25, 0.02, Math.hypot(b[0] - a[0], b[2] - a[2]));
+      segment.rotation.y = Math.atan2(b[0] - a[0], b[2] - a[2]);
+      this.courierRoute.add(segment);
+    }
+    this.courierRoute.visible = false;
+    this.scene.add(this.courierRoute);
     // Car visuals are instantiated from the verified shared content package.
     const capsule = new THREE.CapsuleGeometry(0.32, 1.1, 4, 8);
     this.geometry.add(capsule);

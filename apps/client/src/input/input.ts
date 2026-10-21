@@ -12,6 +12,7 @@ const bound = new Set([
   "ShiftRight",
   "Space",
   "KeyE",
+  "KeyF",
 ]);
 export class InputState {
   readonly keys = new Set<string>();
@@ -22,11 +23,13 @@ export class InputState {
   active = false;
   private jump = false;
   private interact = false;
+  private job = false;
   press(code: string, repeat = false): void {
     if (!this.active || !bound.has(code)) return;
     this.keys.add(code);
     if (code === "Space" && !repeat) this.jump = true;
     if (code === "KeyE" && !repeat) this.interact = true;
+    if (code === "KeyF" && !repeat) this.job = true;
   }
   release(code: string): void {
     this.keys.delete(code);
@@ -35,6 +38,7 @@ export class InputState {
     this.keys.clear();
     this.jump = false;
     this.interact = false;
+    this.job = false;
     this.active = false;
   }
   look(x: number, y: number): void {
@@ -55,6 +59,11 @@ export class InputState {
   consumeInteract(): boolean {
     const value = this.active && this.interact;
     this.interact = false;
+    return value;
+  }
+  consumeJob(): boolean {
+    const value = this.active && this.job;
+    this.job = false;
     return value;
   }
   sample(driving = false): Omit<InputFrame, "tick"> {

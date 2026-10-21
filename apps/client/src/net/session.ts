@@ -6,6 +6,8 @@ import type {
   InputFrame,
   OwnerState,
   PlayerStatus,
+  MissionView,
+  Action,
 } from "@port-meridian/protocol";
 import { loadPackage, type LoadedPackage } from "@port-meridian/content";
 import { BrowserTransport, type Channel } from "./transport";
@@ -41,6 +43,7 @@ export class GameSession {
   private resyncAt = -Infinity;
   private resyncPending = false;
   private statusRevision = 0;
+  private mission: MissionView | null = null;
   private receivedBytes = 0;
   private sentBytes = 0;
   private rateAt = performance.now();
@@ -235,7 +238,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t10-local" ||
+      info.build_id !== "t11-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -372,6 +375,7 @@ export class GameSession {
       case "player_status":
         if (message.data.revision < this.statusRevision) return;
         this.statusRevision = message.data.revision;
+        this.mission = message.data.mission;
         this.events.playerStatus?.(message.data);
         this.log(
           `Private status baseline: credits ${message.data.credits}, revision ${message.data.revision}`,
@@ -574,21 +578,73 @@ export class GameSession {
       .filter((t) => t.distance <= 2)
       .sort((a, b) => a.distance - b.distance)[0]?.actor;
   }
+  get currentMission(): MissionView | null {
+    return this.mission;
+  }
+  estimatedTick(now: number): number {
+    return this.clock.estimate(now);
+  }
+  private terminal(now: number) {
+    const motor = this.presentation(now);
+    if (!motor || !this.assets) return undefined;
+    return this.assets.manifest.mission_templates.find((t) => {
+      if (t.objective.kind !== "courier") return false;
+      const zone = this.assets?.manifest.zones.find(
+        (z) => z.id === t.terminal_zone_id,
+      );
+      return (
+        zone &&
+        Math.hypot(
+          motor.position[0] - zone.center[0],
+          motor.position[2] - zone.center[2],
+        ) <= Math.min(3, zone.radius)
+      );
+    });
+  }
+  private requestAction(action: Action): void {
+    const now = performance.now();
+    if (this.phase !== "playing" || now - this.actionAt < 250) return;
+    this.actionAt = now;
+    this.actionMessage = "";
+    this.send({
+      kind: "action",
+      data: { request_id: ++this.requestId, control_epoch: this.epoch, action },
+    });
+  }
+  useTerminal(): void {
+    const template = this.terminal(performance.now());
+    if (template)
+      this.requestAction({
+        kind: "accept_mission",
+        data: { template_id: template.id },
+      });
+  }
+  cancelMission(): void {
+    this.requestAction({ kind: "cancel_mission", data: {} });
+  }
   interactionPrompt(now: number): string {
+    const terminal = this.terminal(now);
+    const job =
+      terminal && !this.mission ? " · F accept courier · 150 credits" : "";
     if (this.driving)
-      return "E exit when stopped · WASD drive · Space handbrake";
+      return `E exit when stopped · WASD drive · Space handbrake${job}`;
     const target = this.target(now);
     return target?.state.kind === "vehicle"
       ? target.state.data.driver_id
         ? "Vehicle occupied"
-        : "E enter compact"
-      : "Walk to the left door of a parked compact · E enter";
+        : `E enter compact${job}`
+      : terminal && !this.mission
+        ? "E / F accept courier · 150 credits"
+        : "Walk to the left door of a parked compact · E enter";
   }
   interact(): void {
     const now = performance.now();
     if (this.phase !== "playing" || now - this.actionAt < 250) return;
     const target = this.target(now);
-    if (!this.driving && !target) return;
+    if (!this.driving && !target) {
+      this.useTerminal();
+      return;
+    }
     const targetId = target?.id ?? 0;
     this.actionAt = now;
     this.actionMessage = "";

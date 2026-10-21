@@ -695,3 +695,224 @@ fn all_blocked_exit_candidates_preserve_occupancy_and_epoch() {
     assert_eq!(w.vehicles[&car].state.driver_id, Some(id));
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.code==ActionCode::ExitBlocked)));
 }
+
+fn courier_action(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32) {
+    vehicle_action(
+        w,
+        t,
+        p,
+        request,
+        w.sessions[&p].epoch,
+        Action::AcceptMission(AcceptMission {
+            template_id: TemplateId("courier_quay_market".into()),
+        }),
+    );
+}
+fn place(w: &mut World, p: PeerKey, position: [f32; 3]) {
+    let id = w.sessions[&p].player.unwrap().0;
+    w.players.get_mut(&id).unwrap().state.motor = sim_core::spawn_character(position, 0.0).unwrap();
+}
+#[test]
+fn courier_acceptance_is_private_scoped_cached_and_survives_resync() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(1);
+    let q = peer(2);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    assert!(w.sessions[&p].mission.is_none());
+    assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.code==ActionCode::OutOfRange)));
+    place(&mut w, p, [-172.0, 0.02, 180.0]);
+    courier_action(&w, &mut t, p, 2);
+    step(&mut w, &mut a, &mut t);
+    let instance = w.sessions[&p].mission.as_ref().unwrap().id.clone();
+    courier_action(&w, &mut t, p, 2);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].mission.as_ref().unwrap().id, instance);
+    courier_action(&w, &mut t, p, 3);
+    step(&mut w, &mut a, &mut t);
+    assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.code==ActionCode::AlreadyActive)));
+    send(
+        &w,
+        &mut t,
+        p,
+        ClientMessage::ResyncRequest(ResyncRequest {
+            reason: ResyncReason::Stale,
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    ready(&mut w, &mut a, &mut t, p);
+    assert_eq!(w.sessions[&p].mission.as_ref().unwrap().id, instance);
+    assert!(t.sent.iter().any(|(target,delivery,m)| *target==p && *delivery==Delivery::Reliable && matches!(&m.message,ServerMessage::PlayerStatus(v) if v.revision.0>1 && v.mission.as_ref().is_some_and(|m|m.instance_id.0==instance))));
+    assert!(!t.sent.iter().any(|(target,_,m)| *target==q && matches!(&m.message,ServerMessage::PlayerStatus(v) if v.mission.is_some() || v.credits.0!=0)));
+}
+#[test]
+fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoin() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(1);
+    let cookie = join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    place(&mut w, p, [-172.0, 0.02, 180.0]);
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    let instance = w.sessions[&p].mission.as_ref().unwrap().id.clone();
+    place(&mut w, p, [-44.0, 0.02, 52.0]);
+    for _ in 0..29 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 0);
+    place(&mut w, p, [-44.0, 0.02, 60.0]);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].mission.as_ref().unwrap().dwell, 0);
+    place(&mut w, p, [-44.0, 0.02, 52.0]);
+    for _ in 0..30 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let profile = a.profile(Some(&cookie)).unwrap();
+    assert_eq!((profile.credits.0, profile.completed_jobs), (150, 1));
+    assert_eq!(
+        w.sessions[&p].mission.as_ref().unwrap().phase,
+        server::missions::Phase::Completed
+    );
+    let duplicate = a
+        .apply_mission_reward(&profile.profile_id.0, &instance, 150)
+        .unwrap();
+    assert_eq!(duplicate.credits.0, 150);
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    for _ in 0..151 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(w.sessions[&p].mission.is_none());
+    assert_eq!(a.profile(Some(&cookie)).unwrap().completed_jobs, 1);
+    w.disconnect(p, &mut a);
+    let q = peer(2);
+    join(&mut w, &mut a, &mut t, q, Some(&cookie));
+    ready(&mut w, &mut a, &mut t, q);
+    assert_eq!(w.sessions[&q].profile.as_ref().unwrap().credits.0, 150);
+    assert!(w.sessions[&q].mission.is_none());
+}
+#[test]
+fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
+    for cause in ["cancel", "timeout", "death", "disconnect", "fast"] {
+        let (mut w, mut a, mut t) = setup();
+        let p = peer(1);
+        let cookie = join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        place(&mut w, p, [-172.0, 0.02, 180.0]);
+        courier_action(&w, &mut t, p, 1);
+        step(&mut w, &mut a, &mut t);
+        place(&mut w, p, [-44.0, 0.02, 52.0]);
+        // Arrange success on the next tick so terminal failures must win.
+        w.sessions
+            .get_mut(&p)
+            .unwrap()
+            .mission
+            .as_mut()
+            .unwrap()
+            .dwell = 29;
+        match cause {
+            "cancel" => vehicle_action(&w, &mut t, p, 2, 1, Action::CancelMission(Empty {})),
+            "timeout" => {
+                w.sessions
+                    .get_mut(&p)
+                    .unwrap()
+                    .mission
+                    .as_mut()
+                    .unwrap()
+                    .deadline = w.tick + 1
+            }
+            "death" => {
+                let id = w.sessions[&p].player.unwrap().0;
+                w.players.get_mut(&id).unwrap().state.health = CharacterHealth(0);
+            }
+            "disconnect" => {
+                w.disconnect(p, &mut a);
+            }
+            "fast" => {
+                batch(&w, &mut t, p, w.tick + 1, 0, 32767, 1);
+                let id = w.sessions[&p].player.unwrap().0;
+                w.players.get_mut(&id).unwrap().state.motor.velocity =
+                    Vec3([Scalar(0.0), Scalar(0.0), Scalar(-4.0)]);
+            }
+            _ => unreachable!(),
+        }
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 0, "{cause}");
+        if cause == "fast" {
+            assert_eq!(w.sessions[&p].mission.as_ref().unwrap().dwell, 0);
+        } else if cause != "disconnect" {
+            assert_eq!(
+                w.sessions[&p].mission.as_ref().unwrap().phase,
+                server::missions::Phase::Failed,
+                "{cause}"
+            );
+        }
+    }
+}
+#[test]
+fn memory_rewards_are_atomic_bounded_and_reject_event_conflicts() {
+    let mut a = MemoryProfiles::default();
+    let (p, _) = a.session(None).unwrap();
+    let (q, _) = a.session(None).unwrap();
+    assert!(
+        a.apply_mission_reward(&p.profile_id.0, "too-large", 1_000_000_001)
+            .is_err()
+    );
+    let v = a
+        .apply_mission_reward(&p.profile_id.0, "first", 150)
+        .unwrap();
+    assert_eq!(v.credits.0, 150);
+    assert!(
+        a.apply_mission_reward(&q.profile_id.0, "first", 150)
+            .is_err()
+    );
+    assert!(
+        a.apply_mission_reward(&p.profile_id.0, "first", 151)
+            .is_err()
+    );
+    assert_eq!(
+        a.apply_mission_reward(&p.profile_id.0, "first", 150)
+            .unwrap()
+            .completed_jobs,
+        1
+    );
+}
+
+#[test]
+fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driver() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(1);
+    let cookie = join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    place(&mut w, p, [-172.0, 0.02, 180.0]);
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    let car = *w.vehicles.keys().next().unwrap();
+    at_door(&mut w, p, car);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        2,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    w.vehicles.get_mut(&car).unwrap().state.motor =
+        sim_core::spawn_vehicle([-44.0, 0.0, 52.0], 0.0).unwrap();
+    for _ in 0..29 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 150);
+    assert_eq!(w.vehicles[&car].state.driver_id, w.sessions[&p].player);
+    assert_eq!(w.sessions[&p].epoch, 2);
+    assert!(t.sent.iter().any(|(target,_,m)| *target==p && matches!(&m.message,ServerMessage::PlayerStatus(v) if v.credits.0==150 && v.completed_jobs==1 && v.mission.as_ref().is_some_and(|m|m.phase==MissionPhase::Completed))));
+}

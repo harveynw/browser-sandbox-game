@@ -24,7 +24,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T08 Browser scene and controls | T04, T06, T07 | Third-person greybox walkthrough |
 | Complete | T09 Prediction/replication | T08 | Two-player synchronized movement |
 | Complete | T10 Cars and possession | T09 | Shared driving and atomic entry/exit |
-| Not started | T11 Courier vertical slice | T10 | Complete short gameplay loop |
+| Complete | T11 Courier vertical slice | T10 | Complete short gameplay loop |
 | Not started | T12 Full city and content kit | T11 | Six districts, navigation, streaming visuals |
 | Not started | T13 Traffic and pedestrians | T12 | Bounded city population |
 | Not started | T14 Pistol and damage | T13 | Authoritative hits, health, downing |

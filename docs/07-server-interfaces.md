@@ -204,7 +204,7 @@ The worker interface accepts `LoadProfile`, `SetDisplayName`, and `ApplyEconomic
 
 For repairs, reserve the request, debit once, then repair if the live actor is still eligible; if it is no longer eligible, submit a compensating uniquely keyed refund. On disconnect before application, refund rather than repair an unrelated car. This makes the asynchronous boundary explicit.
 
-Memory mode implements the same interface and idempotency semantics. Save no active missions, car state, or position. On process crash the map restarts from content; committed profile transactions survive.
+Memory mode implements the same interface and idempotency semantics. Save no active missions, car state, or position. On process crash the map restarts from content. Committed profile transactions survive only with the T17 durable adapter; T11 memory mode retains them for the running process and reconnects only.
 
 ## Startup/shutdown
 

@@ -8,7 +8,7 @@ use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t10-local";
+pub const BUILD_ID: &str = "t11-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -34,6 +34,9 @@ pub struct Session {
     pub inputs: BTreeMap<u32, InputFrame>,
     actions: BTreeMap<u32, ActionResult>,
     last_request: u32,
+    pub mission: Option<crate::missions::Courier>,
+    status_revision: u32,
+    status_dirty: bool,
     last_heard: u64,
     deadline: u64,
     last_resync: Option<u64>,
@@ -288,6 +291,91 @@ impl World {
         }
         Ok(())
     }
+    fn status(tick: u32, s: &Session) -> Result<PlayerStatus, String> {
+        let p = s.profile.as_ref().ok_or("profile missing")?;
+        Ok(PlayerStatus {
+            revision: Revision(s.status_revision),
+            server_tick: tick,
+            credits: p.credits,
+            completed_jobs: p.completed_jobs,
+            heat: Heat(0),
+            pursuit: Pursuit::Clear,
+            magazine: Magazine(12),
+            reload_end_tick: None,
+            mission: s.mission.as_ref().map(|m| m.view()),
+            respawn_tick: None,
+            protected_until_tick: None,
+        })
+    }
+    fn advance_missions(&mut self, profiles: &mut MemoryProfiles) -> Result<(), String> {
+        let mut messages = Vec::new();
+        for (&peer, s) in &mut self.sessions {
+            let mut changed = s.status_dirty;
+            if let Some(m) = &mut s.mission {
+                let old_phase = m.phase;
+                let id = s.player.ok_or("mission owner missing")?;
+                let player = self.players.get(&id.0).ok_or("mission player missing")?;
+                let motor = player
+                    .state
+                    .vehicle_id
+                    .and_then(|id| self.vehicles.get(&id.0))
+                    .map(|v| sim_core::presentation_motor(&v.state.motor))
+                    .unwrap_or_else(|| player.state.motor.clone());
+                let alive = player.state.health.0 > 0
+                    && !matches!(
+                        player.state.mode,
+                        CharacterMode::Downed | CharacterMode::Arrested
+                    )
+                    && player.state.vehicle_id.is_none_or(|id| {
+                        self.vehicles
+                            .get(&id.0)
+                            .is_some_and(|v| !v.state.disabled && v.state.health.0 > 0)
+                    });
+                m.advance(
+                    self.tick,
+                    alive,
+                    s.phase == SessionPhase::Playing,
+                    motor.position.0.map(|v| v.0),
+                    motor
+                        .velocity
+                        .0
+                        .iter()
+                        .map(|v| v.0.powi(2))
+                        .sum::<f32>()
+                        .sqrt(),
+                );
+                if m.phase == crate::missions::Phase::RewardPending {
+                    let profile = s.profile.as_ref().ok_or("mission profile missing")?;
+                    if let Ok(committed) =
+                        profiles.apply_mission_reward(&profile.profile_id.0, &m.id, m.reward)
+                    {
+                        s.profile = Some(committed);
+                        m.phase = crate::missions::Phase::Completed;
+                        m.clear_at = Some(self.tick.saturating_add(150));
+                    }
+                }
+                changed |= old_phase != m.phase;
+                if m.clear_at.is_some_and(|end| self.tick >= end) {
+                    s.mission = None;
+                    changed = true;
+                }
+            }
+            if changed {
+                s.status_revision = s
+                    .status_revision
+                    .checked_add(1)
+                    .ok_or("status revision exhausted")?;
+                s.status_dirty = false;
+                if s.phase == SessionPhase::Playing {
+                    messages.push((peer, s.id.clone(), Self::status(self.tick, s)?));
+                }
+            }
+        }
+        for (peer, sid, status) in messages {
+            self.reliable(peer, sid.as_deref(), ServerMessage::PlayerStatus(status));
+        }
+        Ok(())
+    }
     fn action(&mut self, peer: PeerKey, s: &mut Session, action: &Action) -> ActionCode {
         let Some(id) = s.player else {
             return ActionCode::NotReady;
@@ -302,8 +390,99 @@ impl World {
             return ActionCode::Unavailable;
         }
         let player = &self.players[&id.0];
-        if player.state.health.0 == 0 {
+        if player.state.health.0 == 0
+            || matches!(
+                player.state.mode,
+                CharacterMode::Downed | CharacterMode::Arrested
+            )
+        {
             return ActionCode::Dead;
+        }
+        match action {
+            Action::AcceptMission(request) => {
+                if s.mission.is_some() {
+                    return ActionCode::AlreadyActive;
+                }
+                let Some(template) = self
+                    .content
+                    .manifest
+                    .mission_templates
+                    .iter()
+                    .find(|t| t.id == request.template_id.0)
+                else {
+                    return ActionCode::InvalidTarget;
+                };
+                let content::MissionObjective::Courier {
+                    destination_zone_id,
+                    dwell_ticks,
+                    max_speed,
+                } = &template.objective
+                else {
+                    return ActionCode::Unavailable;
+                };
+                let Some(terminal) = self.content.manifest.zones.iter().find(|z| {
+                    z.id == template.terminal_zone_id && z.allowed_templates.contains(&template.id)
+                }) else {
+                    return ActionCode::Unavailable;
+                };
+                let position = player
+                    .state
+                    .vehicle_id
+                    .and_then(|id| self.vehicles.get(&id.0))
+                    .map(|v| v.state.motor.position.0.map(|v| v.0))
+                    .unwrap_or_else(|| player.state.motor.position.0.map(|v| v.0));
+                let distance = position
+                    .iter()
+                    .zip(terminal.center)
+                    .map(|(a, b)| (f64::from(*a) - b).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
+                if distance > terminal.radius.min(3.0) {
+                    return ActionCode::OutOfRange;
+                }
+                let Some(target) = self
+                    .content
+                    .manifest
+                    .zones
+                    .iter()
+                    .find(|z| z.id == *destination_zone_id)
+                else {
+                    return ActionCode::Unavailable;
+                };
+                let Ok(instance) = random_id("mission-", 16) else {
+                    return ActionCode::Unavailable;
+                };
+                let Some(deadline) = self.tick.checked_add(template.duration_ticks) else {
+                    return ActionCode::Unavailable;
+                };
+                s.mission = Some(crate::missions::Courier {
+                    id: instance,
+                    template: template.id.clone(),
+                    deadline,
+                    target: target.center.map(|v| v as f32),
+                    radius: target.radius.min(5.0) as f32,
+                    max_speed: *max_speed as f32,
+                    required_dwell: *dwell_ticks,
+                    reward: template.reward_credits,
+                    dwell: 0,
+                    phase: crate::missions::Phase::Active,
+                    clear_at: None,
+                });
+                s.status_dirty = true;
+                return ActionCode::Ok;
+            }
+            Action::CancelMission(_) => {
+                let Some(m) = &mut s.mission else {
+                    return ActionCode::NotActive;
+                };
+                if m.phase != crate::missions::Phase::Active {
+                    return ActionCode::NotActive;
+                }
+                m.fail(self.tick);
+                s.status_dirty = true;
+                return ActionCode::Ok;
+            }
+            _ => {}
         }
         let vehicle_id;
         match action {
@@ -605,23 +784,12 @@ impl World {
                         owner: self.owner(s).map_err(|_| "owner missing")?,
                     }),
                 );
-                let p = s.profile.as_ref().ok_or("profile missing")?;
                 self.reliable(
                     peer,
                     s.id.as_deref(),
-                    ServerMessage::PlayerStatus(PlayerStatus {
-                        revision: Revision(1),
-                        server_tick: self.tick,
-                        credits: p.credits,
-                        completed_jobs: p.completed_jobs,
-                        heat: Heat(0),
-                        pursuit: Pursuit::Clear,
-                        magazine: Magazine(12),
-                        reload_end_tick: None,
-                        mission: None,
-                        respawn_tick: None,
-                        protected_until_tick: None,
-                    }),
+                    ServerMessage::PlayerStatus(
+                        Self::status(self.tick, s).map_err(|_| "status unavailable")?,
+                    ),
                 );
             }
             ClientMessage::InputBatch(batch) => {
@@ -865,6 +1033,9 @@ impl World {
                             inputs: BTreeMap::new(),
                             actions: BTreeMap::new(),
                             last_request: 0,
+                            mission: None,
+                            status_revision: 1,
+                            status_dirty: false,
                             last_heard: now,
                             deadline: now.saturating_add(5000),
                             last_resync: None,
@@ -1002,6 +1173,7 @@ impl World {
             self.disconnect(peer, profiles);
             self.closing.insert(peer, "unsafe motor input/state");
         }
+        self.advance_missions(profiles)?;
         self.sync_visible()?;
         if self.tick.is_multiple_of(3) {
             let updates: Result<Vec<_>, String> = self
@@ -1075,7 +1247,6 @@ impl World {
                     batches.push((peer, Delivery::Unreliable, envelope));
                 }
                 if self.tick.is_multiple_of(30) {
-                    let p = session.profile.as_ref().ok_or("missing profile")?;
                     batches.push((
                         peer,
                         Delivery::Reliable,
@@ -1083,19 +1254,7 @@ impl World {
                             v: ProtocolVersion(1),
                             world_id: Some(OpaqueId(self.id.clone())),
                             session_id: session.id.clone().map(OpaqueId),
-                            message: ServerMessage::PlayerStatus(PlayerStatus {
-                                revision: Revision(1),
-                                server_tick: self.tick,
-                                credits: p.credits,
-                                completed_jobs: p.completed_jobs,
-                                heat: Heat(0),
-                                pursuit: Pursuit::Clear,
-                                magazine: Magazine(12),
-                                reload_end_tick: None,
-                                mission: None,
-                                respawn_tick: None,
-                                protected_until_tick: None,
-                            }),
+                            message: ServerMessage::PlayerStatus(Self::status(self.tick, session)?),
                         },
                     ));
                 }
@@ -1144,6 +1303,7 @@ impl World {
             ) {
                 self.disconnect(peer, profiles);
                 self.closing.insert(peer, "output unavailable");
+                self.advance_missions(profiles)?;
                 self.sync_visible()?;
             }
         }

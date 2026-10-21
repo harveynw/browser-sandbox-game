@@ -241,6 +241,7 @@ main.game-app {
   margin-right: 0.6rem;
 }
 .game-hud {
+  white-space: pre-line;
   position: fixed;
   bottom: 1rem;
   left: 1rem;

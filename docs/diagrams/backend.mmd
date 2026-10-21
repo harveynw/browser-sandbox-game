@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T10.
+%% Backend module system — current implementation through T11.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -8,11 +8,12 @@ flowchart TD
     scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
     loader["content_loader.rs<br/>Verify and load world content"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
+    missions["missions.rs<br/>Courier dwell, failure and reward lifecycle"]:::sim
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
   end
   subgraph group_1["crates/server/src/ — networking and admission"]
     control["control.rs · HTTP thread<br/>Sessions, tickets and health"]:::net
-    admission["admission.rs · shared state<br/>Guest profiles and one-use join tickets"]:::net
+    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Atomic idempotent memory rewards"]:::net
     transport["transport.rs · network pump thread<br/>Bounded queues, codecs and channel routing"]:::net
     replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
   end
@@ -45,6 +46,9 @@ flowchart TD
   transport -.->|"coalescing / budgets"| replication
   transport -->|"encode / decode"| protocol
   replication -->|"packet sizing"| protocol
+  world -->|"evaluate courier after movement"| missions
+  world <-->|"commit reward event / profile values"| admission
+  world -->|"private mission and credits status"| transport
   world -->|"step authoritative movement"| sim
   world -->|"atomic entry / exit geometry"| vehicles
   vehicles -->|"seat transforms and clearance queries"| sim

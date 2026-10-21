@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T10 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T11 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T11 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T12 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -16,7 +16,7 @@ Latest checkpoint: **T10 complete, 21 October 2026**. The user requested a stop/
 | T08 — Browser scene and controls | Complete |
 | T09 — Prediction/replication | Complete |
 | T10 — Cars and possession | Complete |
-| T11 — Courier vertical slice | Not started |
+| T11 — Courier vertical slice | Complete |
 | T12 — Full city and content kit | Not started |
 | T13 — Traffic and pedestrians | Not started |
 | T14 — Pistol and damage | Not started |
@@ -400,3 +400,34 @@ Verification:
 - Screenshot of the held brake and zero-speed HUD: `/private/tmp/port-meridian-handbrake-held.png`. Browser and server remain available for the user, with the test car stopped.
 
 This is a T10 control correction; T11 remains unstarted.
+
+## T11 — Courier vertical slice
+
+Status: **complete, 21 October 2026**. The user authorized the next step after the handbrake correction. T12 remains unstarted. G2 now passes for the two-guest localhost greybox slice.
+
+Prerequisites: T10 source, its stop/hold/release handbrake correction, real net-crate transport and existing content were reviewed. Native/WASM motors, possession, prediction and private status were retained. No new wire DTO or content bake/hash change was needed.
+
+Implemented:
+
+- `missions.rs` supplies the server-only courier lifecycle: opaque instance ID, content-owned destination/reward/duration, 30 continuous ticks inside 5 m below 2 m/s, failure/timeout precedence, internal reward-pending state, and a five-second terminal view. The world accepts only E/F action intent at the authored terminal, permits one live mission, evaluates authoritative character or controlled-car motion after simulation, and abandons jobs on session cleanup. Resync retains identity/deadline and interrupts dwell.
+- The memory profile adapter atomically stores a unique `mission:<instance_id>` event with credits/completed-job count. Identical retries return committed values; conflicting profile/amount and bounds errors mutate nothing. Completion is private and follows commit. Events are bounded to 4,096 per process; profiles remain capped at 256. SQLite/durable recovery remains T17.
+- PlayerStatus now uses real changing revisions and mission/profile data for initial readiness, lifecycle changes and its existing one-second repair heartbeat. Another guest's replicas contain no balance or private mission data.
+- F is an edged terminal action; E on foot falls back to the terminal when no car takes priority. E still exits while driving; F can use a nearby terminal from the car. Added terminal and destination rings/poles, a private gold route from the baked road graph, distance/countdown/stopping instructions, committed success feedback, and an Esc-menu cancellation button. Guidance is presentation only; no client reports completion/dwell/reward.
+- Updated frontend/backend module diagrams, task tables, README and owning memory-persistence wording. New [courier guide and saved demonstration](25-courier-slice.md) includes commands, lifecycle/bounds, limitations and three repository screenshots.
+
+Verification:
+
+- `npm run check` — **PASS**, 187 TypeScript tests / 78 Rust tests, contract/content/bridge drift, release WASM, strict TypeScript, lint/format and Clippy with warnings denied.
+- `npm run build` — **PASS**, native workspace, generated/baked content, release WASM and production frontend. The existing large Three.js chunk warning remains. Native/WASM movement fixtures and content hashes are unchanged.
+- Five new native world tests cover acceptance range, duplicate/cached actions and one job, private revisions, mission-preserving resync, on-foot and in-car completion, interrupted/too-fast dwell, cancellation/timeout/death/disconnect precedence, atomic/idempotent/conflicting/bounded rewards, five-second cleanup and profile values on rejoin. Three TS tests cover terminal key edges/pause cleanup and mission countdown/outcome guidance. Every fake transport result crosses the real wire codec.
+- Live real WS/RTC pair: development `localhost:5173` player 3 and production `127.0.0.1:4173` player 4, independent cookies/tickets/sessions. Runner accepted near **[-172.89, 0.02, 179.62]** at tick **3468**, entered compact 1 (epoch 1 → 2), drove around city/Market obstacles, and stopped its center at **[-44.23, 0, 55.51]** inside the authored Market zone. At tick **7980**, after braking/continuous dwell, HUD displayed **Delivery complete! +150 credits**, balance **150**, with two players and the driver still in the car. The observed run took about **150 seconds**, within its 180-second deadline.
+- The production observer independently reported car **[-44.23, 0, 55.51]** and driver seat **[-44.33, 0.80, 55.27]**, while keeping **0 credits** and no active courier. Both guests had real reliable/unreliable pong receipts and ordinary displayed correction p95 **0.000 m**. This is a two-player loopback sample, not a population or impairment benchmark.
+- Owner Leave/Retry created fresh player 5 at spawn with exactly **150 credits** and no active mission. No duplicate reward appeared through the terminal view clearing and reconnect. The production guest separately accepted a job, used **Cancel courier**, displayed failure/cancellation feedback, and retained zero credits.
+- Initial live admission exposed an overlooked client build-ID gate still expecting T10 after the server advanced to T11. Updated both expectations and rebuilt production before the successful two-guest run; no fallback or weakened version check was added.
+- Saved evidence: `docs/evidence/t11-delivery.png`, `docs/evidence/t11-observer.png`, and `docs/evidence/t11-rejoin.png`. The live run used ordinary keyboard controls; native boundary tests arrange fixture actor positions explicitly. No live teleport/completion injection or fake RTC path was used.
+
+Design clarifications: documents 07/09 now explicitly distinguish memory rewards retained through reconnect in a running process from durable T17 rewards retained across process restarts. This corrects an ambiguous future-persistence summary; T11 does not claim disk persistence.
+
+Limitations: one original courier template and compact greybox district; terminal failure feedback combines failure/cancellation because the existing MissionView carries no failure reason. Real timeout/death boundary cases are automated, not additional live three-minute runs. Higher-capacity memory event exhaustion retains pending outcomes and requires restarting the memory server; durable recovery/UI remains later work. Traffic, combat, police, full city, 16-player soak, physical RTC impairment, successful native pointer lock and forced WebGL restoration remain outside this milestone's evidence.
+
+Next action: stop for user review of the complete slice. **T12 — full map, navigation and content kit** is the next plan task; it was not started here.

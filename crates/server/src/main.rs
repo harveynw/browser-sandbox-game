@@ -35,7 +35,7 @@ fn run() -> Result<(), String> {
     let mut transport =
         NetCrateTransport::start("127.0.0.1:3000").map_err(|e| format!("WS bind/start: {e}"))?;
     println!(
-        "T10 localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
+        "T11 localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
         world.id
     );
     println!(

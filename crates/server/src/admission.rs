@@ -29,6 +29,7 @@ pub struct MemoryProfiles {
     cookies: BTreeMap<String, String>,
     tickets: BTreeMap<String, Ticket>,
     active: BTreeMap<String, String>,
+    economic_events: BTreeMap<String, (String, u32)>,
     pub probe_until_ms: u64,
 }
 impl MemoryProfiles {
@@ -66,6 +67,50 @@ impl MemoryProfiles {
         let id = self.cookies.get(&hash)?;
         let profile = self.profiles.get(id)?;
         (profile.cookie_hash == hash).then(|| profile.view.clone())
+    }
+    /// Commit the reward and event atomically in memory; retries never award twice.
+    pub fn apply_mission_reward(
+        &mut self,
+        profile_id: &str,
+        instance_id: &str,
+        amount: u32,
+    ) -> Result<ProfileView, String> {
+        let event = format!("mission:{instance_id}");
+        let profile = self
+            .profiles
+            .get(profile_id)
+            .ok_or("unknown reward profile")?;
+        if let Some((owner, credited)) = self.economic_events.get(&event) {
+            if owner != profile_id || *credited != amount {
+                return Err("economic event conflict".into());
+            }
+            return Ok(profile.view.clone());
+        }
+        if self.economic_events.len() >= 4096 {
+            return Err("memory economic event capacity reached; restart required".into());
+        }
+        let credits = profile
+            .view
+            .credits
+            .0
+            .checked_add(amount)
+            .filter(|v| *v <= 1_000_000_000)
+            .ok_or("credit bound exceeded")?;
+        let jobs = profile
+            .view
+            .completed_jobs
+            .checked_add(1)
+            .ok_or("job count exhausted")?;
+        let mut view = profile.view.clone();
+        view.credits = Credits(credits);
+        view.completed_jobs = jobs;
+        self.economic_events
+            .insert(event, (profile_id.into(), amount));
+        self.profiles
+            .get_mut(profile_id)
+            .ok_or("unknown profile")?
+            .view = view.clone();
+        Ok(view)
     }
     pub fn issue(&mut self, cookie: Option<&str>, now: u64) -> Result<String, String> {
         let profile = self.profile(cookie).ok_or("guest cookie required")?;

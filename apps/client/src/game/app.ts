@@ -1,3 +1,4 @@
+import { courierGuidance } from "./courier";
 import type { CharacterMotor } from "@port-meridian/protocol";
 import type { LoadedPackage } from "@port-meridian/content";
 import type { PredictionWorld } from "../simulation/bridge";
@@ -53,6 +54,8 @@ export class GameApp {
   private cameraDistance = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly reload = document.createElement("button");
+  private readonly cancelCourier = document.createElement("button");
+  private readonly courierInfo = document.createElement("p");
   constructor(private readonly root: HTMLElement) {
     document.title = "Port Meridian — explore Old Quay";
     document.body.classList.add("game-mode");
@@ -71,7 +74,7 @@ export class GameApp {
     const note = document.createElement("p");
     note.className = "game-note";
     note.textContent =
-      "Walk to a parked compact, press E at its left door, then drive. Courier jobs follow in the next milestone.";
+      "Walk to a parked compact, press E at its left door, then drive. Find the cyan Quay terminal and press E / F for a courier job. Deliver to the gold Market marker for 150 credits.";
     this.play.textContent = "Play";
     this.resume.textContent = "Resume / mouse look";
     this.leave.textContent = "Leave game";
@@ -82,7 +85,20 @@ export class GameApp {
     this.reload.addEventListener("click", () => location.reload(), {
       signal: this.abort.signal,
     });
-    actions.append(this.play, this.resume, this.leave, this.reload);
+    this.cancelCourier.textContent = "Cancel courier";
+    this.cancelCourier.hidden = true;
+    this.cancelCourier.addEventListener(
+      "click",
+      () => this.session?.cancelMission(),
+      { signal: this.abort.signal },
+    );
+    actions.append(
+      this.play,
+      this.resume,
+      this.leave,
+      this.cancelCourier,
+      this.reload,
+    );
     const settings = document.createElement("details");
     const summary = document.createElement("summary");
     summary.textContent = "Settings";
@@ -160,6 +176,7 @@ export class GameApp {
       title,
       this.status,
       instructions,
+      this.courierInfo,
       actions,
       settings,
       note,
@@ -409,6 +426,7 @@ export class GameApp {
     try {
       if (!this.contextLost && this.phase === "playing") {
         if (this.input.consumeInteract()) this.session?.interact();
+        if (this.input.consumeJob()) this.session?.useTerminal();
         this.session?.advance(now, () =>
           this.input.sample(this.session?.isDriving),
         );
@@ -418,6 +436,10 @@ export class GameApp {
       if (!this.contextLost && this.renderer && this.queries && localMotor) {
         this.renderer.pose(localMotor, this.session?.isDriving);
         this.renderer.remotes(remotes);
+        const mission = this.session?.currentMission;
+        this.renderer.setMissionTarget(
+          mission?.phase === "active" ? mission.target_position : null,
+        );
         const distance = this.camera.update(
           this.renderer.camera,
           localMotor.position,
@@ -435,13 +457,24 @@ export class GameApp {
         this.lastHud = now;
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
+        const mission = this.session?.currentMission ?? null;
+        const guidance = courierGuidance(
+          mission,
+          this.session?.estimatedTick(now) ?? 0,
+          localMotor?.position,
+          this.assets?.manifest.zones.find((z) => z.kind === "terminal")
+            ?.center,
+        );
+        this.courierInfo.textContent = this.phase === "playing" ? guidance : "";
+        this.cancelCourier.hidden =
+          this.phase !== "playing" || mission?.phase !== "active";
         const drivingStatus = this.session?.isDriving
           ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
           : "";
         this.debug.textContent = `${this.connection} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
         this.hud.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}`
+            ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
             : "Port Meridian · Walking and driving";
       }
     } catch (error) {

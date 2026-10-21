@@ -137,3 +137,19 @@ it("edges interaction requests, holds the driving handbrake, and clears both on 
   expect(input.sample(true).buttons).toBe(0);
   expect(input.consumeInteract()).toBe(false);
 });
+
+it("edges terminal interaction and clears it on pause without changing movement", () => {
+  const input = new InputState();
+  input.press("KeyF");
+  expect(input.consumeJob()).toBe(false);
+  input.active = true;
+  input.press("KeyF");
+  expect(input.consumeJob()).toBe(true);
+  expect(input.consumeJob()).toBe(false);
+  input.press("KeyF", true);
+  expect(input.consumeJob()).toBe(false);
+  input.release("KeyF");
+  input.press("KeyF");
+  input.clear();
+  expect(input.consumeJob()).toBe(false);
+});
