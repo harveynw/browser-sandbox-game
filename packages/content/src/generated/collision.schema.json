@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "BoxShape": {
+      "enum": [
+        "box"
+      ],
+      "type": "string"
+    },
+    "ColliderRole": {
+      "enum": [
+        "ground",
+        "boundary",
+        "building",
+        "landmark"
+      ],
+      "type": "string"
+    },
+    "StaticCollider": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "flags": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "half_extents": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/$defs/ColliderRole"
+        },
+        "shape": {
+          "$ref": "#/$defs/BoxShape"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "center",
+        "flags",
+        "half_extents",
+        "id",
+        "role",
+        "shape",
+        "yaw"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "colliders": {
+      "items": {
+        "$ref": "#/$defs/StaticCollider"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "colliders",
+    "schema_version"
+  ],
+  "title": "CollisionPackage",
+  "type": "object"
+}

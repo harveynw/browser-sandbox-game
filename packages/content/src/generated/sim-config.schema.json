@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "CharacterConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "air_acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "gravity": {
+          "format": "double",
+          "type": "number"
+        },
+        "ground_acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "ground_snap": {
+          "format": "double",
+          "type": "number"
+        },
+        "height": {
+          "format": "double",
+          "type": "number"
+        },
+        "jump_cooldown_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jump_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "max_fall_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "skin": {
+          "format": "double",
+          "type": "number"
+        },
+        "slope_limit_degrees": {
+          "format": "double",
+          "type": "number"
+        },
+        "sprint_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "step_height": {
+          "format": "double",
+          "type": "number"
+        },
+        "turn_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "walk_speed": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "air_acceleration",
+        "gravity",
+        "ground_acceleration",
+        "ground_snap",
+        "height",
+        "jump_cooldown_ticks",
+        "jump_speed",
+        "max_fall_speed",
+        "radius",
+        "skin",
+        "slope_limit_degrees",
+        "sprint_speed",
+        "step_height",
+        "turn_speed",
+        "walk_speed"
+      ],
+      "type": "object"
+    },
+    "VehicleConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "handbrake": {
+          "format": "double",
+          "type": "number"
+        },
+        "max_substeps": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_yaw_rate": {
+          "format": "double",
+          "type": "number"
+        },
+        "rolling_resistance": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_fast": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_rate": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_slow": {
+          "format": "double",
+          "type": "number"
+        },
+        "translation_substep": {
+          "format": "double",
+          "type": "number"
+        },
+        "yaw_substep": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "handbrake",
+        "max_substeps",
+        "max_yaw_rate",
+        "rolling_resistance",
+        "steering_fast",
+        "steering_rate",
+        "steering_slow",
+        "translation_substep",
+        "yaw_substep"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "character": {
+      "$ref": "#/$defs/CharacterConfig"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "tick_rate": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "vehicle": {
+      "$ref": "#/$defs/VehicleConfig"
+    }
+  },
+  "required": [
+    "character",
+    "schema_version",
+    "tick_rate",
+    "vehicle"
+  ],
+  "title": "SimConfig",
+  "type": "object"
+}

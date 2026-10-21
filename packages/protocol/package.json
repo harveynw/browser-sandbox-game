@@ -1,0 +1,13 @@
+{
+  "name": "@port-meridian/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@msgpack/msgpack": "3.1.3",
+    "ajv": "8.20.0"
+  }
+}

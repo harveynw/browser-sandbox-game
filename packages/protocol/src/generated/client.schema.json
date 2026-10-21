@@ -1,0 +1,581 @@
+{
+  "$defs": {
+    "AcceptMission": {
+      "additionalProperties": false,
+      "properties": {
+        "template_id": {
+          "$ref": "#/$defs/TemplateId"
+        }
+      },
+      "required": [
+        "template_id"
+      ],
+      "type": "object"
+    },
+    "Action": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/EnterVehicle"
+            },
+            "kind": {
+              "const": "enter_vehicle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Empty"
+            },
+            "kind": {
+              "const": "exit_vehicle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Fire"
+            },
+            "kind": {
+              "const": "fire",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Empty"
+            },
+            "kind": {
+              "const": "reload",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/AcceptMission"
+            },
+            "kind": {
+              "const": "accept_mission",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Empty"
+            },
+            "kind": {
+              "const": "cancel_mission",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Repair"
+            },
+            "kind": {
+              "const": "repair",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ActionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/Action"
+        },
+        "control_epoch": {
+          "$ref": "#/$defs/ControlEpoch"
+        },
+        "request_id": {
+          "$ref": "#/$defs/RequestId"
+        }
+      },
+      "required": [
+        "action",
+        "control_epoch",
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "BaselineId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "BuildId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "Buttons": {
+      "maximum": 15,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "ClientHello": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "$ref": "#/$defs/BuildId"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "display_name": {
+          "$ref": "#/$defs/DisplayName"
+        },
+        "join_ticket": {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        "protocol_version": {
+          "$ref": "#/$defs/ProtocolVersion"
+        },
+        "sim_config_hash": {
+          "$ref": "#/$defs/ContentHash"
+        }
+      },
+      "required": [
+        "build_id",
+        "content_hash",
+        "display_name",
+        "join_ticket",
+        "protocol_version",
+        "sim_config_hash"
+      ],
+      "type": "object"
+    },
+    "ClientMessage": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ClientHello"
+            },
+            "kind": {
+              "const": "client_hello",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ClientReady"
+            },
+            "kind": {
+              "const": "client_ready",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/InputBatch"
+            },
+            "kind": {
+              "const": "input_batch",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ActionRequest"
+            },
+            "kind": {
+              "const": "action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Ping"
+            },
+            "kind": {
+              "const": "ping",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ResyncRequest"
+            },
+            "kind": {
+              "const": "resync_request",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Empty"
+            },
+            "kind": {
+              "const": "leave",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ClientReady": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "$ref": "#/$defs/BaselineId"
+        }
+      },
+      "required": [
+        "baseline_id"
+      ],
+      "type": "object"
+    },
+    "ContentHash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ControlEpoch": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "DisplayName": {
+      "maxLength": 20,
+      "minLength": 3,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+      "type": "string"
+    },
+    "Empty": {
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "EnterVehicle": {
+      "additionalProperties": false,
+      "properties": {
+        "vehicle_id": {
+          "$ref": "#/$defs/EntityId"
+        }
+      },
+      "required": [
+        "vehicle_id"
+      ],
+      "type": "object"
+    },
+    "EntityId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Fire": {
+      "additionalProperties": false,
+      "properties": {
+        "aim_pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "aim_yaw": {
+          "$ref": "#/$defs/Yaw"
+        }
+      },
+      "required": [
+        "aim_pitch",
+        "aim_yaw"
+      ],
+      "type": "object"
+    },
+    "InputAxis": {
+      "maximum": 32767,
+      "minimum": -32767,
+      "type": "integer"
+    },
+    "InputBatch": {
+      "additionalProperties": false,
+      "properties": {
+        "control_epoch": {
+          "$ref": "#/$defs/ControlEpoch"
+        },
+        "frames": {
+          "items": {
+            "$ref": "#/$defs/InputFrame"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "control_epoch",
+        "frames"
+      ],
+      "type": "object"
+    },
+    "InputFrame": {
+      "additionalProperties": false,
+      "properties": {
+        "buttons": {
+          "$ref": "#/$defs/Buttons"
+        },
+        "look_pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "look_yaw": {
+          "$ref": "#/$defs/Yaw"
+        },
+        "move_x": {
+          "$ref": "#/$defs/InputAxis"
+        },
+        "move_z": {
+          "$ref": "#/$defs/InputAxis"
+        },
+        "tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "buttons",
+        "look_pitch",
+        "look_yaw",
+        "move_x",
+        "move_z",
+        "tick"
+      ],
+      "type": "object"
+    },
+    "Milliseconds": {
+      "maximum": 9007199254740991.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "OpaqueId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "Ping": {
+      "additionalProperties": false,
+      "properties": {
+        "client_time_ms": {
+          "$ref": "#/$defs/Milliseconds"
+        },
+        "nonce": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "client_time_ms",
+        "nonce"
+      ],
+      "type": "object"
+    },
+    "Pitch": {
+      "maximum": 1.2000000476837158,
+      "minimum": -1.2000000476837158,
+      "type": "number"
+    },
+    "ProtocolVersion": {
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Repair": {
+      "additionalProperties": false,
+      "properties": {
+        "zone_id": {
+          "$ref": "#/$defs/TemplateId"
+        }
+      },
+      "required": [
+        "zone_id"
+      ],
+      "type": "object"
+    },
+    "RequestId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ResyncReason": {
+      "enum": [
+        "stale",
+        "overflow",
+        "invalid_state"
+      ],
+      "type": "string"
+    },
+    "ResyncRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/ResyncReason"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "TemplateId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "Yaw": {
+      "maximum": 3.1415927410125732,
+      "minimum": -3.1415927410125732,
+      "type": "number"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "message": {
+      "$ref": "#/$defs/ClientMessage"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "v": {
+      "$ref": "#/$defs/ProtocolVersion"
+    },
+    "world_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "message",
+    "session_id",
+    "v",
+    "world_id"
+  ],
+  "title": "ClientEnvelope",
+  "type": "object"
+}

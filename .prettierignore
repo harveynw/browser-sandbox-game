@@ -1,0 +1,18 @@
+# Preserve the design documents; this command formats source/configuration.
+**/*.md
+Cargo.lock
+package-lock.json
+target/
+node_modules/
+dist/
+coverage/
+packages/sim-wasm/
+content/generated/
+packages/protocol/src/generated/
+tests/fixtures/protocol/
+
+
+packages/content/src/generated/
+apps/client/public/content/
+
+apps/client/src/simulation/generated/

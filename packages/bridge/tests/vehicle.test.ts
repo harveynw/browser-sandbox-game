@@ -1,0 +1,153 @@
+import { readFile } from "node:fs/promises";
+import { beforeAll, expect, it } from "vitest";
+import init from "../../sim-wasm/sim_wasm";
+import { PredictionWorld } from "../../../apps/client/src/simulation/bridge";
+import {
+  LocalPrediction,
+  actorMotor,
+} from "../../../apps/client/src/simulation/prediction";
+import { ServerClock } from "../../../apps/client/src/net/clock";
+import type { CollisionPackage, VehicleTemplate } from "@port-meridian/content";
+import type { OwnerState, VehicleMotor } from "@port-meridian/protocol";
+import fixture from "../../../tests/fixtures/simulation/vehicle-trace.json";
+const initial = fixture.initial_motor as VehicleMotor;
+beforeAll(async () => {
+  await init({
+    module_or_path: await readFile(
+      new URL("../../sim-wasm/sim_wasm_bg.wasm", import.meta.url),
+    ),
+  });
+});
+async function world() {
+  const w = await PredictionWorld.create();
+  w.loadCollision(fixture.collision as CollisionPackage, fixture.sim_config);
+  return w;
+}
+const carOwner = (tick: number, epoch = 2): OwnerState => ({
+  server_tick: tick,
+  consumed_through_tick: tick,
+  control_epoch: epoch,
+  player_id: 7,
+  controlled_entity_id: 9,
+  state: {
+    kind: "vehicle",
+    data: { motor: initial, health: 100, driver_id: 7, disabled: false },
+  },
+  player_state: {
+    motor: { ...actorMotor(initial), position: [0, 0.8, -0.25] },
+    health: 100,
+    mode: "driving",
+    vehicle_id: 9,
+  },
+});
+it("matches 60 frozen native car checkpoints within one centimetre over 1800 real WASM ticks", async () => {
+  const w = await world();
+  let tick = 0;
+  let maxError = 0;
+  try {
+    w.reset({
+      version: 1,
+      tick: 0,
+      control_epoch: 2,
+      controlled_entity_id: 9,
+      motor: actorMotor(initial),
+      vehicle: {
+        motor: initial,
+        template: fixture.template as VehicleTemplate,
+      },
+    });
+    for (const segment of fixture.segments)
+      for (let i = 0; i < segment.ticks; i++) {
+        tick++;
+        const frame = w.step({
+          tick,
+          move_x: segment.move_x,
+          move_z: segment.move_z,
+          buttons: segment.buttons,
+          look_yaw: 0,
+          look_pitch: 0,
+        });
+        const expected = fixture.checkpoints.find((c) => c.tick === tick);
+        if (expected) {
+          const error = Math.hypot(
+            ...expected.motor.position.map(
+              (v, j) => v - (frame.motor.position[j] ?? v),
+            ),
+          );
+          maxError = Math.max(maxError, error);
+          expect(error).toBeLessThan(0.01);
+          expect(frame.vehicle?.motor.speed).toBeCloseTo(
+            expected.motor.speed,
+            3,
+          );
+        }
+      }
+    expect(tick).toBe(1800);
+    expect(fixture.checkpoints).toHaveLength(60);
+    console.info(
+      `Vehicle native/WASM trace: ${tick} ticks / 60 checkpoints, maximum position error ${maxError.toFixed(6)} m`,
+    );
+  } finally {
+    w.free();
+  }
+});
+it("requires reliable control installation and cannot regain a retired car from reordered owner snapshots", async () => {
+  const w = await world();
+  const clock = new ServerClock();
+  const failures: string[] = [];
+  const p = new LocalPrediction(w, clock, (r) => failures.push(r), [
+    fixture.template as VehicleTemplate,
+  ]);
+  try {
+    const onFoot: OwnerState = {
+      ...carOwner(10, 1),
+      controlled_entity_id: 7,
+      state: {
+        kind: "character",
+        data: {
+          motor: { ...actorMotor(initial), position: [-4, 0, 0] },
+          health: 100,
+          mode: "on_foot",
+          vehicle_id: null,
+        },
+      },
+      player_state: {
+        motor: { ...actorMotor(initial), position: [-4, 0, 0] },
+        health: 100,
+        mode: "on_foot",
+        vehicle_id: null,
+      },
+    };
+    clock.observe(10, 0);
+    p.install(onFoot, 0);
+    p.reconcile(carOwner(12), 10);
+    expect(p.epoch).toBe(1);
+    expect(w.currentState().vehicle).toBeUndefined();
+    p.install(carOwner(11), 20);
+    expect(p.epoch).toBe(2);
+    expect(w.currentState().vehicle).toBeDefined();
+    p.advance(30, () => ({
+      move_x: 0,
+      move_z: 32767,
+      look_yaw: 0,
+      look_pitch: 0,
+      buttons: 0,
+    }));
+    p.install(
+      {
+        ...onFoot,
+        server_tick: 14,
+        consumed_through_tick: 14,
+        control_epoch: 3,
+      },
+      40,
+    );
+    p.reconcile(carOwner(100, 2), 45);
+    expect(p.epoch).toBe(3);
+    expect(w.currentState().vehicle).toBeUndefined();
+    expect(p.history.size).toBeLessThan(4);
+    expect(failures).toEqual([]);
+  } finally {
+    w.free();
+  }
+});

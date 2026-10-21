@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "Primitive": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "collider_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "color": {
+          "type": "string"
+        },
+        "half_extents": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/VisualRole"
+        }
+      },
+      "required": [
+        "center",
+        "collider_id",
+        "color",
+        "half_extents",
+        "id",
+        "role"
+      ],
+      "type": "object"
+    },
+    "VisualRole": {
+      "enum": [
+        "ground",
+        "road",
+        "sidewalk",
+        "marking",
+        "building",
+        "boundary",
+        "landmark",
+        "vehicle"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "primitives": {
+      "items": {
+        "$ref": "#/$defs/Primitive"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "primitives",
+    "schema_version"
+  ],
+  "title": "VisualChunk",
+  "type": "object"
+}

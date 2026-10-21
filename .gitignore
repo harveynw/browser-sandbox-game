@@ -1,0 +1,17 @@
+# Rust and browser build artifacts
+/target/
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+/packages/sim-wasm/
+/content/generated/
+
+# Local runtime state and environment overrides
+/var/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+

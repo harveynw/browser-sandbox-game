@@ -1,0 +1,18 @@
+[package]
+name = "sim-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+content.workspace = true
+serde.workspace = true
+protocol = { path = "../protocol", default-features = false }
+rapier3d = { version = "=0.36.1", default-features = false, features = ["std", "dim3", "f32", "enhanced-determinism"] }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

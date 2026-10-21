@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StepRequest",
+  "type": "object",
+  "properties": {
+    "control_epoch": {
+      "$ref": "#/$defs/ControlEpoch"
+    },
+    "controlled_entity_id": {
+      "$ref": "#/$defs/EntityId"
+    },
+    "input": {
+      "$ref": "#/$defs/InputFrame"
+    },
+    "version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "control_epoch",
+    "controlled_entity_id",
+    "input"
+  ],
+  "$defs": {
+    "Buttons": {
+      "type": "integer",
+      "maximum": 15,
+      "minimum": 0
+    },
+    "ControlEpoch": {
+      "type": "integer",
+      "maximum": 4294967295,
+      "minimum": 1
+    },
+    "EntityId": {
+      "type": "integer",
+      "maximum": 4294967295,
+      "minimum": 1
+    },
+    "InputAxis": {
+      "type": "integer",
+      "maximum": 32767,
+      "minimum": -32767
+    },
+    "InputFrame": {
+      "type": "object",
+      "properties": {
+        "buttons": {
+          "$ref": "#/$defs/Buttons"
+        },
+        "look_pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "look_yaw": {
+          "$ref": "#/$defs/Yaw"
+        },
+        "move_x": {
+          "$ref": "#/$defs/InputAxis"
+        },
+        "move_z": {
+          "$ref": "#/$defs/InputAxis"
+        },
+        "tick": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "tick",
+        "move_x",
+        "move_z",
+        "look_yaw",
+        "look_pitch",
+        "buttons"
+      ]
+    },
+    "Pitch": {
+      "type": "number",
+      "maximum": 1.2000000476837158,
+      "minimum": -1.2000000476837158
+    },
+    "Yaw": {
+      "type": "number",
+      "maximum": 3.1415927410125732,
+      "minimum": -3.1415927410125732
+    }
+  }
+}

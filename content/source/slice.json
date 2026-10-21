@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "world_asset_id": "port_meridian_slice_v1",
+  "bounds": {
+    "min": [-256, -2, 0],
+    "max": [0, 64, 256]
+  },
+  "roads": {
+    "x": [-246, -128, -10],
+    "z": [10, 128, 246],
+    "carriageway_width": 12,
+    "sidewalk_width": 3
+  },
+  "buildings": {
+    "grid": 4,
+    "size": 20,
+    "spacing": 8,
+    "setback": 12,
+    "seed": 424242
+  },
+  "reservations": [
+    {
+      "id": "plaza_quay",
+      "rect": {
+        "min": [-192.0, 168.0],
+        "max": [-168.0, 192.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_apron",
+      "rect": {
+        "min": [-168.0, 168.0],
+        "max": [-148.0, 200.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_01_clear",
+      "rect": {
+        "min": [-155.0, 171.0],
+        "max": [-149.0, 181.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_02_clear",
+      "rect": {
+        "min": [-155.0, 187.0],
+        "max": [-149.0, 197.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "market_clear",
+      "rect": {
+        "min": [-52.0, 44.0],
+        "max": [-36.0, 60.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "garage_clear",
+      "rect": {
+        "min": [-230.0, 38.0],
+        "max": [-210.0, 58.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "spawn_driveway",
+      "rect": {
+        "min": [-168.0, 177.0],
+        "max": [-128.0, 183.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_01_driveway",
+      "rect": {
+        "min": [-152.0, 173.0],
+        "max": [-128.0, 179.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_02_driveway",
+      "rect": {
+        "min": [-152.0, 189.0],
+        "max": [-128.0, 195.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "market_driveway",
+      "rect": {
+        "min": [-47.0, 10.0],
+        "max": [-41.0, 44.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "garage_driveway",
+      "rect": {
+        "min": [-246.0, 45.0],
+        "max": [-230.0, 51.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "tower_clear",
+      "rect": {
+        "min": [-222.0, 210.0],
+        "max": [-210.0, 222.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "canopy_clear",
+      "rect": {
+        "min": [-48.0, 82.0],
+        "max": [-36.0, 94.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "beacon_clear",
+      "rect": {
+        "min": [-226.0, 22.0],
+        "max": [-214.0, 34.0]
+      },
+      "clear": false
+    }
+  ],
+  "accesses": [
+    {
+      "id": "spawn_access",
+      "position": [-180, 0, 180],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "spawn_driveway"
+    },
+    {
+      "id": "terminal_access",
+      "position": [-172, 0, 180],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "spawn_driveway"
+    },
+    {
+      "id": "parking_01_access",
+      "position": [-152, 0, 176],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "parking_01_driveway"
+    },
+    {
+      "id": "parking_02_access",
+      "position": [-152, 0, 192],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "parking_02_driveway"
+    },
+    {
+      "id": "market_access",
+      "position": [-44, 0, 52],
+      "road_axis": "z",
+      "road_center": 10,
+      "driveway_id": "market_driveway"
+    },
+    {
+      "id": "garage_access",
+      "position": [-220, 0, 48],
+      "road_axis": "x",
+      "road_center": -246,
+      "driveway_id": "garage_driveway"
+    }
+  ],
+  "spawns": [
+    {
+      "id": "spawn_quay",
+      "position": [-180, 0, 180],
+      "yaw": 0,
+      "safe_radius": 2.5,
+      "reservation_id": "plaza_quay",
+      "access_id": "spawn_access"
+    }
+  ],
+  "parking": [
+    {
+      "id": "parking_quay_01",
+      "position": [-152, 0, 176],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "reservation_id": "parking_01_clear",
+      "access_id": "parking_01_access"
+    },
+    {
+      "id": "parking_quay_02",
+      "position": [-152, 0, 192],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "reservation_id": "parking_02_clear",
+      "access_id": "parking_02_access"
+    }
+  ],
+  "zones": [
+    {
+      "id": "terminal_quay",
+      "center": [-172, 0, 180],
+      "radius": 3,
+      "kind": "terminal",
+      "reservation_id": "plaza_quay",
+      "access_id": "terminal_access",
+      "allowed_templates": ["courier_quay_market"]
+    },
+    {
+      "id": "delivery_market",
+      "center": [-44, 0, 52],
+      "radius": 5,
+      "kind": "delivery",
+      "reservation_id": "market_clear",
+      "access_id": "market_access",
+      "allowed_templates": []
+    },
+    {
+      "id": "garage_quay",
+      "center": [-220, 0, 48],
+      "radius": 5,
+      "kind": "garage",
+      "reservation_id": "garage_clear",
+      "access_id": "garage_access",
+      "allowed_templates": []
+    }
+  ],
+  "mission_templates": [
+    {
+      "id": "courier_quay_market",
+      "terminal_zone_id": "terminal_quay",
+      "duration_ticks": 5400,
+      "reward_credits": 150,
+      "objective": {
+        "kind": "courier",
+        "data": {
+          "destination_zone_id": "delivery_market",
+          "dwell_ticks": 30,
+          "max_speed": 2
+        }
+      }
+    }
+  ],
+  "vehicle_templates": [
+    {
+      "id": "compact",
+      "dimensions": [1.8, 1.4, 4.2],
+      "top_speed": 22,
+      "reverse_speed": 7,
+      "acceleration": 7,
+      "brake": 12,
+      "wheelbase": 2.5,
+      "health": 100,
+      "visual_asset_id": "compact_greybox",
+      "seat_offset": [0, 0.8, -0.25],
+      "exit_offsets": [
+        [-1.5, 0, 0],
+        [1.5, 0, 0],
+        [0, 0, 3]
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "quay_water_tower",
+      "position": [-216, 0, 216],
+      "size": [6, 24, 6],
+      "color": "#e89b43"
+    },
+    {
+      "id": "market_canopy",
+      "position": [-42, 0, 88],
+      "size": [10, 10, 10],
+      "color": "#3cbd91"
+    },
+    {
+      "id": "garage_beacon",
+      "position": [-220, 0, 28],
+      "size": [4, 18, 4],
+      "color": "#de6754"
+    }
+  ],
+  "sim_config": {
+    "schema_version": 1,
+    "tick_rate": 30,
+    "character": {
+      "height": 1.8,
+      "radius": 0.35,
+      "walk_speed": 4,
+      "sprint_speed": 7,
+      "ground_acceleration": 30,
+      "air_acceleration": 10,
+      "jump_speed": 5.5,
+      "jump_cooldown_ticks": 6,
+      "gravity": 18,
+      "max_fall_speed": 30,
+      "skin": 0.02,
+      "slope_limit_degrees": 45,
+      "step_height": 0.25,
+      "ground_snap": 0.15,
+      "turn_speed": 12
+    },
+    "vehicle": {
+      "rolling_resistance": 1.5,
+      "handbrake": 8,
+      "steering_slow": 0.55,
+      "steering_fast": 0.2,
+      "steering_rate": 2.5,
+      "max_yaw_rate": 1.8,
+      "translation_substep": 0.25,
+      "yaw_substep": 0.03,
+      "max_substeps": 8
+    }
+  }
+}

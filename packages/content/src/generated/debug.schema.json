@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "Access": {
+      "additionalProperties": false,
+      "properties": {
+        "driveway_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "road_axis": {
+          "$ref": "#/$defs/Axis"
+        },
+        "road_center": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "driveway_id",
+        "id",
+        "position",
+        "road_axis",
+        "road_center"
+      ],
+      "type": "object"
+    },
+    "Axis": {
+      "enum": [
+        "x",
+        "z"
+      ],
+      "type": "string"
+    },
+    "BoxShape": {
+      "enum": [
+        "box"
+      ],
+      "type": "string"
+    },
+    "ColliderRole": {
+      "enum": [
+        "ground",
+        "boundary",
+        "building",
+        "landmark"
+      ],
+      "type": "string"
+    },
+    "Rect": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "Reservation": {
+      "additionalProperties": false,
+      "properties": {
+        "clear": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "rect": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "clear",
+        "id",
+        "rect"
+      ],
+      "type": "object"
+    },
+    "StaticCollider": {
+      "additionalProperties": false,
+      "properties": {
+        "center": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "flags": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "half_extents": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "role": {
+          "$ref": "#/$defs/ColliderRole"
+        },
+        "shape": {
+          "$ref": "#/$defs/BoxShape"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "center",
+        "flags",
+        "half_extents",
+        "id",
+        "role",
+        "shape",
+        "yaw"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accesses": {
+      "items": {
+        "$ref": "#/$defs/Access"
+      },
+      "type": "array"
+    },
+    "colliders": {
+      "items": {
+        "$ref": "#/$defs/StaticCollider"
+      },
+      "type": "array"
+    },
+    "reservations": {
+      "items": {
+        "$ref": "#/$defs/Reservation"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "accesses",
+    "colliders",
+    "reservations",
+    "schema_version"
+  ],
+  "title": "DebugOverlay",
+  "type": "object"
+}

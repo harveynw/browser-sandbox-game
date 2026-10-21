@@ -1,0 +1,847 @@
+{
+  "$defs": {
+    "Access": {
+      "additionalProperties": false,
+      "properties": {
+        "driveway_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "road_axis": {
+          "$ref": "#/$defs/Axis"
+        },
+        "road_center": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "driveway_id",
+        "id",
+        "position",
+        "road_axis",
+        "road_center"
+      ],
+      "type": "object"
+    },
+    "Axis": {
+      "enum": [
+        "x",
+        "z"
+      ],
+      "type": "string"
+    },
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "BuildingRecipe": {
+      "additionalProperties": false,
+      "properties": {
+        "grid": {
+          "format": "double",
+          "type": "number"
+        },
+        "seed": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "setback": {
+          "format": "double",
+          "type": "number"
+        },
+        "size": {
+          "format": "double",
+          "type": "number"
+        },
+        "spacing": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "grid",
+        "seed",
+        "setback",
+        "size",
+        "spacing"
+      ],
+      "type": "object"
+    },
+    "CharacterConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "air_acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "gravity": {
+          "format": "double",
+          "type": "number"
+        },
+        "ground_acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "ground_snap": {
+          "format": "double",
+          "type": "number"
+        },
+        "height": {
+          "format": "double",
+          "type": "number"
+        },
+        "jump_cooldown_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "jump_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "max_fall_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "skin": {
+          "format": "double",
+          "type": "number"
+        },
+        "slope_limit_degrees": {
+          "format": "double",
+          "type": "number"
+        },
+        "sprint_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "step_height": {
+          "format": "double",
+          "type": "number"
+        },
+        "turn_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "walk_speed": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "air_acceleration",
+        "gravity",
+        "ground_acceleration",
+        "ground_snap",
+        "height",
+        "jump_cooldown_ticks",
+        "jump_speed",
+        "max_fall_speed",
+        "radius",
+        "skin",
+        "slope_limit_degrees",
+        "sprint_speed",
+        "step_height",
+        "turn_speed",
+        "walk_speed"
+      ],
+      "type": "object"
+    },
+    "Landmark": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "size": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "color",
+        "id",
+        "position",
+        "size"
+      ],
+      "type": "object"
+    },
+    "MissionObjective": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "destination_zone_id": {
+                  "type": "string"
+                },
+                "dwell_ticks": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "max_speed": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "destination_zone_id",
+                "dwell_ticks",
+                "max_speed"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "courier",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "checkpoints": {
+                  "items": {
+                    "items": {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                "gate_radius": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "checkpoints",
+                "gate_radius"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "time_trial",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "garage_zone_id": {
+                  "type": "string"
+                },
+                "parking_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "garage_zone_id",
+                "parking_ids"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "recovery",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MissionTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "objective": {
+          "$ref": "#/$defs/MissionObjective"
+        },
+        "reward_credits": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "terminal_zone_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "duration_ticks",
+        "id",
+        "objective",
+        "reward_credits",
+        "terminal_zone_id"
+      ],
+      "type": "object"
+    },
+    "ParkingSpawn": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "secured": {
+          "type": "boolean"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "access_id",
+        "id",
+        "position",
+        "reservation_id",
+        "secured",
+        "template_id",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "Rect": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "Reservation": {
+      "additionalProperties": false,
+      "properties": {
+        "clear": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "rect": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "clear",
+        "id",
+        "rect"
+      ],
+      "type": "object"
+    },
+    "Roads": {
+      "additionalProperties": false,
+      "properties": {
+        "carriageway_width": {
+          "format": "double",
+          "type": "number"
+        },
+        "sidewalk_width": {
+          "format": "double",
+          "type": "number"
+        },
+        "x": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "z": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "carriageway_width",
+        "sidewalk_width",
+        "x",
+        "z"
+      ],
+      "type": "object"
+    },
+    "SimConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "character": {
+          "$ref": "#/$defs/CharacterConfig"
+        },
+        "schema_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tick_rate": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "vehicle": {
+          "$ref": "#/$defs/VehicleConfig"
+        }
+      },
+      "required": [
+        "character",
+        "schema_version",
+        "tick_rate",
+        "vehicle"
+      ],
+      "type": "object"
+    },
+    "SpawnPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "safe_radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "access_id",
+        "id",
+        "position",
+        "reservation_id",
+        "safe_radius",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "VehicleConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "handbrake": {
+          "format": "double",
+          "type": "number"
+        },
+        "max_substeps": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_yaw_rate": {
+          "format": "double",
+          "type": "number"
+        },
+        "rolling_resistance": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_fast": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_rate": {
+          "format": "double",
+          "type": "number"
+        },
+        "steering_slow": {
+          "format": "double",
+          "type": "number"
+        },
+        "translation_substep": {
+          "format": "double",
+          "type": "number"
+        },
+        "yaw_substep": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "handbrake",
+        "max_substeps",
+        "max_yaw_rate",
+        "rolling_resistance",
+        "steering_fast",
+        "steering_rate",
+        "steering_slow",
+        "translation_substep",
+        "yaw_substep"
+      ],
+      "type": "object"
+    },
+    "VehicleTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "brake": {
+          "format": "double",
+          "type": "number"
+        },
+        "dimensions": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "exit_offsets": {
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "health": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "reverse_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "seat_offset": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "top_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "visual_asset_id": {
+          "type": "string"
+        },
+        "wheelbase": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "acceleration",
+        "brake",
+        "dimensions",
+        "exit_offsets",
+        "health",
+        "id",
+        "reverse_speed",
+        "seat_offset",
+        "top_speed",
+        "visual_asset_id",
+        "wheelbase"
+      ],
+      "type": "object"
+    },
+    "Zone": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "allowed_templates": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "center": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ZoneKind"
+        },
+        "radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "reservation_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "access_id",
+        "allowed_templates",
+        "center",
+        "id",
+        "kind",
+        "radius",
+        "reservation_id"
+      ],
+      "type": "object"
+    },
+    "ZoneKind": {
+      "enum": [
+        "delivery",
+        "garage",
+        "repair",
+        "terminal"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accesses": {
+      "items": {
+        "$ref": "#/$defs/Access"
+      },
+      "type": "array"
+    },
+    "bounds": {
+      "$ref": "#/$defs/Bounds"
+    },
+    "buildings": {
+      "$ref": "#/$defs/BuildingRecipe"
+    },
+    "landmarks": {
+      "items": {
+        "$ref": "#/$defs/Landmark"
+      },
+      "type": "array"
+    },
+    "mission_templates": {
+      "items": {
+        "$ref": "#/$defs/MissionTemplate"
+      },
+      "type": "array"
+    },
+    "parking": {
+      "items": {
+        "$ref": "#/$defs/ParkingSpawn"
+      },
+      "type": "array"
+    },
+    "reservations": {
+      "items": {
+        "$ref": "#/$defs/Reservation"
+      },
+      "type": "array"
+    },
+    "roads": {
+      "$ref": "#/$defs/Roads"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "sim_config": {
+      "$ref": "#/$defs/SimConfig"
+    },
+    "spawns": {
+      "items": {
+        "$ref": "#/$defs/SpawnPoint"
+      },
+      "type": "array"
+    },
+    "vehicle_templates": {
+      "items": {
+        "$ref": "#/$defs/VehicleTemplate"
+      },
+      "type": "array"
+    },
+    "world_asset_id": {
+      "type": "string"
+    },
+    "zones": {
+      "items": {
+        "$ref": "#/$defs/Zone"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "accesses",
+    "bounds",
+    "buildings",
+    "landmarks",
+    "mission_templates",
+    "parking",
+    "reservations",
+    "roads",
+    "schema_version",
+    "sim_config",
+    "spawns",
+    "vehicle_templates",
+    "world_asset_id",
+    "zones"
+  ],
+  "title": "Authoring",
+  "type": "object"
+}

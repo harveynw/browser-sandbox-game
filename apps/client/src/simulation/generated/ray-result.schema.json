@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StaticRayResult",
+  "type": "object",
+  "properties": {
+    "hit": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StaticHit"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version"
+  ],
+  "$defs": {
+    "StaticHit": {
+      "type": "object",
+      "properties": {
+        "collider_id": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "distance": {
+          "type": "number",
+          "format": "float"
+        },
+        "normal": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "point": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "collider_id",
+        "distance",
+        "point",
+        "normal"
+      ]
+    }
+  }
+}

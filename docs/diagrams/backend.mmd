@@ -1,0 +1,57 @@
+%% Backend module system — current implementation through T10.
+%% Update with module, ownership, transport or data-flow changes.
+%% Purple: orchestration; blue: networking; green: simulation;
+%% orange: graphics; yellow: content; grey: diagnostics/external.
+flowchart TD
+  subgraph group_0["crates/server/src/ — startup and world"]
+    main["main.rs<br/>Startup and main loop"]:::app
+    scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
+    loader["content_loader.rs<br/>Verify and load world content"]:::content
+    world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
+    vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
+  end
+  subgraph group_1["crates/server/src/ — networking and admission"]
+    control["control.rs · HTTP thread<br/>Sessions, tickets and health"]:::net
+    admission["admission.rs · shared state<br/>Guest profiles and one-use join tickets"]:::net
+    transport["transport.rs · network pump thread<br/>Bounded queues, codecs and channel routing"]:::net
+    replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
+  end
+  subgraph group_2["Shared Rust crates"]
+    sim["crates/sim-core/<br/>Character / vehicle motors<br/>Static collision and car proxies"]:::sim
+    content["crates/content/<br/>Content types and validation"]:::content
+    protocol["crates/protocol/<br/>Messages, codecs and limits"]:::net
+  end
+    browser["Browser frontend"]:::other
+    assets["Baked content package<br/>Map, collision and configuration"]:::content
+    net["net-crate<br/>WebSocket + WebRTC server"]:::other
+
+  main -->|"load at startup"| loader
+  assets -->|"baked package"| loader
+  loader -->|"validation"| content
+  loader -->|"loaded world"| world
+  main <-->|"elapsed time"| scheduler
+  main -->|"30 Hz steps"| world
+  main -->|"start / publish health"| control
+  main -->|"start pump"| transport
+  browser <-->|"HTTP :3001"| control
+  control <-->|"create guest / issue ticket"| admission
+  world <-->|"consume ticket / activate session"| admission
+  browser <-->|"WS + WebRTC :3000"| net
+  net <-->|"binary messages"| transport
+  transport -->|"queued client messages"| world
+  world -->|"lifecycle / owner state"| transport
+  world -->|"visible entities"| replication
+  replication -->|"remote snapshots · 10 Hz"| transport
+  transport -.->|"coalescing / budgets"| replication
+  transport -->|"encode / decode"| protocol
+  replication -->|"packet sizing"| protocol
+  world -->|"step authoritative movement"| sim
+  world -->|"atomic entry / exit geometry"| vehicles
+  vehicles -->|"seat transforms and clearance queries"| sim
+
+  classDef app fill:#E9DDF7,stroke:#BDC5CE,color:#202B38
+  classDef net fill:#DCEBFA,stroke:#BDC5CE,color:#202B38
+  classDef sim fill:#DFF1E4,stroke:#BDC5CE,color:#202B38
+  classDef gfx fill:#FBE5D2,stroke:#BDC5CE,color:#202B38
+  classDef content fill:#FFF1BC,stroke:#BDC5CE,color:#202B38
+  classDef other fill:#ECEFF2,stroke:#BDC5CE,color:#202B38

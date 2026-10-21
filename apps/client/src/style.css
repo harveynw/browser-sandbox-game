@@ -1,0 +1,305 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #edf2f1;
+  background: #14232c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+main {
+  width: min(36rem, calc(100% - 3rem));
+  padding: 3rem 0;
+}
+
+h1 {
+  margin: 0.7rem 0 1.2rem;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+p {
+  color: #bdcdd0;
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.stage {
+  color: #efb26b;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tools {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+}
+
+.status {
+  color: #efb26b;
+  font-weight: 700;
+}
+.actions {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+button {
+  border: 1px solid #7bafb8;
+  border-radius: 0.4rem;
+  padding: 0.7rem 1.2rem;
+  font: inherit;
+  color: #14232c;
+  background: #bce8da;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button:focus-visible {
+  outline: 3px solid #efb26b;
+  outline-offset: 3px;
+}
+pre {
+  height: 15rem;
+  overflow: auto;
+  padding: 1rem;
+  background: #0b171e;
+  color: #bce8da;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+a {
+  color: #bce8da;
+}
+body.map-mode {
+  display: block;
+  overflow: hidden;
+}
+main.map-inspector {
+  width: 100%;
+  padding: 0;
+}
+.map-inspector canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  touch-action: none;
+}
+.map-hud {
+  position: fixed;
+  z-index: 2;
+  top: 1rem;
+  left: 1rem;
+  max-width: min(25rem, calc(100vw - 4rem));
+  padding: 1rem;
+  background: #10222de8;
+  border: 1px solid #577680;
+  border-radius: 0.6rem;
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+}
+.map-hud h1 {
+  font-size: 1.6rem;
+  margin: 0.5rem 0;
+}
+.map-hud p {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  margin: 0.6rem 0;
+}
+.map-hud .stage {
+  font-size: 0.7rem;
+}
+.map-hud [role="status"] {
+  color: #f2c278;
+}
+.map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.9rem;
+  margin: 0.8rem 0;
+}
+.map-actions label {
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.map-actions button {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+}
+.map-hud .map-details {
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+.map-labels {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.map-labels span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  background: #10222de0;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font:
+    11px ui-monospace,
+    monospace;
+}
+
+.map-hud summary {
+  cursor: pointer;
+  color: #bce8da;
+  font-size: 0.8rem;
+  padding: 0.3rem 0;
+}
+
+body.game-mode {
+  display: block;
+  overflow: hidden;
+  background: #b3ced1;
+}
+main.game-app {
+  width: 100%;
+  height: 100dvh;
+  padding: 0;
+}
+.game-app canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.game-menu {
+  position: fixed;
+  z-index: 3;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: min(34rem, calc(100vw - 4rem));
+  max-height: calc(100dvh - 4rem);
+  overflow: auto;
+  background: #142b35f5;
+  border: 1px solid #5c7e83;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 20px 80px #14232c55;
+}
+.game-menu[hidden] {
+  display: none;
+}
+.game-menu h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  margin: 0.6rem 0;
+}
+.game-menu p {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.game-menu .stage {
+  font-size: 0.75rem;
+}
+.game-menu details {
+  margin-top: 1rem;
+}
+.game-menu summary,
+.game-metrics summary {
+  cursor: pointer;
+}
+.game-menu label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.8rem;
+  min-height: 1.8rem;
+}
+.game-menu .game-note,
+.game-menu .game-links {
+  font-size: 0.85rem;
+}
+.game-links a {
+  display: inline-block;
+  margin-right: 0.6rem;
+}
+.game-hud {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  right: 1rem;
+  width: fit-content;
+  max-width: calc(100vw - 4rem);
+  background: #142b35e8;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  pointer-events: none;
+  line-height: 1.5;
+}
+.game-metrics {
+  position: fixed;
+  z-index: 2;
+  top: 1rem;
+  left: 1rem;
+  max-width: calc(100vw - 4rem);
+  background: #142b35e8;
+  padding: 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.8rem;
+}
+.game-debug {
+  display: block;
+  margin-top: 0.5rem;
+  overflow-wrap: anywhere;
+}
+input,
+select {
+  font: inherit;
+  accent-color: #bce8da;
+}
+
+.game-debug-cross {
+  position: fixed;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.game-debug-cross::before,
+.game-debug-cross::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #32ff72;
+  box-shadow: 0 0 2px #071e12;
+}
+.game-debug-cross::before {
+  width: 20px;
+  height: 2px;
+}
+.game-debug-cross::after {
+  width: 2px;
+  height: 20px;
+}

@@ -1,0 +1,823 @@
+{
+  "$defs": {
+    "Access": {
+      "additionalProperties": false,
+      "properties": {
+        "driveway_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "road_axis": {
+          "$ref": "#/$defs/Axis"
+        },
+        "road_center": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "driveway_id",
+        "id",
+        "position",
+        "road_axis",
+        "road_center"
+      ],
+      "type": "object"
+    },
+    "Axis": {
+      "enum": [
+        "x",
+        "z"
+      ],
+      "type": "string"
+    },
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "ChunkAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "cx": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cz": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lod_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "visual_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "bounds",
+        "cx",
+        "cz",
+        "id",
+        "lod_url",
+        "sha256",
+        "visual_url"
+      ],
+      "type": "object"
+    },
+    "EdgeKind": {
+      "enum": [
+        "lane",
+        "sidewalk",
+        "crossing",
+        "driveway"
+      ],
+      "type": "string"
+    },
+    "GraphAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "node_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "access_id",
+        "node_id"
+      ],
+      "type": "object"
+    },
+    "GraphEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/EdgeKind"
+        },
+        "speed_limit": {
+          "format": "double",
+          "type": "number"
+        },
+        "to": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "width": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "from",
+        "kind",
+        "speed_limit",
+        "to",
+        "width"
+      ],
+      "type": "object"
+    },
+    "GraphNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "position"
+      ],
+      "type": "object"
+    },
+    "MissionObjective": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "destination_zone_id": {
+                  "type": "string"
+                },
+                "dwell_ticks": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "max_speed": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "destination_zone_id",
+                "dwell_ticks",
+                "max_speed"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "courier",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "checkpoints": {
+                  "items": {
+                    "items": {
+                      "format": "double",
+                      "type": "number"
+                    },
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "type": "array"
+                  },
+                  "type": "array"
+                },
+                "gate_radius": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "checkpoints",
+                "gate_radius"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "time_trial",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": false,
+              "properties": {
+                "garage_zone_id": {
+                  "type": "string"
+                },
+                "parking_ids": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "garage_zone_id",
+                "parking_ids"
+              ],
+              "type": "object"
+            },
+            "kind": {
+              "const": "recovery",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MissionTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "objective": {
+          "$ref": "#/$defs/MissionObjective"
+        },
+        "reward_credits": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "terminal_zone_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "duration_ticks",
+        "id",
+        "objective",
+        "reward_credits",
+        "terminal_zone_id"
+      ],
+      "type": "object"
+    },
+    "ParkingSpawn": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "secured": {
+          "type": "boolean"
+        },
+        "template_id": {
+          "type": "string"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "access_id",
+        "id",
+        "position",
+        "reservation_id",
+        "secured",
+        "template_id",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "Rect": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "Reservation": {
+      "additionalProperties": false,
+      "properties": {
+        "clear": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "rect": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "clear",
+        "id",
+        "rect"
+      ],
+      "type": "object"
+    },
+    "RoadGraph": {
+      "additionalProperties": false,
+      "properties": {
+        "accesses": {
+          "items": {
+            "$ref": "#/$defs/GraphAccess"
+          },
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/GraphEdge"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/GraphNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "accesses",
+        "edges",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "Roads": {
+      "additionalProperties": false,
+      "properties": {
+        "carriageway_width": {
+          "format": "double",
+          "type": "number"
+        },
+        "sidewalk_width": {
+          "format": "double",
+          "type": "number"
+        },
+        "x": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "z": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "carriageway_width",
+        "sidewalk_width",
+        "x",
+        "z"
+      ],
+      "type": "object"
+    },
+    "SpawnPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "position": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "safe_radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "yaw": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "access_id",
+        "id",
+        "position",
+        "reservation_id",
+        "safe_radius",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "VehicleTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "acceleration": {
+          "format": "double",
+          "type": "number"
+        },
+        "brake": {
+          "format": "double",
+          "type": "number"
+        },
+        "dimensions": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "exit_offsets": {
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 3,
+            "minItems": 3,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "health": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "reverse_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "seat_offset": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "top_speed": {
+          "format": "double",
+          "type": "number"
+        },
+        "visual_asset_id": {
+          "type": "string"
+        },
+        "wheelbase": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "acceleration",
+        "brake",
+        "dimensions",
+        "exit_offsets",
+        "health",
+        "id",
+        "reverse_speed",
+        "seat_offset",
+        "top_speed",
+        "visual_asset_id",
+        "wheelbase"
+      ],
+      "type": "object"
+    },
+    "VisualAsset": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "sha256",
+        "url"
+      ],
+      "type": "object"
+    },
+    "Zone": {
+      "additionalProperties": false,
+      "properties": {
+        "access_id": {
+          "type": "string"
+        },
+        "allowed_templates": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "center": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ZoneKind"
+        },
+        "radius": {
+          "format": "double",
+          "type": "number"
+        },
+        "reservation_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "access_id",
+        "allowed_templates",
+        "center",
+        "id",
+        "kind",
+        "radius",
+        "reservation_id"
+      ],
+      "type": "object"
+    },
+    "ZoneKind": {
+      "enum": [
+        "delivery",
+        "garage",
+        "repair",
+        "terminal"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accesses": {
+      "items": {
+        "$ref": "#/$defs/Access"
+      },
+      "type": "array"
+    },
+    "bounds": {
+      "$ref": "#/$defs/Bounds"
+    },
+    "chunks": {
+      "items": {
+        "$ref": "#/$defs/ChunkAsset"
+      },
+      "type": "array"
+    },
+    "collision_sha256": {
+      "type": "string"
+    },
+    "collision_url": {
+      "type": "string"
+    },
+    "content_hash": {
+      "type": "string"
+    },
+    "debug_sha256": {
+      "type": "string"
+    },
+    "debug_url": {
+      "type": "string"
+    },
+    "mission_templates": {
+      "items": {
+        "$ref": "#/$defs/MissionTemplate"
+      },
+      "type": "array"
+    },
+    "parking": {
+      "items": {
+        "$ref": "#/$defs/ParkingSpawn"
+      },
+      "type": "array"
+    },
+    "pedestrian_graph": {
+      "$ref": "#/$defs/RoadGraph"
+    },
+    "reservations": {
+      "items": {
+        "$ref": "#/$defs/Reservation"
+      },
+      "type": "array"
+    },
+    "road_graph": {
+      "$ref": "#/$defs/RoadGraph"
+    },
+    "roads": {
+      "$ref": "#/$defs/Roads"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "sim_config_hash": {
+      "type": "string"
+    },
+    "sim_config_url": {
+      "type": "string"
+    },
+    "spawns": {
+      "items": {
+        "$ref": "#/$defs/SpawnPoint"
+      },
+      "type": "array"
+    },
+    "vehicle_templates": {
+      "items": {
+        "$ref": "#/$defs/VehicleTemplate"
+      },
+      "type": "array"
+    },
+    "vehicle_visuals": {
+      "items": {
+        "$ref": "#/$defs/VisualAsset"
+      },
+      "type": "array"
+    },
+    "world_asset_id": {
+      "type": "string"
+    },
+    "zones": {
+      "items": {
+        "$ref": "#/$defs/Zone"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "accesses",
+    "bounds",
+    "chunks",
+    "collision_sha256",
+    "collision_url",
+    "content_hash",
+    "debug_sha256",
+    "debug_url",
+    "mission_templates",
+    "parking",
+    "pedestrian_graph",
+    "reservations",
+    "road_graph",
+    "roads",
+    "schema_version",
+    "sim_config_hash",
+    "sim_config_url",
+    "spawns",
+    "vehicle_templates",
+    "vehicle_visuals",
+    "world_asset_id",
+    "zones"
+  ],
+  "title": "WorldManifest",
+  "type": "object"
+}

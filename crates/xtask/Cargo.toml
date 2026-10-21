@@ -1,0 +1,19 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+protocol.workspace = true
+content.workspace = true
+sim-core.workspace = true
+sim-wasm = { path = "../sim-wasm" }
+serde.workspace = true
+serde_json.workspace = true
+ts-rs.workspace = true
+schemars.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,46 @@
+{
+  "name": "port-meridian",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/client",
+    "packages/protocol",
+    "packages/content"
+  ],
+  "engines": {
+    "node": ">=24.0.0 <25",
+    "npm": ">=10 <12"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @port-meridian/client",
+    "build": "npm run protocol:generate && npm run content:bake && cargo build --workspace --locked && npm run bridge:generate && npm run build:wasm && npm run typecheck && npm run build --workspace @port-meridian/client",
+    "build:wasm": "node tools/build-wasm.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/client/tsconfig.json && tsc --noEmit -p packages/protocol/tsconfig.json && tsc --noEmit -p packages/content/tsconfig.json",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write . && cargo fmt --all",
+    "format:check": "prettier --check . && cargo fmt --all -- --check",
+    "test:unit": "vitest run",
+    "check": "npm run bridge:check && npm run build:wasm && npm run protocol:check && npm run content:check && npm run typecheck && npm run lint && npm run format:check && npm run test:unit && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked",
+    "protocol:generate": "cargo run -p xtask --locked -- generate",
+    "protocol:check": "cargo run -p xtask --locked -- check-generated",
+    "content:bake": "cargo run -p xtask --locked -- bake-content",
+    "content:generate": "cargo run -p xtask --locked -- generate-content",
+    "content:check": "cargo run -p xtask --locked -- check-content",
+    "sim:trace": "cargo run -p xtask --locked -- character-trace",
+    "bridge:generate": "cargo run -p xtask --locked -- generate-bridge",
+    "bridge:check": "cargo run -p xtask --locked -- check-bridge",
+    "predev": "npm run bridge:generate && npm run build:wasm"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,63 @@
+%% Frontend module system — current implementation through T10.
+%% Update with module, ownership, transport or data-flow changes.
+%% Purple: orchestration; blue: networking; green: simulation;
+%% orange: graphics; yellow: content; grey: diagnostics/external.
+flowchart TD
+  subgraph group_0["apps/client/src/ — application"]
+    main["main.ts<br/>Page routing"]:::app
+    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Contextual entry / exit prompts"]:::app
+    input["input/<br/>Walking / driving controls<br/>Interaction edge and held handbrake"]:::app
+    tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
+  end
+  subgraph group_1["apps/client/src/ — networking"]
+    session["net/session.ts<br/>Session lifecycle and state coordination"]:::net
+    transport["net/transport.ts<br/>WebSocket + WebRTC"]:::net
+    clock["net/clock.ts<br/>Server time and input lead"]:::net
+    replica["world/replica.ts<br/>Remote state and interpolation"]:::net
+  end
+  subgraph group_2["apps/client/src/ — simulation"]
+    prediction["simulation/prediction.ts<br/>Local prediction and reconciliation"]:::sim
+    bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
+  end
+  subgraph group_3["apps/client/src/ — graphics"]
+    renderer["render/renderer.ts<br/>Three.js scene, characters and cars"]:::gfx
+    camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks"]:::gfx
+  end
+  subgraph group_4["Shared frontend packages"]
+    content["packages/content/<br/>Load and verify map assets"]:::content
+    protocol["packages/protocol/<br/>Message encoding and validation"]:::net
+    wasm["packages/sim-wasm/<br/>Shared Rust simulation in WASM"]:::sim
+  end
+    backend["Backend<br/>HTTP :3001 · WS / WebRTC :3000"]:::other
+
+  main -->|"game page"| game
+  main -->|"diagnostic pages"| tools
+  input -->|"controls"| game
+  game -->|"advance frame"| session
+  session <-->|"game messages"| transport
+  transport <-->|"WS reliable / RTC unreliable"| backend
+  session <-->|"HTTP admission"| backend
+  session -->|"time estimate"| clock
+  session -->|"codec"| protocol
+  session -->|"inputs / owner corrections"| prediction
+  prediction -->|"simulate / replay"| bridge
+  bridge -->|"shared motor"| wasm
+  session -->|"baselines / remote snapshots"| replica
+  replica -.->|"sampled vehicle proxies for replay"| bridge
+  session -->|"load assets"| content
+  content -.->|"verified map assets"| game
+  session -.->|"local / remote poses"| game
+  game -->|"map and actor poses"| renderer
+  game -->|"pose and look input"| camera
+  camera -.->|"spherecast"| bridge
+  camera -->|"camera transform"| renderer
+  tools -.->|"session diagnostic"| session
+  tools -.->|"map inspector"| content
+  tools -.->|"simulation trace"| bridge
+
+  classDef app fill:#E9DDF7,stroke:#BDC5CE,color:#202B38
+  classDef net fill:#DCEBFA,stroke:#BDC5CE,color:#202B38
+  classDef sim fill:#DFF1E4,stroke:#BDC5CE,color:#202B38
+  classDef gfx fill:#FBE5D2,stroke:#BDC5CE,color:#202B38
+  classDef content fill:#FFF1BC,stroke:#BDC5CE,color:#202B38
+  classDef other fill:#ECEFF2,stroke:#BDC5CE,color:#202B38

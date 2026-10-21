@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProxySet",
+  "type": "object",
+  "properties": {
+    "proxies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/VehicleProxy"
+      }
+    },
+    "version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "proxies"
+  ],
+  "$defs": {
+    "EntityId": {
+      "type": "integer",
+      "maximum": 4294967295,
+      "minimum": 1
+    },
+    "Scalar": {
+      "type": "number",
+      "maximum": 3.4028234663852886e+38,
+      "minimum": -3.4028234663852886e+38
+    },
+    "Steering": {
+      "type": "number",
+      "maximum": 0.550000011920929,
+      "minimum": -0.550000011920929
+    },
+    "VehicleMotor": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "speed": {
+          "$ref": "#/$defs/Scalar"
+        },
+        "steering": {
+          "$ref": "#/$defs/Steering"
+        },
+        "velocity": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "yaw": {
+          "$ref": "#/$defs/Yaw"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "position",
+        "yaw",
+        "speed",
+        "steering",
+        "velocity"
+      ]
+    },
+    "VehicleProxy": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "motor": {
+          "$ref": "#/$defs/VehicleMotor"
+        },
+        "template": {
+          "$ref": "#/$defs/VehicleTemplate"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "entity_id",
+        "template",
+        "motor"
+      ]
+    },
+    "VehicleTemplate": {
+      "type": "object",
+      "properties": {
+        "acceleration": {
+          "type": "number",
+          "format": "double"
+        },
+        "brake": {
+          "type": "number",
+          "format": "double"
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "exit_offsets": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            },
+            "maxItems": 3,
+            "minItems": 3
+          }
+        },
+        "health": {
+          "type": "integer",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0
+        },
+        "id": {
+          "type": "string"
+        },
+        "reverse_speed": {
+          "type": "number",
+          "format": "double"
+        },
+        "seat_offset": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "top_speed": {
+          "type": "number",
+          "format": "double"
+        },
+        "visual_asset_id": {
+          "type": "string"
+        },
+        "wheelbase": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "dimensions",
+        "top_speed",
+        "reverse_speed",
+        "acceleration",
+        "brake",
+        "wheelbase",
+        "health",
+        "visual_asset_id",
+        "seat_offset",
+        "exit_offsets"
+      ]
+    },
+    "Yaw": {
+      "type": "number",
+      "maximum": 3.1415927410125732,
+      "minimum": -3.1415927410125732
+    }
+  }
+}

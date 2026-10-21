@@ -1,0 +1,1385 @@
+{
+  "$defs": {
+    "ActionCode": {
+      "enum": [
+        "ok",
+        "not_ready",
+        "stale_epoch",
+        "stale_request",
+        "invalid_target",
+        "out_of_range",
+        "occupied",
+        "too_fast",
+        "exit_blocked",
+        "cooldown",
+        "no_ammo",
+        "dead",
+        "unavailable",
+        "insufficient_funds",
+        "already_active",
+        "not_active",
+        "pursuit_active"
+      ],
+      "type": "string"
+    },
+    "ActionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_entity_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "applied_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "code": {
+          "$ref": "#/$defs/ActionCode"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "request_id": {
+          "$ref": "#/$defs/RequestId"
+        }
+      },
+      "required": [
+        "affected_entity_id",
+        "applied_tick",
+        "code",
+        "ok",
+        "request_id"
+      ],
+      "type": "object"
+    },
+    "BaselineBegin": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "$ref": "#/$defs/BaselineId"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "server_tick"
+      ],
+      "type": "object"
+    },
+    "BaselineEnd": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "$ref": "#/$defs/BaselineId"
+        },
+        "entity_count": {
+          "$ref": "#/$defs/EntityCount"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "entity_count"
+      ],
+      "type": "object"
+    },
+    "BaselineId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "BuildId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "CharacterHealth": {
+      "maximum": 100,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "CharacterMode": {
+      "enum": [
+        "on_foot",
+        "driving",
+        "downed",
+        "arrested"
+      ],
+      "type": "string"
+    },
+    "CharacterMotor": {
+      "additionalProperties": false,
+      "properties": {
+        "grounded": {
+          "type": "boolean"
+        },
+        "jump_cooldown_ticks": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "velocity": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "yaw": {
+          "$ref": "#/$defs/Yaw"
+        }
+      },
+      "required": [
+        "grounded",
+        "jump_cooldown_ticks",
+        "position",
+        "velocity",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "CharacterState": {
+      "additionalProperties": false,
+      "properties": {
+        "health": {
+          "$ref": "#/$defs/CharacterHealth"
+        },
+        "mode": {
+          "$ref": "#/$defs/CharacterMode"
+        },
+        "motor": {
+          "$ref": "#/$defs/CharacterMotor"
+        },
+        "vehicle_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "health",
+        "mode",
+        "motor",
+        "vehicle_id"
+      ],
+      "type": "object"
+    },
+    "ContentHash": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ControlEpoch": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Credits": {
+      "maximum": 1000000000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "DetailText": {
+      "maxLength": 512,
+      "minLength": 0,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]*$",
+      "type": "string"
+    },
+    "Disconnect": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/TemplateId"
+        },
+        "detail": {
+          "$ref": "#/$defs/DetailText"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "DisplayName": {
+      "maxLength": 20,
+      "minLength": 3,
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$",
+      "type": "string"
+    },
+    "EntityCount": {
+      "maximum": 96,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "EntityDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DisplayName"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entity_kind": {
+          "$ref": "#/$defs/EntityKind"
+        },
+        "id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "template_id": {
+          "$ref": "#/$defs/TemplateId"
+        }
+      },
+      "required": [
+        "display_name",
+        "entity_kind",
+        "id",
+        "template_id"
+      ],
+      "type": "object"
+    },
+    "EntityHide": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "reason": {
+          "$ref": "#/$defs/HideReason"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "visibility_id": {
+          "$ref": "#/$defs/VisibilityId"
+        }
+      },
+      "required": [
+        "entity_id",
+        "reason",
+        "server_tick",
+        "visibility_id"
+      ],
+      "type": "object"
+    },
+    "EntityId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "EntityKind": {
+      "enum": [
+        "player",
+        "vehicle",
+        "pedestrian",
+        "police"
+      ],
+      "type": "string"
+    },
+    "EntityShow": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BaselineId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "descriptor": {
+          "$ref": "#/$defs/EntityDescriptor"
+        },
+        "state": {
+          "$ref": "#/$defs/EntityState"
+        },
+        "state_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "visibility_id": {
+          "$ref": "#/$defs/VisibilityId"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "descriptor",
+        "state",
+        "state_tick",
+        "visibility_id"
+      ],
+      "type": "object"
+    },
+    "EntityState": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/CharacterState"
+            },
+            "kind": {
+              "const": "character",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/VehicleState"
+            },
+            "kind": {
+              "const": "vehicle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EventId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Heat": {
+      "maximum": 3,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "HideReason": {
+      "enum": [
+        "out_of_range",
+        "destroyed",
+        "disconnected"
+      ],
+      "type": "string"
+    },
+    "Impact": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "event_id": {
+          "$ref": "#/$defs/EventId"
+        },
+        "position": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        }
+      },
+      "required": [
+        "entity_id",
+        "event_id",
+        "position",
+        "server_tick",
+        "severity"
+      ],
+      "type": "object"
+    },
+    "InputLead": {
+      "maximum": 6,
+      "minimum": 2,
+      "type": "integer"
+    },
+    "Magazine": {
+      "maximum": 12,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Milliseconds": {
+      "maximum": 9007199254740991.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "MissionPhase": {
+      "enum": [
+        "active",
+        "completed",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "MissionView": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_index": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deadline_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "instance_id": {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        "phase": {
+          "$ref": "#/$defs/MissionPhase"
+        },
+        "target_entity_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_position": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "template_id": {
+          "$ref": "#/$defs/TemplateId"
+        }
+      },
+      "required": [
+        "checkpoint_index",
+        "deadline_tick",
+        "instance_id",
+        "phase",
+        "target_entity_id",
+        "target_position",
+        "template_id"
+      ],
+      "type": "object"
+    },
+    "OpaqueId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "OwnerState": {
+      "additionalProperties": false,
+      "properties": {
+        "consumed_through_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "control_epoch": {
+          "$ref": "#/$defs/ControlEpoch"
+        },
+        "controlled_entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "player_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "player_state": {
+          "$ref": "#/$defs/CharacterState"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/$defs/EntityState"
+        }
+      },
+      "required": [
+        "consumed_through_tick",
+        "control_epoch",
+        "controlled_entity_id",
+        "player_id",
+        "player_state",
+        "server_tick",
+        "state"
+      ],
+      "type": "object"
+    },
+    "PlayerStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "completed_jobs": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "credits": {
+          "$ref": "#/$defs/Credits"
+        },
+        "heat": {
+          "$ref": "#/$defs/Heat"
+        },
+        "magazine": {
+          "$ref": "#/$defs/Magazine"
+        },
+        "mission": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MissionView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protected_until_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pursuit": {
+          "$ref": "#/$defs/Pursuit"
+        },
+        "reload_end_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "respawn_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "completed_jobs",
+        "credits",
+        "heat",
+        "magazine",
+        "mission",
+        "protected_until_tick",
+        "pursuit",
+        "reload_end_tick",
+        "respawn_tick",
+        "revision",
+        "server_tick"
+      ],
+      "type": "object"
+    },
+    "Pong": {
+      "additionalProperties": false,
+      "properties": {
+        "client_time_ms": {
+          "$ref": "#/$defs/Milliseconds"
+        },
+        "nonce": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "server_time_ms": {
+          "$ref": "#/$defs/Milliseconds"
+        }
+      },
+      "required": [
+        "client_time_ms",
+        "nonce",
+        "server_tick",
+        "server_time_ms"
+      ],
+      "type": "object"
+    },
+    "ProfileView": {
+      "additionalProperties": false,
+      "properties": {
+        "completed_jobs": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "credits": {
+          "$ref": "#/$defs/Credits"
+        },
+        "display_name": {
+          "$ref": "#/$defs/DisplayName"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/OpaqueId"
+        }
+      },
+      "required": [
+        "completed_jobs",
+        "credits",
+        "display_name",
+        "profile_id"
+      ],
+      "type": "object"
+    },
+    "ProtocolVersion": {
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Pursuit": {
+      "enum": [
+        "clear",
+        "pursuing",
+        "searching",
+        "arresting"
+      ],
+      "type": "string"
+    },
+    "Reject": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/RejectCode"
+        },
+        "detail": {
+          "$ref": "#/$defs/DetailText"
+        }
+      },
+      "required": [
+        "code",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "RejectCode": {
+      "enum": [
+        "version_mismatch",
+        "content_mismatch",
+        "invalid_ticket",
+        "server_full",
+        "invalid_name",
+        "unavailable"
+      ],
+      "type": "string"
+    },
+    "RequestId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Revision": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Scalar": {
+      "maximum": 3.4028234663852886e+38,
+      "minimum": -3.4028234663852886e+38,
+      "type": "number"
+    },
+    "ServerHello": {
+      "additionalProperties": false,
+      "properties": {
+        "build_id": {
+          "$ref": "#/$defs/BuildId"
+        },
+        "content_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "protocol_version": {
+          "$ref": "#/$defs/ProtocolVersion"
+        },
+        "sim_config_hash": {
+          "$ref": "#/$defs/ContentHash"
+        },
+        "snapshot_rate": {
+          "$ref": "#/$defs/SnapshotRate"
+        },
+        "tick_rate": {
+          "$ref": "#/$defs/TickRate"
+        }
+      },
+      "required": [
+        "build_id",
+        "content_hash",
+        "protocol_version",
+        "sim_config_hash",
+        "snapshot_rate",
+        "tick_rate"
+      ],
+      "type": "object"
+    },
+    "ServerMessage": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ServerHello"
+            },
+            "kind": {
+              "const": "server_hello",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Reject"
+            },
+            "kind": {
+              "const": "reject",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Welcome"
+            },
+            "kind": {
+              "const": "welcome",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BaselineBegin"
+            },
+            "kind": {
+              "const": "baseline_begin",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/EntityShow"
+            },
+            "kind": {
+              "const": "entity_show",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/BaselineEnd"
+            },
+            "kind": {
+              "const": "baseline_end",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/StartPlay"
+            },
+            "kind": {
+              "const": "start_play",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/EntityHide"
+            },
+            "kind": {
+              "const": "entity_hide",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Snapshot"
+            },
+            "kind": {
+              "const": "snapshot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/OwnerState"
+            },
+            "kind": {
+              "const": "owner_state",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/OwnerState"
+            },
+            "kind": {
+              "const": "control_changed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ActionResult"
+            },
+            "kind": {
+              "const": "action_result",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/PlayerStatus"
+            },
+            "kind": {
+              "const": "player_status",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/WorldEvent"
+            },
+            "kind": {
+              "const": "world_event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Pong"
+            },
+            "kind": {
+              "const": "pong",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Disconnect"
+            },
+            "kind": {
+              "const": "disconnect",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Severity": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "type": "number"
+    },
+    "Shot": {
+      "additionalProperties": false,
+      "properties": {
+        "end": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "event_id": {
+          "$ref": "#/$defs/EventId"
+        },
+        "hit_entity_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "origin": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shooter_id": {
+          "$ref": "#/$defs/EntityId"
+        }
+      },
+      "required": [
+        "end",
+        "event_id",
+        "hit_entity_id",
+        "origin",
+        "server_tick",
+        "shooter_id"
+      ],
+      "type": "object"
+    },
+    "Snapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "records": {
+          "items": {
+            "$ref": "#/$defs/StateRecord"
+          },
+          "maxItems": 96,
+          "minItems": 1,
+          "type": "array"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "records",
+        "server_tick"
+      ],
+      "type": "object"
+    },
+    "SnapshotRate": {
+      "maximum": 10,
+      "minimum": 10,
+      "type": "integer"
+    },
+    "StartPlay": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "$ref": "#/$defs/BaselineId"
+        },
+        "owner": {
+          "$ref": "#/$defs/OwnerState"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "owner"
+      ],
+      "type": "object"
+    },
+    "StateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "entity_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "state": {
+          "$ref": "#/$defs/EntityState"
+        },
+        "visibility_id": {
+          "$ref": "#/$defs/VisibilityId"
+        }
+      },
+      "required": [
+        "entity_id",
+        "state",
+        "visibility_id"
+      ],
+      "type": "object"
+    },
+    "Steering": {
+      "maximum": 0.550000011920929,
+      "minimum": -0.550000011920929,
+      "type": "number"
+    },
+    "TemplateId": {
+      "maxLength": 64,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "type": "string"
+    },
+    "TickRate": {
+      "maximum": 30,
+      "minimum": 30,
+      "type": "integer"
+    },
+    "VehicleHealth": {
+      "maximum": 160,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "VehicleMotor": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "speed": {
+          "$ref": "#/$defs/Scalar"
+        },
+        "steering": {
+          "$ref": "#/$defs/Steering"
+        },
+        "velocity": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "yaw": {
+          "$ref": "#/$defs/Yaw"
+        }
+      },
+      "required": [
+        "position",
+        "speed",
+        "steering",
+        "velocity",
+        "yaw"
+      ],
+      "type": "object"
+    },
+    "VehicleState": {
+      "additionalProperties": false,
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "driver_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "health": {
+          "$ref": "#/$defs/VehicleHealth"
+        },
+        "motor": {
+          "$ref": "#/$defs/VehicleMotor"
+        }
+      },
+      "required": [
+        "disabled",
+        "driver_id",
+        "health",
+        "motor"
+      ],
+      "type": "object"
+    },
+    "VisibilityId": {
+      "maximum": 4294967295,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "Welcome": {
+      "additionalProperties": false,
+      "properties": {
+        "input_lead_ticks": {
+          "$ref": "#/$defs/InputLead"
+        },
+        "player_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "profile": {
+          "$ref": "#/$defs/ProfileView"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input_lead_ticks",
+        "player_id",
+        "profile",
+        "server_tick"
+      ],
+      "type": "object"
+    },
+    "WorldEvent": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Shot"
+            },
+            "kind": {
+              "const": "shot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/Impact"
+            },
+            "kind": {
+              "const": "impact",
+              "type": "string"
+            }
+          },
+          "required": [
+            "data",
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Yaw": {
+      "maximum": 3.1415927410125732,
+      "minimum": -3.1415927410125732,
+      "type": "number"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "message": {
+      "$ref": "#/$defs/ServerMessage"
+    },
+    "session_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "v": {
+      "$ref": "#/$defs/ProtocolVersion"
+    },
+    "world_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OpaqueId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "message",
+    "session_id",
+    "v",
+    "world_id"
+  ],
+  "title": "ServerEnvelope",
+  "type": "object"
+}
