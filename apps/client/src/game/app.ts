@@ -435,10 +435,13 @@ export class GameApp {
         this.lastHud = now;
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
+        const drivingStatus = this.session?.isDriving
+          ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
+          : "";
         this.debug.textContent = `${this.connection} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
         this.hud.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}`
+            ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}`
             : "Port Meridian · Walking and driving";
       }
     } catch (error) {

@@ -25,11 +25,11 @@ The scripted connection diagnostic is now [localhost:5173/diagnostic](http://loc
 | Command | Current behavior |
 |---|---|
 | `npm run dev` | Generate bridge/build WASM, then loopback Vite on port 5173; fails if occupied |
-| `npm run check` | Generated drift, strict TS, lint/formatting, 183 TS tests (including release WASM/seeded netcode), Clippy, and 72 Rust tests |
+| `npm run check` | Generated drift, strict TS, lint/formatting, 184 TS tests (including release WASM/seeded netcode), Clippy, and 73 Rust tests |
 | `npm run build` | Generate contracts/content, compile native Rust/package WASM, type-check, bundle frontend |
 | `npm run sim:trace` | Replay the native 60-second character trace against 13 saved checkpoints |
 | `npm run build:wasm` | Package release WASM + web JS/declarations using pinned wasm-bindgen CLI |
-| `cargo test --workspace --locked` | Run 22 simulation, 1 bridge, 8 content, 9 protocol, 30 server and 2 drift tests |
+| `cargo test --workspace --locked` | Run 23 simulation, 1 bridge, 8 content, 9 protocol, 30 server and 2 drift tests |
 | `cargo run -p server --locked` | Start authoritative WS/RTC on 127.0.0.1:3000 and local HTTP issuer on 127.0.0.1:3001 |
 | `npm run protocol:generate` / `protocol:check` | Generate contracts/fixtures or detect drift without modifying files |
 | `npm run content:generate` / `content:check` | Generate content contracts or detect contract/baked-package drift |

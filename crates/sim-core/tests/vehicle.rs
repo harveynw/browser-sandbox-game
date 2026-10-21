@@ -75,6 +75,79 @@ fn driving_from_slice_parking_keeps_a_valid_flat_motor() {
     }
 }
 #[test]
+fn held_handbrake_overrides_throttle_stops_both_directions_and_releases() {
+    let (config, world) = room(false);
+    let template = &source().vehicle_templates[0];
+    for direction in [-1.0_f32, 1.0] {
+        let mut state = spawn_vehicle([0.0, 0.0, 0.0], 0.0).unwrap();
+        state.speed = Scalar(direction * 6.0);
+        state.velocity = protocol::Vec3([Scalar(0.0), Scalar(0.0), Scalar(-direction * 6.0)]);
+        let mut coast = state.clone();
+        for tick in 1..=30 {
+            let context = StepContext {
+                tick,
+                collision: &world,
+                config: &config,
+            };
+            coast = step_vehicle(&coast, &neutral_input(tick, Yaw(0.0)), template, &context)
+                .unwrap()
+                .motor;
+            let mut input = neutral_input(tick, Yaw(0.0));
+            input.move_z = InputAxis((direction * 32767.0) as i16);
+            input.buttons = Buttons(4);
+            state = step_vehicle(&state, &input, template, &context)
+                .unwrap()
+                .motor;
+        }
+        assert!(
+            coast.speed.0.abs() > 4.0,
+            "coasting must remain distinct from braking"
+        );
+        assert_eq!(state.speed.0, 0.0, "Space must stop despite held throttle");
+        assert!(
+            state.position.0[2].0.abs() < 2.0,
+            "handbrake stopping distance"
+        );
+        let stopped = state.position.clone();
+        for tick in 31..=60 {
+            let mut input = neutral_input(tick, Yaw(0.0));
+            input.move_z = InputAxis((direction * 32767.0) as i16);
+            input.buttons = Buttons(4);
+            state = step_vehicle(
+                &state,
+                &input,
+                template,
+                &StepContext {
+                    tick,
+                    collision: &world,
+                    config: &config,
+                },
+            )
+            .unwrap()
+            .motor;
+        }
+        assert_eq!(state.position, stopped, "held brake prevents creeping");
+        let mut input = neutral_input(61, Yaw(0.0));
+        input.move_z = InputAxis((direction * 32767.0) as i16);
+        state = step_vehicle(
+            &state,
+            &input,
+            template,
+            &StepContext {
+                tick: 61,
+                collision: &world,
+                config: &config,
+            },
+        )
+        .unwrap()
+        .motor;
+        assert!(
+            state.speed.0 * direction > 0.2,
+            "release restores acceleration"
+        );
+    }
+}
+#[test]
 fn throttle_brake_reverse_steering_and_handbrake_are_bounded() {
     let (config, world) = room(false);
     let template = &source().vehicle_templates[0];

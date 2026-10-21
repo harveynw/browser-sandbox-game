@@ -93,7 +93,7 @@ Map roads are flat, but the character should handle low steps. Test against wall
 Cars use planar bicycle steering, upright Y = 0, no gravity, rollover, suspension physics, or airborne driving in alpha.
 
 1. Apply throttle acceleration from its template. Opposite throttle while moving first applies brake; change direction only when speed magnitude < 0.25 m/s.
-2. With neutral input, approach zero speed using 1.5 m/s² rolling resistance. Handbrake adds 8 m/s² deceleration.
+2. With neutral input, approach zero speed using 1.5 m/s² rolling resistance. While held, the handbrake overrides throttle to neutral and adds 8 m/s² deceleration; it holds the stopped car even when W/S remains pressed. Releasing it restores throttle immediately.
 3. Steering input positive means right, so target steering angle is **negative** under our yaw convention. Max steering magnitude interpolates from 0.55 rad at rest to 0.20 rad at top speed. Move steering toward target at 2.5 rad/s.
 4. Compute `yaw_rate = speed / wheelbase * tan(steering)`. Clamp magnitude to 1.8 rad/s. At zero speed there is no yaw turn.
 5. Forward vector is `[-sin(yaw), 0, -cos(yaw)]`; displacement is forward × speed × DT.

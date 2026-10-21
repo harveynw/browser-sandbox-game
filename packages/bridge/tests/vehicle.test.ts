@@ -11,6 +11,7 @@ import type { CollisionPackage, VehicleTemplate } from "@port-meridian/content";
 import type { OwnerState, VehicleMotor } from "@port-meridian/protocol";
 import fixture from "../../../tests/fixtures/simulation/vehicle-trace.json";
 import contentIndex from "../../../apps/client/public/content/slice.json";
+import { InputState } from "../../../apps/client/src/input/input";
 const initial = fixture.initial_motor as VehicleMotor;
 beforeAll(async () => {
   await init({
@@ -24,6 +25,48 @@ async function world() {
   w.loadCollision(fixture.collision as CollisionPackage, fixture.sim_config);
   return w;
 }
+it("holds and releases the handbrake through real driving controls and WASM despite held throttle", async () => {
+  for (const direction of [-1, 1]) {
+    const w = await world();
+    try {
+      const input = new InputState();
+      input.active = true;
+      input.press(direction > 0 ? "KeyW" : "KeyS");
+      input.press("Space");
+      const motor: VehicleMotor = {
+        ...initial,
+        position: [0, 0, 0],
+        velocity: [0, 0, -direction * 6],
+        speed: direction * 6,
+        yaw: 0,
+        steering: 0,
+      };
+      w.reset({
+        version: 1,
+        tick: 0,
+        control_epoch: 2,
+        controlled_entity_id: 9,
+        motor: actorMotor(motor),
+        vehicle: { motor, template: fixture.template as VehicleTemplate },
+      });
+      for (let tick = 1; tick <= 30; tick++)
+        w.step({ tick, ...input.sample(true) });
+      const stopped = w.currentState();
+      expect(Math.abs(stopped.vehicle?.motor.speed ?? NaN)).toBe(0);
+      expect(Math.abs(stopped.motor.position[2])).toBeLessThan(2);
+      for (let tick = 31; tick <= 60; tick++)
+        w.step({ tick, ...input.sample(true) });
+      expect(w.currentState().motor.position).toEqual(stopped.motor.position);
+      input.release("Space");
+      const resumed = w.step({ tick: 61, ...input.sample(true) });
+      expect((resumed.vehicle?.motor.speed ?? NaN) * direction).toBeGreaterThan(
+        0.2,
+      );
+    } finally {
+      w.free();
+    }
+  }
+});
 it("keeps the real parking-to-street route flat through coasting and braking", async () => {
   const w = await PredictionWorld.create();
   try {

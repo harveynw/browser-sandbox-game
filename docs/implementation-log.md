@@ -382,3 +382,21 @@ Manual scenario evidence:
 Known limitations: greybox compact only, two authored cars, flat upright vehicle physics, no vehicle damage/respawn gameplay, missions, NPC traffic, durable profiles or public hosting. Dynamic collisions under network impairment and 16-client capacity/soak remain T19/T20. Native pointer-lock acceptance and forced WebGL restoration remain unverified. G2 remains partial until the courier loop is implemented.
 
 Next action: **T11 — courier vertical slice**, after the user's milestone review. Stop here; no courier or broader-alpha work was added in this continuation.
+
+
+### T10 feedback — handbrake priority and verification
+
+The user requested verification that the handbrake works. Inspection found that Space supplied the correct held button, but W/S acceleration was applied before braking: with the configured 7 m/s² acceleration and 8 m/s² handbrake, a held accelerator reduced effective braking to 1 m/s². A new native regression reproduced a car starting at 6 m/s still travelling at 5 m/s after one second of throttle plus Space.
+
+Corrected the shared native/WASM vehicle motor so a held handbrake overrides throttle to neutral, then applies the existing rolling resistance and handbrake deceleration. It now stops and holds in both directions even with W/S held; releasing Space restores acceleration. Steering, brake strength, collision and network authority remain unchanged. Updated the owning vehicle rules in document 06 and the usage guide in document 24. The HUD now displays authoritative speed in km/h and a Handbrake indicator while the local driving control holds Space.
+
+Verification:
+
+- Added a native forward/reverse regression comparing handbraking against coasting from 6 m/s: stop within 30 ticks / one second and less than 2 m; remain stationary for another second with throttle held; release and resume acceleration. This failed before the fix and passes afterward.
+- Added a real release-WASM regression sampling the actual InputState W/S + Space controls, verifying stop/hold/release in both directions. Existing held-control, pause/focus cleanup and the unchanged 60-second native/WASM vehicle trace also pass.
+- `npm run check` — **PASS**, 184 TypeScript tests and 73 Rust tests, release WASM, contract/content drift, strict TS, lint/format and Clippy warnings denied.
+- `npm run build` — **PASS**, including native server and production frontend; existing Three.js chunk warning only.
+- Live in-app browser using the rebuilt real Rust server: accelerated to **25 km/h**, then held **W + Space** for two seconds and observed authoritative **0 km/h**. Holding W + Space again retained zero speed; the UI visibly showed **Handbrake**. Releasing it and holding W restored **25 km/h**. Space alone then returned to **0 km/h**. No session/epoch change or disconnection occurred during these braking checks.
+- Screenshot of the held brake and zero-speed HUD: `/private/tmp/port-meridian-handbrake-held.png`. Browser and server remain available for the user, with the test car stopped.
+
+This is a T10 control correction; T11 remains unstarted.

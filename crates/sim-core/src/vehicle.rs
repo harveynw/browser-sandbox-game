@@ -100,7 +100,13 @@ pub fn step_vehicle(
         return Err("vehicle starts obstructed".into());
     }
     let config = &context.config.vehicle;
-    let throttle = f32::from(input.move_z.0) / 32767.0;
+    let handbrake = input.buttons.0 & 4 != 0;
+    // A held handbrake must stop and hold the car even with W/S still down.
+    let throttle = if handbrake {
+        0.0
+    } else {
+        f32::from(input.move_z.0) / 32767.0
+    };
     let mut speed = state.speed.0;
     if throttle == 0.0 {
         speed = approach(speed, 0.0, config.rolling_resistance as f32 * DT_SECONDS);
@@ -113,7 +119,7 @@ pub fn step_vehicle(
     } else {
         speed += throttle * template.acceleration as f32 * DT_SECONDS;
     }
-    if input.buttons.0 & 4 != 0 {
+    if handbrake {
         speed = approach(speed, 0.0, config.handbrake as f32 * DT_SECONDS);
     }
     speed = speed.clamp(-template.reverse_speed as f32, template.top_speed as f32);
