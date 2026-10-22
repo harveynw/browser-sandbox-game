@@ -159,8 +159,10 @@ export class BrowserTransport {
     try {
       for (const handler of this.bytesHandlers)
         handler(channel, new Uint8Array(data));
-    } catch {
-      this.close("Invalid server message");
+    } catch (error) {
+      this.close(
+        `Invalid server message${error instanceof Error ? `: ${error.message}` : ""}`,
+      );
     }
   }
   private checkPressure(): boolean {

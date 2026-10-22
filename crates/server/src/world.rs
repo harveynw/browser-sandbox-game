@@ -1,14 +1,14 @@
 use crate::{
     admission::{MemoryProfiles, random_id},
     content_loader::WorldContent,
-    replication::{Budget, InputRate, SpatialIndex, packets},
+    replication::{Budget, InputRate, LIFECYCLE_RESERVE, SpatialIndex, packets},
     transport::*,
 };
 use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t12-local";
+pub const BUILD_ID: &str = "t13-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -66,6 +66,7 @@ pub struct World {
     pub players: BTreeMap<u32, Player>,
     pub metrics: Metrics,
     pub vehicles: BTreeMap<u32, crate::vehicles::Vehicle>,
+    pub population: crate::population::Population,
     content: WorldContent,
     config: SimConfig,
     collision: CollisionWorld,
@@ -127,7 +128,14 @@ impl World {
                 .set_vehicle_proxies(&vehicles.values().map(|v| v.proxy()).collect::<Vec<_>>())?;
         }
         let next_entity = vehicles.len() as u32 + 1;
+        let population = crate::population::Population::new(
+            &content.manifest,
+            &content.config,
+            vehicles.keys().copied(),
+            424242,
+        )?;
         Ok(Self {
+            population,
             tick: 0,
             id: random_id("world-", 16)?,
             sessions: BTreeMap::new(),
@@ -239,6 +247,20 @@ impl World {
                             display_name: None,
                         },
                         EntityState::Vehicle(v.state.clone()),
+                    ),
+                )
+            }))
+            .chain(self.population.pedestrians.iter().map(|(&id, p)| {
+                (
+                    id,
+                    (
+                        EntityDescriptor {
+                            id: p.id,
+                            entity_kind: EntityKind::Pedestrian,
+                            template_id: TemplateId("pedestrian_greybox".into()),
+                            display_name: None,
+                        },
+                        EntityState::Character(p.state.clone()),
                     ),
                 )
             }))
@@ -502,7 +524,7 @@ impl World {
                 if !s.visible.contains_key(&vehicle_id) {
                     return ActionCode::OutOfRange;
                 }
-                if car.state.driver_id.is_some() {
+                if car.state.driver_id.is_some() || !self.population.can_enter(vehicle_id) {
                     return ActionCode::Occupied;
                 }
                 if car.state.disabled || car.state.health.0 == 0 {
@@ -1101,6 +1123,25 @@ impl World {
             s.inputs.retain(|tick, _| *tick > next);
             actor_inputs.insert(player.state.vehicle_id.map_or(id, |v| v.0), input);
         }
+        let observers: Vec<_> = self
+            .sessions
+            .values()
+            .filter(|s| s.phase == SessionPhase::Playing)
+            .filter_map(|s| s.player)
+            .filter_map(|id| self.players.get(&id.0))
+            .map(|p| crate::population::Observer {
+                position: p.state.motor.position.0.map(|v| v.0),
+                yaw: p.state.motor.yaw.0,
+            })
+            .collect();
+        self.population.direct(
+            next,
+            &observers,
+            &mut self.vehicles,
+            &self.content.manifest,
+            &mut self.collision,
+            &mut self.next_entity,
+        )?;
         self.collision.set_vehicle_proxies(
             &self
                 .vehicles
@@ -1108,12 +1149,23 @@ impl World {
                 .map(|v| v.proxy())
                 .collect::<Vec<_>>(),
         )?;
+        self.population.decide(
+            next,
+            &self.vehicles,
+            &observers,
+            &self.content.manifest,
+            &mut self.collision,
+        )?;
         for car_id in self.vehicles.keys().copied().collect::<Vec<_>>() {
             let car = self.vehicles.get_mut(&car_id).ok_or("missing vehicle")?;
             self.collision.exclude_vehicle(Some(car.id.0));
             let input = actor_inputs
                 .get(&car.id.0)
                 .cloned()
+                .or_else(|| {
+                    self.population
+                        .vehicle_input(car.id.0, next, car.state.motor.speed.0)
+                })
                 .unwrap_or_else(|| sim_core::neutral_input(next, car.state.motor.yaw));
             match sim_core::step_vehicle(
                 &car.state.motor,
@@ -1173,6 +1225,8 @@ impl World {
                 }
             }
         }
+        self.population
+            .step_pedestrians(next, &self.collision, &self.config)?;
         self.tick = next;
         for peer in failed {
             self.disconnect(peer, profiles);
@@ -1235,6 +1289,13 @@ impl World {
                     };
                     (age_b >= 9)
                         .cmp(&(age_a >= 9))
+                        .then_with(|| {
+                            if age_a >= 9 && age_b >= 9 {
+                                age_b.cmp(&age_a)
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        })
                         .then(dist(a).total_cmp(&dist(b)))
                         .then(a.cmp(b))
                 });
@@ -1268,6 +1329,16 @@ impl World {
         }
         let mut flushed = 0;
         while let Some((peer, delivery, message)) = self.output.pop_front() {
+            // A failed reliable send retires this session immediately. Never send the
+            // tail of its baseline after dropping an earlier show record.
+            if !self.sessions.contains_key(&peer)
+                && !matches!(
+                    message.message,
+                    ServerMessage::Reject(_) | ServerMessage::Disconnect(_)
+                )
+            {
+                continue;
+            }
             flushed += 1;
             if flushed > 4096 {
                 return Err("tick output budget exhausted".into());
@@ -1277,10 +1348,11 @@ impl World {
                 .len();
             let is_snapshot = matches!(message.message, ServerMessage::Snapshot(_));
             if let Some(session) = self.sessions.get_mut(&peer) {
-                if !session
-                    .egress_budget
-                    .allow(bytes, now, if is_snapshot { 1100 } else { 0 })
-                {
+                if !session.egress_budget.allow(
+                    bytes,
+                    now,
+                    if is_snapshot { LIFECYCLE_RESERVE } else { 0 },
+                ) {
                     self.metrics.budget_drops += 1;
                     if delivery == Delivery::Reliable {
                         self.disconnect(peer, profiles);

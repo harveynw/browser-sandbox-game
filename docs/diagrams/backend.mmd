@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T12.
+%% Backend module system — current implementation through T13.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -9,6 +9,7 @@ flowchart TD
     loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
     missions["missions.rs<br/>Courier dwell, failure and reward lifecycle"]:::sim
+    population["population.rs<br/>1 Hz director · 5 Hz NPC decisions<br/>Pool tags, lane paths and intersection reservations"]:::sim
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
   end
   subgraph group_1["crates/server/src/ — networking and admission"]
@@ -49,6 +50,8 @@ flowchart TD
   world -->|"evaluate courier after movement"| missions
   world <-->|"commit reward event / profile values"| admission
   world -->|"private mission and credits status"| transport
+  world <-->|"spawn / recycle · NPC controls and replicas"| population
+  population -->|"shared motors and collision queries"| sim
   world -->|"step authoritative movement"| sim
   world -->|"atomic entry / exit geometry"| vehicles
   vehicles -->|"seat transforms and clearance queries"| sim

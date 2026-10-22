@@ -31,8 +31,10 @@ const neutral = (tick: number, yaw: number): InputFrame => ({
   look_pitch: 0,
   buttons: 0,
 });
-const mixYaw = (a: number, b: number, t: number) =>
-  a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+const mixYaw = (a: number, b: number, t: number) => {
+  const yaw = a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+  return Math.atan2(Math.sin(yaw), Math.cos(yaw));
+};
 export function mixMotor(
   a: CharacterMotor,
   b: CharacterMotor,

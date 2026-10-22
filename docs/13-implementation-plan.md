@@ -26,7 +26,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T10 Cars and possession | T09 | Shared driving and atomic entry/exit |
 | Complete | T11 Courier vertical slice | T10 | Complete short gameplay loop |
 | Complete | T12 Full city and content kit | T11 | Six districts, navigation, streaming visuals |
-| Not started | T13 Traffic and pedestrians | T12 | Bounded city population |
+| Complete | T13 Traffic and pedestrians | T12 | Bounded city population |
 | Not started | T14 Pistol and damage | T13 | Authoritative hits, health, downing |
 | Not started | T15 Police and heat | T14 | Witnesses, pursuit, search, arrest |
 | Not started | T16 Remaining jobs and repair | T15 | Time trial/recovery/repair rules |

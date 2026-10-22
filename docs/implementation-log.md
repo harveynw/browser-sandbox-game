@@ -18,7 +18,7 @@ Latest checkpoint: **T12 complete, 21 October 2026**. The user requested a stop/
 | T10 — Cars and possession | Complete |
 | T11 — Courier vertical slice | Complete |
 | T12 — Full city and content kit | Complete |
-| T13 — Traffic and pedestrians | Not started |
+| T13 — Traffic and pedestrians | Complete |
 | T14 — Pistol and damage | Not started |
 | T15 — Police and heat | Not started |
 | T16 — Remaining jobs and repair | Not started |
@@ -452,3 +452,27 @@ Saved evidence: `docs/evidence/t12-city.png`, `docs/evidence/t12-handbrake.png`,
 Limitations: greybox presentation, flat vehicle physics, inactive trial/recovery gameplay, no traffic, combat or police. Final tall-camera behavior is covered automatically; the final-package live driving sample used a compact. Broader memory profiling, frame-rate/capacity gates and sustained soak remain T20. Native pointer lock and forced WebGL restoration retain their prior verification limits.
 
 Next action: stop for milestone review. **T13 — Traffic and pedestrians** is next and has not started.
+
+## T13 — Ambient traffic and pedestrians
+
+Status: **complete, 22 October 2026**. The user approved proceeding after the progress assessment. Saved the completed T12 work as commit `bc53cec`, then implemented this milestone. T14 remains unstarted.
+
+Implemented:
+
+- Added `population.rs`: seeded, ordered population state; once-per-second hidden spawning/retirement; permanent vehicle-pool tags; 24 traffic and 32 pedestrian caps; parked capacity of 24 with eight recovery slots reserved. The four authored ordinary parked cars remain the current public parking stock. Empty parked slots are not populated with arbitrary off-road cars. Occupied traffic cars stay pinned and retain their original slot through player possession/disconnect.
+- Directed lane travel-time paths use a FIFO capped at four jobs per tick and two requests per second per car. Five-Hz driving decisions feed the existing 30-Hz motor with proportional cruise control, a 12 m/s maximum, turn slowdown, three front obstacle rays, actor sensing, deterministic four-second intersection reservations, safe no-path stops and hidden stuck recovery. Nearby free authored public parking spots support Parking → Available without creating a replacement entity. AI-driven cars cannot be taken while stopped/yielding.
+- Pedestrians use the shared character motor at 1.4 m/s along sidewalk/authored crossing edges, occasional waits, traffic checks before crossing and completion once committed. Added a graph-bound five-second flee hook for future authoritative observations; no shots/damage/police producer was added. Pedestrian replicas use the existing descriptor/state contracts, AOI and interpolation, with purple rendering and local diagnostic counts.
+- Updated current architecture diagrams, README, task status and [27 — Ambient population](27-ambient-population.md). The content package and native/WASM movement fixtures are unchanged.
+
+Verification and corrections:
+
+- Final `npm run check` — **PASS**, **195 TypeScript / 92 Rust tests**, generated contract/content/bridge drift, release WASM, strict typing, lint/formatting and Clippy with warnings denied. Final `npm run build` — **PASS**, native workspace, generated/baked content, release WASM and production client. Existing Vite large Three.js chunk advisory remains.
+- Seven population tests cover cap/reservation accounting, occupied pinning, deterministic motion, hidden/ranged spawning, shared-motor clearance, sensor braking, unreachable-route stopping, intersection ownership/expiry, actual parking/availability, crossing waits and flee expiry. The 2,100-tick seeded city traversal reaches **24 traffic / 32 pedestrians**, spawns **119** successive actors, observes **50 traffic actors moving over 20 m**, recycles **63** actors before its final empty-world retirement, and never processes more than **four path jobs per tick**. Every vehicle motor endpoint is collision-safe and remains at or below 12 m/s; pedestrian endpoints are capsule-clear. [Saved native transcript](evidence/t13-population-test.txt).
+- Two world regressions cross the real codec: NPC show/snapshot replication, rejected AI-seat entry, available-car player driving and disconnect pool identity; and a saturated populated connection completing resync without exhausting reliable bandwidth. The fake world observer changes district position explicitly; this is not claimed as a live driving route or a real-time capacity benchmark.
+- Live production verification exposed lifecycle pressure at populated density: Resync world closed the old client with **Incomplete baseline**. A native regression failed before the fix. Snapshot traffic now preserves **64 KiB inside the existing 120 KiB burst allowance** at both application and transport layers, without changing the 60 KiB/s rate; retired sessions cannot emit a dropped baseline's tail. The regression passes afterward.
+- Investigation also reproduced an existing shortest-arc interpolation error at ±π: the real WASM proxy test failed with **Invalid bridge DTO/version** before normalizing the interpolated angle, and passes in both directions afterward. Receive failures now retain their concrete error detail instead of presenting every handler exception as an unspecified invalid message.
+- Final production browser at `localhost:4173` used real WS/RTC, received 32 relevant pedestrians before resync, and completed **two populated resyncs, epoch 1 → 2 → 3**, remaining the same player 5. Saved diagnostics at tick **2418** show **68 WS / 68 RTC receipts**, **0.000 m correction p95**, 14 resident chunks, no pending/failed chunks and 1.4 MiB WASM. Ordinary keyboard walking afterward reached the Market Grid street, with purple pedestrians and moving cars visible. Screenshots: [street](evidence/t13-street.jpg), [resync](evidence/t13-resync.jpg); [displayed diagnostic transcript](evidence/t13-live-diagnostics.txt). This is one final local guest, not the later 16-player/impairment benchmark.
+
+Limitations: original greybox visuals and simple waypoint driving; no overtaking, signal phases, combat, damage or police. Dense replication can still drop lower-priority snapshots within the configured budget; overdue records now sort by oldest refresh age before distance. Some distant actors can show the existing stale treatment. Visibility safety uses static occlusion from authoritative guest eye positions, not a trusted client camera report. Full population/frame/memory profiling, target network impairment, native pointer-lock and forced WebGL restoration retain their later verification scope.
+
+Next action: stop for milestone review. **T14 — Pistol and damage** is next and has not started.

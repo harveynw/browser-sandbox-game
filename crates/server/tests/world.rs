@@ -950,3 +950,129 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
         assert_eq!(w.vehicles[&id].state.driver_id, w.sessions[&p].player);
     }
 }
+
+#[test]
+fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
+    let mut a = MemoryProfiles::default();
+    let mut t = FakeTransport::default();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    for _ in 0..120 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(!w.population.traffic.is_empty());
+    assert!(!w.population.pedestrians.is_empty());
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::EntityShow(s) if s.descriptor.entity_kind==EntityKind::Pedestrian && matches!(s.state,EntityState::Character(_)))));
+    let pedestrian_ids: BTreeSet<_> = w.population.pedestrians.keys().copied().collect();
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::Snapshot(s) if s.records.iter().any(|r|pedestrian_ids.contains(&r.entity_id.0)))));
+    let car_id = *w.population.traffic.keys().next().unwrap();
+    w.vehicles.get_mut(&car_id).unwrap().stop();
+    let player = w.sessions[&p].player.unwrap().0;
+    let entry = w.vehicles[&car_id].entry();
+    w.players.get_mut(&player).unwrap().state.motor =
+        sim_core::spawn_character(entry, 0.0).unwrap();
+    step(&mut w, &mut a, &mut t);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        100,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car_id),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==100 && r.code==ActionCode::Occupied)));
+    assert_eq!(w.vehicles[&car_id].state.driver_id, None);
+    // The parking state machine's Available transition enables ordinary possession.
+    w.population.traffic.get_mut(&car_id).unwrap().phase =
+        server::population::TrafficPhase::Available;
+    w.vehicles.get_mut(&car_id).unwrap().stop();
+    at_door(&mut w, p, car_id);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        101,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car_id),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.vehicles[&car_id].state.driver_id, Some(EntityId(player)));
+    assert_eq!(
+        w.population.pools[&car_id],
+        server::population::VehiclePool::Traffic
+    );
+    let before = w.vehicles[&car_id].state.motor.position.clone();
+    for _ in 0..6 {
+        batch(&w, &mut t, p, w.tick + 1, 0, 32767, 2);
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_ne!(w.vehicles[&car_id].state.motor.position, before);
+    w.disconnect(p, &mut a);
+    assert_eq!(w.vehicles[&car_id].state.driver_id, None);
+    assert_eq!(
+        w.population.pools[&car_id],
+        server::population::VehiclePool::Traffic
+    );
+    assert!(w.population.traffic.len() <= 24 && w.population.pedestrians.len() <= 32);
+}
+
+#[test]
+fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
+    let mut a = MemoryProfiles::default();
+    let mut t = FakeTransport::default();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    for _ in 0..360 {
+        if w.tick.is_multiple_of(60) {
+            batch(&w, &mut t, p, w.tick + 1, 0, 0, 1);
+        }
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+    }
+    assert!(
+        w.metrics.budget_drops > 0,
+        "exercise saturated snapshot output"
+    );
+    send(
+        &w,
+        &mut t,
+        p,
+        ClientMessage::ResyncRequest(ResyncRequest {
+            reason: ResyncReason::Stale,
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    let mut shown = BTreeSet::new();
+    let mut expected = None;
+    for (_, _, envelope) in &t.sent {
+        match &envelope.message {
+            ServerMessage::EntityShow(s) if s.baseline_id == Some(BaselineId(2)) => {
+                shown.insert(s.descriptor.id.0);
+            }
+            ServerMessage::BaselineEnd(end) if end.baseline_id == BaselineId(2) => {
+                expected = Some(usize::from(end.entity_count.0))
+            }
+            _ => {}
+        }
+    }
+    assert!(
+        w.sessions.contains_key(&p),
+        "resync must not exhaust reliable byte budget"
+    );
+    assert_eq!(Some(shown.len()), expected);
+    assert!(shown.len() > 32);
+    ready(&mut w, &mut a, &mut t, p);
+    assert_eq!(w.sessions[&p].phase, SessionPhase::Playing);
+    assert_eq!(w.sessions[&p].epoch, 2);
+}

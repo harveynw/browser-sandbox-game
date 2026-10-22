@@ -1,6 +1,6 @@
 //! Bounded application boundary. Only the pump thread touches net::Server.
 //! Dependency-internal queues remain unbounded/opaque; see docs/04.
-use crate::replication::{Budget, SnapshotBuffer};
+use crate::replication::{Budget, LIFECYCLE_RESERVE, SnapshotBuffer};
 use protocol::{ClientEnvelope, Delivery, ServerEnvelope, decode_client, encode_server};
 use std::{
     collections::{BTreeMap, VecDeque},
@@ -237,7 +237,11 @@ impl NetCrateTransport {
                                     match p.snapshots.drain() {
                                         Ok(packets) => {
                                             for bytes in packets {
-                                                if p.wire_budget.allow(bytes.len(), now, 1100) {
+                                                if p.wire_budget.allow(
+                                                    bytes.len(),
+                                                    now,
+                                                    LIFECYCLE_RESERVE,
+                                                ) {
                                                     sends.push((
                                                         key.id,
                                                         Delivery::Unreliable,

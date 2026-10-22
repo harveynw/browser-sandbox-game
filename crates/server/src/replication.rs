@@ -2,6 +2,9 @@
 use protocol::*;
 use std::collections::{BTreeMap, BTreeSet};
 use std::result::Result;
+/// Keep a bounded baseline/lifecycle burst available while snapshots saturate the link.
+/// This reserves tokens inside the existing 60 KiB/s, 120 KiB burst budget.
+pub const LIFECYCLE_RESERVE: usize = 64 * 1024;
 #[derive(Debug)]
 pub struct Budget {
     tokens: f64,

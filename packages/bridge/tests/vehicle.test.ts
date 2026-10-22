@@ -5,6 +5,7 @@ import { PredictionWorld } from "../../../apps/client/src/simulation/bridge";
 import {
   LocalPrediction,
   actorMotor,
+  mixMotor,
 } from "../../../apps/client/src/simulation/prediction";
 import { ServerClock } from "../../../apps/client/src/net/clock";
 import type { CollisionPackage, VehicleTemplate } from "@port-meridian/content";
@@ -280,5 +281,38 @@ it("uses the controlled entity's class for compact, van and sport prediction", a
     } finally {
       w.free();
     }
+  }
+});
+
+it("accepts turning traffic proxies across the yaw boundary during reconciliation", async () => {
+  const w = await world();
+  try {
+    for (const direction of [-1, 1]) {
+      const a = { ...actorMotor(initial), yaw: direction * 3.1 };
+      const b = { ...a, yaw: -direction * 3.1 };
+      for (const fraction of [0.25, 0.5, 0.75, 1]) {
+        const sampled = mixMotor(a, b, fraction);
+        const motor = {
+          ...initial,
+          position: [20, 0, 0] as [number, number, number],
+          yaw: sampled.yaw,
+        };
+        expect(() =>
+          w.setVehicleProxies({
+            version: 1,
+            proxies: [
+              {
+                entity_id: 77,
+                template: fixture.template as VehicleTemplate,
+                motor,
+              },
+            ],
+          }),
+        ).not.toThrow();
+        expect(Math.abs(sampled.yaw)).toBeLessThanOrEqual(Math.PI);
+      }
+    }
+  } finally {
+    w.free();
   }
 });

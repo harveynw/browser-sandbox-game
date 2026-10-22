@@ -1,4 +1,4 @@
-%% Frontend module system — current implementation through T12.
+%% Frontend module system — current implementation through T13.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -13,14 +13,14 @@ flowchart TD
     session["net/session.ts<br/>Session lifecycle and state coordination"]:::net
     transport["net/transport.ts<br/>WebSocket + WebRTC"]:::net
     clock["net/clock.ts<br/>Server time and input lead"]:::net
-    replica["world/replica.ts<br/>Remote state and interpolation"]:::net
+    replica["world/replica.ts<br/>Player / NPC state and interpolation"]:::net
   end
   subgraph group_2["apps/client/src/ — simulation"]
     prediction["simulation/prediction.ts<br/>Local prediction and reconciliation"]:::sim
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, characters and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route"]:::gfx
     camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]

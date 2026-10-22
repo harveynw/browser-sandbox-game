@@ -36,6 +36,10 @@ export class GameRenderer {
     color: "#66d8c3",
     roughness: 0.8,
   });
+  private readonly pedestrianMaterial = new THREE.MeshStandardMaterial({
+    color: "#c5a5dc",
+    roughness: 0.8,
+  });
   private readonly staleMaterial = new THREE.MeshStandardMaterial({
     color: "#9ca9aa",
     roughness: 0.8,
@@ -172,6 +176,7 @@ export class GameRenderer {
     this.geometry.add(capsule);
     this.capsule = capsule;
     this.materials.add(this.remoteMaterial);
+    this.materials.add(this.pedestrianMaterial);
     this.materials.add(this.staleMaterial);
     this.materials.add(this.characterMaterial);
     const body = new THREE.Mesh(capsule, this.characterMaterial);
@@ -434,7 +439,11 @@ export class GameRenderer {
         body instanceof THREE.Mesh &&
         actor.descriptor.entity_kind !== "vehicle"
       )
-        body.material = actor.stale ? this.staleMaterial : this.remoteMaterial;
+        body.material = actor.stale
+          ? this.staleMaterial
+          : actor.descriptor.entity_kind === "pedestrian"
+            ? this.pedestrianMaterial
+            : this.remoteMaterial;
       group.scale.setScalar(
         actor.state.kind === "character" && actor.state.data.mode === "driving"
           ? 0.55
