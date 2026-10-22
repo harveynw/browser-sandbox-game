@@ -120,8 +120,10 @@ export class GameSession {
     try {
       const [assets, bridge] = await Promise.all([
         loadPackage(
-          new URL("/content/slice.json", location.href),
+          new URL("/content/city.json", location.href),
           this.abort.signal,
+          fetch,
+          { streamVisuals: true },
         ),
         import("../simulation/bridge"),
       ]);
@@ -161,6 +163,7 @@ export class GameSession {
             });
           prediction.setVehicleProxies({ version: 1, proxies });
         },
+        (id) => this.replicas.template(id),
       );
       this.assets = assets;
       prediction.loadCollision(assets.collision, assets.sim);
@@ -238,7 +241,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t11-local" ||
+      info.build_id !== "t12-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -549,6 +552,13 @@ export class GameSession {
   presentation(now: number): CharacterMotor | undefined {
     return this.local?.presentation(now);
   }
+  get controlledVehicleTemplate() {
+    return this.driving
+      ? this.assets?.manifest.vehicle_templates.find(
+          (t) => t.id === this.replicas.template(this.controlled),
+        )
+      : undefined;
+  }
   get isDriving(): boolean {
     return this.driving;
   }
@@ -632,10 +642,10 @@ export class GameSession {
     return target?.state.kind === "vehicle"
       ? target.state.data.driver_id
         ? "Vehicle occupied"
-        : `E enter compact${job}`
+        : `E enter ${target.descriptor.template_id}${job}`
       : terminal && !this.mission
         ? "E / F accept courier · 150 credits"
-        : "Walk to the left door of a parked compact · E enter";
+        : "Walk to the left door of a parked car · E enter";
   }
   interact(): void {
     const now = performance.now();

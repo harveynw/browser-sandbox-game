@@ -113,6 +113,30 @@
       ],
       "type": "object"
     },
+    "District": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "rect": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "color",
+        "id",
+        "name",
+        "rect"
+      ],
+      "type": "object"
+    },
     "EdgeKind": {
       "enum": [
         "lane",
@@ -353,6 +377,9 @@
         "id": {
           "type": "string"
         },
+        "mission_reserved": {
+          "type": "boolean"
+        },
         "position": {
           "items": {
             "format": "double",
@@ -379,6 +406,7 @@
       "required": [
         "access_id",
         "id",
+        "mission_reserved",
         "position",
         "reservation_id",
         "secured",
@@ -704,6 +732,9 @@
       },
       "type": "array"
     },
+    "backdrop": {
+      "$ref": "#/$defs/VisualAsset"
+    },
     "bounds": {
       "$ref": "#/$defs/Bounds"
     },
@@ -727,6 +758,15 @@
     },
     "debug_url": {
       "type": "string"
+    },
+    "districts": {
+      "items": {
+        "$ref": "#/$defs/District"
+      },
+      "type": "array"
+    },
+    "minimap": {
+      "$ref": "#/$defs/VisualAsset"
     },
     "mission_templates": {
       "items": {
@@ -796,6 +836,7 @@
   },
   "required": [
     "accesses",
+    "backdrop",
     "bounds",
     "chunks",
     "collision_sha256",
@@ -803,6 +844,8 @@
     "content_hash",
     "debug_sha256",
     "debug_url",
+    "districts",
+    "minimap",
     "mission_templates",
     "parking",
     "pedestrian_graph",

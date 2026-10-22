@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T11 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T12 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T12 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T13 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -17,7 +17,7 @@ Latest checkpoint: **T11 complete, 21 October 2026**. The user requested a stop/
 | T09 — Prediction/replication | Complete |
 | T10 — Cars and possession | Complete |
 | T11 — Courier vertical slice | Complete |
-| T12 — Full city and content kit | Not started |
+| T12 — Full city and content kit | Complete |
 | T13 — Traffic and pedestrians | Not started |
 | T14 — Pistol and damage | Not started |
 | T15 — Police and heat | Not started |
@@ -431,3 +431,24 @@ Design clarifications: documents 07/09 now explicitly distinguish memory rewards
 Limitations: one original courier template and compact greybox district; terminal failure feedback combines failure/cancellation because the existing MissionView carries no failure reason. Real timeout/death boundary cases are automated, not additional live three-minute runs. Higher-capacity memory event exhaustion retains pending outcomes and requires restarting the memory server; durable recovery/UI remains later work. Traffic, combat, police, full city, 16-player soak, physical RTC impairment, successful native pointer lock and forced WebGL restoration remain outside this milestone's evidence.
 
 Next action: stop for user review of the complete slice. **T12 — full map, navigation and content kit** is the next plan task; it was not started here.
+
+## T12 — Full city and content kit
+
+Status: **complete**, 21 October 2026. Continued after the user's approval of the next step. The runtime and inspector now use the full 768 m city: six named districts, 36 chunks, 385 static colliders, connected lane/sidewalk/access graphs, eight landmarks, three car templates and four public cars. Trial/recovery templates, repair and eight reserved recovery slots are authored and validated for later gameplay. The old slice remains a separately baked regression fixture. No traffic or pedestrian population was added.
+
+Added hashed streamed visuals with 192 m loading / 256 m retention, at most four requests and 24 detailed resident chunks, two retries, timeout/cancellation, coarse fallback and buffer disposal. All simplified collision loads before Ready and never depends on visual residency. Added original district palettes, outside backdrop, baked minimap, template-aware prediction/seating/prompts and a taller van camera. Content schemas, generated packages and frontend/backend ownership diagrams were updated together.
+
+Verification:
+
+- `npm run check` — **PASS**, 194 TypeScript / 83 Rust tests, including release WASM, content/protocol/bridge drift, typing, lint/formatting and Clippy with warnings denied. Original slice traces remain unchanged.
+- `npm run build` — **PASS**, native workspace, generated contracts/content, release WASM and production frontend. Existing Vite chunk-size advisory remains.
+- Native full-city acceptance samples **17,818** graph positions for floor/clearance, runs all three vehicle motors against complete collision, sees five distinct landmarks from major intersections, and drives the continuous ring for **7,478 ticks / 2,780.3 m**. Malformed content, streaming bounds/retries/cancellation/disposal, corrupt distant assets, actual vehicle-template prediction and van camera height have regression coverage.
+- Live traversal crossed Quay → Market Grid → Civic Center and the former slice boundary, moving beyond the initial chunk's keep radius. Observed 14–18 resident chunks, 94–114 KiB instance matrices, 1.4 MiB WASM, three geometries and zero settled failed/pending requests. Civic van entry succeeded; it reached 17 km/h and stopped under Space. This run preceded final hill/pavilion decoration and revealed the camera obstruction fixed afterward.
+- Final package `1bbfceac46cadc4262a397c510856a4158cc7ca7425bcd7266e32d39bc076e63` admitted the browser with real WS/RTC, minimap and streamed detail. Final compact run advanced control epoch 2 → 3, reached **25 km/h**, and stopped under **W + Space** at car center **[-152.00, 0.00, 162.12]**, seat **[-152.00, 0.80, 161.87]**. Displayed correction p95 stayed 0.000 m. A separate clear-space reverse check reached **25 km/h**, then **S + Space** stopped the car at **[-152.00, 0.00, 169.17]**, well before the next parked car at Z = 192; the saved screenshot is this second check. The full map inspector independently verified 36 chunks / 385 colliders and all six district labels.
+- `npm run content:audit -- docs/evidence/t12-budgets.json` records raw/gzip asset sizes and managed graphics bounds. Full city assets are **666,200 B raw / 62,477 B gzip**; collision **41,461 B**; conservative first play including all production code is about **722 kB gzip**, below 12 MiB. Retained instance matrices are bounded at **146,944 B**, and minimap pixels at **851,968 B**. These are asset/buffer accounting, not total browser heap/driver measurements.
+
+Saved evidence: `docs/evidence/t12-city.png`, `docs/evidence/t12-handbrake.png`, `docs/evidence/t12-streaming.png`, and the budget JSON. [26 — Full city](26-full-city.md) documents ownership, reproduction and limits. Content provenance lists only original procedural assets.
+
+Limitations: greybox presentation, flat vehicle physics, inactive trial/recovery gameplay, no traffic, combat or police. Final tall-camera behavior is covered automatically; the final-package live driving sample used a compact. Broader memory profiling, frame-rate/capacity gates and sustained soak remain T20. Native pointer lock and forced WebGL restoration retain their prior verification limits.
+
+Next action: stop for milestone review. **T13 — Traffic and pedestrians** is next and has not started.

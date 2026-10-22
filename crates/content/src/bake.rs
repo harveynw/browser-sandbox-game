@@ -84,6 +84,7 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             [(b.max[0] - b.min[0]) / 2.0, 2.0, 0.5],
         );
     }
+    let full = source.bounds.min[0] == -384.0;
     let recipe = &source.buildings;
     let mut rng = recipe.seed;
     for xpair in source.roads.x.windows(2) {
@@ -137,9 +138,19 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         let (role, color) = match c.role {
             ColliderRole::Ground => (VisualRole::Ground, "#647763"),
             ColliderRole::Boundary => (VisualRole::Boundary, "#e0a348"),
-            ColliderRole::Building => {
-                (VisualRole::Building, palette[c.id as usize % palette.len()])
-            }
+            ColliderRole::Building => (
+                VisualRole::Building,
+                source
+                    .districts
+                    .iter()
+                    .find(|d| {
+                        c.center[0] >= d.rect.min[0]
+                            && c.center[0] < d.rect.max[0]
+                            && c.center[2] >= d.rect.min[1]
+                            && c.center[2] < d.rect.max[1]
+                    })
+                    .map_or(palette[c.id as usize % palette.len()], |d| d.color.as_str()),
+            ),
             ColliderRole::Landmark => {
                 let color = &source.landmarks[landmark_index].color;
                 landmark_index += 1;
@@ -219,8 +230,10 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
     }
     let mut files = BTreeMap::new();
     let mut chunks = Vec::new();
-    for cx in 1..=2 {
-        for cz in 3..=4 {
+    let xs = if full { 0..=5 } else { 1..=2 };
+    let zs = if full { 0..=5 } else { 3..=4 };
+    for cx in xs {
+        for cz in zs.clone() {
             let id = format!("chunk_{cx}_{cz}");
             let min = [
                 -384.0 + 128.0 * f64::from(cx),
@@ -289,6 +302,58 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         let sha256 = asset(&mut files, &url, &visual)?;
         vehicle_visuals.push(VisualAsset { id, url, sha256 });
     }
+    let mut backdrop = VisualChunk {
+        schema_version: 1,
+        id: "backdrop".into(),
+        primitives: visuals
+            .iter()
+            .filter(|p| {
+                matches!(
+                    p.role,
+                    VisualRole::Building
+                        | VisualRole::Landmark
+                        | VisualRole::Ground
+                        | VisualRole::Boundary
+                )
+            })
+            .cloned()
+            .collect(),
+    };
+    if full {
+        backdrop.primitives.push(primitive(
+            "ocean".into(),
+            VisualRole::Ground,
+            [0.0, -2.0, 0.0],
+            [800.0, 0.1, 800.0],
+            "#426d82",
+            None,
+        ));
+        backdrop.primitives.push(primitive(
+            "heights_distant_hill".into(),
+            VisualRole::Landmark,
+            [-216.0, 10.0, -420.0],
+            [60.0, 20.0, 24.0],
+            "#65825e",
+            None,
+        ));
+    }
+    let minimap = VisualChunk {
+        schema_version: 1,
+        id: "minimap".into(),
+        primitives: visuals
+            .iter()
+            .filter(|p| p.role != VisualRole::Marking)
+            .cloned()
+            .map(|mut p| {
+                p.center[1] = 0.001;
+                p.half_extents[1] = 0.001;
+                p.collider_id = None;
+                p
+            })
+            .collect(),
+    };
+    let backdrop_hash = asset(&mut files, "backdrop.json", &backdrop)?;
+    let minimap_hash = asset(&mut files, "minimap.json", &minimap)?;
     let collision_sha256 = asset(&mut files, "collision.json", &collision)?;
     let sim_config_hash = asset(&mut files, "sim-config.json", &source.sim_config)?;
     let debug = DebugOverlay {
@@ -311,6 +376,17 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         debug_url: "debug.json".into(),
         debug_sha256,
         chunks,
+        districts: source.districts.clone(),
+        backdrop: VisualAsset {
+            id: "backdrop".into(),
+            url: "backdrop.json".into(),
+            sha256: backdrop_hash,
+        },
+        minimap: VisualAsset {
+            id: "minimap".into(),
+            url: "minimap.json".into(),
+            sha256: minimap_hash,
+        },
         road_graph: graph(source, false)?,
         pedestrian_graph: graph(source, true)?,
         reservations: source.reservations.clone(),

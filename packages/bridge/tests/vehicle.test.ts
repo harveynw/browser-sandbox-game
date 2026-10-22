@@ -242,3 +242,43 @@ it("requires reliable control installation and cannot regain a retired car from 
     w.free();
   }
 });
+
+it("uses the controlled entity's class for compact, van and sport prediction", async () => {
+  const city = JSON.parse(
+    await readFile(
+      new URL("../../../content/source/city.json", import.meta.url),
+      "utf8",
+    ),
+  ) as { vehicle_templates: VehicleTemplate[] };
+  for (const template of city.vehicle_templates) {
+    const w = await world();
+    try {
+      const clock = new ServerClock();
+      clock.observe(10, 0);
+      const p = new LocalPrediction(
+        w,
+        clock,
+        () => {},
+        city.vehicle_templates,
+        () => {},
+        () => template.id,
+      );
+      p.install(carOwner(10), 0);
+      expect(w.currentState().vehicle?.template.id).toBe(template.id);
+      const state = w.step({
+        tick: w.currentState().tick + 1,
+        move_x: 0,
+        move_z: 32767,
+        buttons: 0,
+        look_yaw: 0,
+        look_pitch: 0,
+      });
+      expect(state.vehicle?.motor.speed).toBeCloseTo(
+        template.acceleration / 30,
+        3,
+      );
+    } finally {
+      w.free();
+    }
+  }
+});

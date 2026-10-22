@@ -17,8 +17,9 @@ fn run() -> Result<(), String> {
     if !args.is_empty() && args != ["--check-content"] {
         return Err("Usage: cargo run -p server -- [--check-content]".into());
     }
-    let content = WorldContent::load(
+    let content = WorldContent::load_index(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
+        "city.json",
     )?;
     let mut world = World::new(content)?;
     if !args.is_empty() {
@@ -35,7 +36,7 @@ fn run() -> Result<(), String> {
     let mut transport =
         NetCrateTransport::start("127.0.0.1:3000").map_err(|e| format!("WS bind/start: {e}"))?;
     println!(
-        "T11 localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
+        "T12 localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
         world.id
     );
     println!(

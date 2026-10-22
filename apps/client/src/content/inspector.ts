@@ -18,9 +18,9 @@ export function mountMapInspector(root: HTMLElement): () => void {
   header.className = "map-hud";
   const eyebrow = document.createElement("p");
   eyebrow.className = "stage";
-  eyebrow.textContent = "T04 · 256 m content slice";
+  eyebrow.textContent = "T12 · 768 m city";
   const title = document.createElement("h1");
-  title.textContent = "Old Quay / Market Grid";
+  title.textContent = "Port Meridian / Six districts";
   const status = document.createElement("p");
   status.setAttribute("role", "status");
   status.textContent = "Verifying baked content…";
@@ -103,8 +103,13 @@ export function mountMapInspector(root: HTMLElement): () => void {
     const camera = new THREE.OrthographicCamera(-200, 200, 200, -200, 1, 2000);
     const fit = () => {
       const aspect = innerWidth / innerHeight;
-      const width = 400 * Math.max(1, aspect),
-        height = 400 * Math.max(1, 1 / aspect);
+      const extent =
+        Math.max(
+          manifest.bounds.max[0] - manifest.bounds.min[0],
+          manifest.bounds.max[2] - manifest.bounds.min[2],
+        ) * 1.4;
+      const width = extent * Math.max(1, aspect),
+        height = extent * Math.max(1, 1 / aspect);
       camera.left = -width / 2;
       camera.right = width / 2;
       camera.top = height / 2;
@@ -112,14 +117,14 @@ export function mountMapInspector(root: HTMLElement): () => void {
       camera.updateProjectionMatrix();
     };
     fit();
-    camera.position.set(-330, 270, 380);
+    camera.position.set(-800, 700, 800);
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(-128, 0, 128);
+    controls.target.set(0, 0, 0);
     controls.enableDamping = true;
     controls.minZoom = 0.4;
     controls.maxZoom = 20;
     controls.minDistance = 10;
-    controls.maxDistance = 650;
+    controls.maxDistance = 2000;
     controls.maxPolarAngle = Math.PI / 2 - 0.03;
     controls.update();
     scene.add(new THREE.HemisphereLight("#eaf8ff", "#364434", 2.5));
@@ -280,6 +285,15 @@ export function mountMapInspector(root: HTMLElement): () => void {
     routeLine.renderOrder = 7;
     scene.add(routeLine);
     const landmarks = [
+      ...manifest.districts.map((d) => ({
+        text: d.name,
+        position: [
+          (d.rect.min[0] + d.rect.max[0]) / 2,
+          0,
+          (d.rect.min[1] + d.rect.max[1]) / 2,
+        ],
+        color: "#ffffff",
+      })),
       ...manifest.spawns.map((s) => ({
         text: s.id,
         position: s.position,
@@ -290,11 +304,13 @@ export function mountMapInspector(root: HTMLElement): () => void {
         position: z.center,
         color: z.kind === "delivery" ? "#f9dc7b" : "#c4dcfa",
       })),
-      ...manifest.parking.map((p) => ({
-        text: p.id,
-        position: p.position,
-        color: "#a5dcf1",
-      })),
+      ...manifest.parking
+        .filter((p) => !p.mission_reserved)
+        .map((p) => ({
+          text: p.id,
+          position: p.position,
+          color: "#a5dcf1",
+        })),
     ].map((label) => {
       const el = document.createElement("span");
       el.textContent = label.text;
@@ -326,15 +342,15 @@ export function mountMapInspector(root: HTMLElement): () => void {
     button("Isometric", () => {
       camera.zoom = 1;
       camera.updateProjectionMatrix();
-      camera.position.set(-330, 270, 380);
-      controls?.target.set(-128, 0, 128);
+      camera.position.set(-800, 700, 800);
+      controls?.target.set(0, 0, 0);
       controls?.update();
     });
     button("Top view", () => {
       camera.zoom = 1;
       camera.updateProjectionMatrix();
-      camera.position.set(-128, 340, 128.1);
-      controls?.target.set(-128, 0, 128);
+      camera.position.set(0, 800, 0.1);
+      controls?.target.set(0, 0, 0);
       controls?.update();
     });
     status.textContent = `Verified · ${manifest.chunks.length} chunks · ${collision.colliders.length} colliders · no game server required`;
@@ -380,7 +396,7 @@ export function mountMapInspector(root: HTMLElement): () => void {
     };
     tick();
   }
-  void loadPackage(new URL("/content/slice.json", location.href), abort.signal)
+  void loadPackage(new URL("/content/city.json", location.href), abort.signal)
     .then(show)
     .catch((error: unknown) => {
       if (disposed) return;

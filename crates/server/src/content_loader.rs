@@ -32,7 +32,10 @@ fn asset(value: &str) -> bool {
 impl WorldContent {
     /// Runtime reads the published package, never rebakes or trusts a source-only hash.
     pub fn load(root: &Path) -> Result<Self, String> {
-        let index: PackageIndex = serde_json::from_slice(&read(&root.join("slice.json"), 4096)?)
+        Self::load_index(root, "slice.json")
+    }
+    pub fn load_index(root: &Path, index_name: &str) -> Result<Self, String> {
+        let index: PackageIndex = serde_json::from_slice(&read(&root.join(index_name), 4096)?)
             .map_err(|e| e.to_string())?;
         if index.schema_version != 1
             || !hash(&index.content_hash)
@@ -68,6 +71,10 @@ impl WorldContent {
                 &manifest.debug_url,
                 &manifest.debug_sha256,
             )))
+            .chain([
+                (&manifest.backdrop.url, &manifest.backdrop.sha256),
+                (&manifest.minimap.url, &manifest.minimap.sha256),
+            ])
             .chain(manifest.chunks.iter().map(|c| (&c.visual_url, &c.sha256)))
             .chain(manifest.vehicle_visuals.iter().map(|v| (&v.url, &v.sha256)));
         let mut total = manifest_bytes.len();

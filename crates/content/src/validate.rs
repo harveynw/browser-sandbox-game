@@ -105,14 +105,38 @@ pub fn authoring(a: &Authoring) -> Result<()> {
         "unsupported content/config version",
     )?;
     require(id(&a.world_asset_id), "invalid world asset ID")?;
+    let full = a.bounds.min == [-384.0, -2.0, -384.0] && a.bounds.max == [384.0, 64.0, 384.0];
     require(
-        a.bounds.min == [-256.0, -2.0, 0.0] && a.bounds.max == [0.0, 64.0, 256.0],
-        "T04 baker supports the specified 256m slice only",
+        full || (a.bounds.min == [-256.0, -2.0, 0.0] && a.bounds.max == [0.0, 64.0, 256.0]),
+        "unsupported city/slice bounds",
     )?;
     require(
-        a.roads.x.len() == 3 && a.roads.z.len() == 3,
+        a.districts.len() == if full { 6 } else { 0 },
+        "district count mismatch",
+    )?;
+    unique(a.districts.iter().map(|d| d.id.as_str()), "district")?;
+    for (i, d) in a.districts.iter().enumerate() {
+        require(
+            contains(&bounds_rect(&a.bounds), &d.rect)
+                && d.rect.max[0] - d.rect.min[0] == 256.0
+                && d.rect.max[1] - d.rect.min[1] == 384.0,
+            "district dimensions",
+        )?;
+        for other in a.districts.iter().skip(i + 1) {
+            require(!overlap(&d.rect, &other.rect), "district overlap")?;
+        }
+    }
+    require(
+        a.roads.x.len() == if full { 7 } else { 3 } && a.roads.z.len() == if full { 7 } else { 3 },
         "slice requires three road lines on each axis",
     )?;
+    if full {
+        require(
+            a.roads.x == [-352.0, -256.0, -128.0, 0.0, 128.0, 256.0, 352.0]
+                && a.roads.z == a.roads.x,
+            "full city grid/ring positions",
+        )?;
+    }
     require(
         a.roads.carriageway_width == 12.0 && a.roads.sidewalk_width == 3.0,
         "slice requires 12m roads and 3m sidewalks",
@@ -124,7 +148,7 @@ pub fn authoring(a: &Authoring) -> Result<()> {
         require(
             lines.windows(2).all(|p| p[1] - p[0] >= 40.0)
                 && lines[0] - 9.0 >= min + 1.0
-                && lines[2] + 9.0 <= max - 1.0,
+                && lines[lines.len() - 1] + 9.0 <= max - 1.0,
             "road envelopes outside boundary or too close",
         )?;
     }
@@ -277,9 +301,11 @@ pub fn authoring(a: &Authoring) -> Result<()> {
         for id in &z.allowed_templates {
             require(
                 z.kind == ZoneKind::Terminal
-                    && a.mission_templates
-                        .iter()
-                        .any(|m| &m.id == id && m.terminal_zone_id == z.id),
+                    && a.mission_templates.iter().any(|m| {
+                        &m.id == id
+                            && (m.terminal_zone_id == z.id
+                                || matches!(m.objective, MissionObjective::Recovery { .. }))
+                    }),
                 "terminal references incompatible mission",
             )?;
         }
@@ -310,8 +336,47 @@ pub fn authoring(a: &Authoring) -> Result<()> {
                     && *max_speed > 0.0,
                 "invalid courier destination/dwell",
             )?,
-            MissionObjective::TimeTrial { .. } | MissionObjective::Recovery { .. } => {
-                return Err("full-city mission content begins in T12".into());
+            MissionObjective::TimeTrial {
+                checkpoints,
+                gate_radius,
+            } => {
+                require(
+                    full && checkpoints.len() >= 3
+                        && checkpoints.first() == checkpoints.last()
+                        && *gate_radius == 8.0,
+                    "invalid time trial gates",
+                )?;
+                for point in checkpoints {
+                    require(
+                        finite(*point)
+                            && point[1] == 0.0
+                            && contains(
+                                &bounds_rect(&a.bounds),
+                                &around(*point, [*gate_radius; 2]),
+                            ),
+                        "trial gate outside map",
+                    )?;
+                }
+            }
+            MissionObjective::Recovery {
+                parking_ids,
+                garage_zone_id,
+            } => {
+                require(
+                    full && parking_ids.len() == 8
+                        && a.zones
+                            .iter()
+                            .any(|z| &z.id == garage_zone_id && z.kind == ZoneKind::Garage),
+                    "invalid recovery lot/garage",
+                )?;
+                let unique: BTreeSet<_> = parking_ids.iter().collect();
+                require(unique.len() == 8, "duplicate recovery slots")?;
+                for id in parking_ids {
+                    require(
+                        a.parking.iter().any(|p| &p.id == id && p.mission_reserved),
+                        "unknown/unreserved recovery slot",
+                    )?;
+                }
             }
         }
     }
@@ -509,9 +574,29 @@ pub fn package(
     }
     graph(&m.road_graph, m, &c.colliders)?;
     graph(&m.pedestrian_graph, m, &c.colliders)?;
+    for mission in &m.mission_templates {
+        if let MissionObjective::TimeTrial {
+            checkpoints,
+            gate_radius,
+        } = &mission.objective
+        {
+            for point in checkpoints {
+                require(
+                    m.road_graph.nodes.iter().any(|n| {
+                        (n.position[0] - point[0]).hypot(n.position[2] - point[2]) <= *gate_radius
+                    }),
+                    "trial gate disconnected from road graph",
+                )?;
+            }
+        }
+    }
     for (url, hash) in std::iter::once((&m.collision_url, &m.collision_sha256))
         .chain(std::iter::once((&m.sim_config_url, &m.sim_config_hash)))
         .chain(std::iter::once((&m.debug_url, &m.debug_sha256)))
+        .chain([
+            (&m.backdrop.url, &m.backdrop.sha256),
+            (&m.minimap.url, &m.minimap.sha256),
+        ])
         .chain(m.chunks.iter().map(|c| (&c.visual_url, &c.sha256)))
         .chain(m.vehicle_visuals.iter().map(|v| (&v.url, &v.sha256)))
     {
@@ -532,7 +617,10 @@ pub fn package(
             && debug.accesses == m.accesses,
         "debug overlay drift",
     )?;
-    require(m.chunks.len() == 4, "slice needs four chunks")?;
+    require(
+        m.chunks.len() == if m.districts.is_empty() { 4 } else { 36 },
+        "city/slice chunk count",
+    )?;
     let stored: CollisionPackage =
         serde_json::from_slice(files.get(&m.collision_url).ok_or("collision")?)
             .map_err(|e| e.to_string())?;

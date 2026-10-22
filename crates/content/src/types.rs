@@ -53,6 +53,7 @@ object!(ParkingSpawn {
     yaw: f64,
     template_id: String,
     secured: bool,
+    mission_reserved: bool,
     reservation_id: String,
     access_id: String
 });
@@ -146,9 +147,15 @@ object!(Landmark {
     size: Vec3,
     color: String
 });
+object!(District {
+    id: String,
+    name: String,
+    rect: Rect,
+    color: String
+});
 object!(Authoring {
     schema_version: u32, world_asset_id: String, bounds: Bounds, roads: Roads,
-    buildings: BuildingRecipe, reservations: Vec<Reservation>, accesses: Vec<Access>,
+    buildings: BuildingRecipe, districts: Vec<District>, reservations: Vec<Reservation>, accesses: Vec<Access>,
     spawns: Vec<SpawnPoint>, parking: Vec<ParkingSpawn>, zones: Vec<Zone>,
     mission_templates: Vec<MissionTemplate>, vehicle_templates: Vec<VehicleTemplate>,
     landmarks: Vec<Landmark>, sim_config: SimConfig,
@@ -234,6 +241,7 @@ object!(WorldManifest {
     sim_config_hash: String, sim_config_url: String,
     bounds: Bounds, roads: Roads, collision_url: String, collision_sha256: String,
     debug_url: String, debug_sha256: String, chunks: Vec<ChunkAsset>,
+    districts: Vec<District>, backdrop: VisualAsset, minimap: VisualAsset,
     road_graph: RoadGraph, pedestrian_graph: RoadGraph,
     reservations: Vec<Reservation>, accesses: Vec<Access>, spawns: Vec<SpawnPoint>,
     parking: Vec<ParkingSpawn>, zones: Vec<Zone>, mission_templates: Vec<MissionTemplate>,

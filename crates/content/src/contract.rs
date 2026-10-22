@@ -51,6 +51,7 @@ pub fn typescript() -> String {
         SimConfig,
         BuildingRecipe,
         Landmark,
+        District,
         Authoring,
         ColliderRole,
         BoxShape,

@@ -78,13 +78,17 @@ export class LocalPrediction {
       tick: number,
       controlled: number,
     ) => void = () => {},
+    private readonly templateFor: (id: number) => string | undefined = () =>
+      "compact",
   ) {}
   private resetOwner(owner: OwnerState): void {
     this.prepare(owner.server_tick, owner.controlled_entity_id);
     const vehicle =
       owner.state.kind === "vehicle" ? owner.state.data.motor : undefined;
     const template = vehicle
-      ? this.templates.find((t) => t.id === "compact")
+      ? this.templates.find(
+          (t) => t.id === this.templateFor(owner.controlled_entity_id),
+        )
       : undefined;
     if (vehicle && !template)
       throw new Error("Controlled vehicle template unavailable");

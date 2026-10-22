@@ -14,11 +14,13 @@ export class FollowCamera {
     queries: Pick<PredictionWorld, "spherecastStatic">,
     reducedMotion = false,
     driving = false,
+    vehicleHeight = 1.4,
   ): number {
     const range = driving ? 7 : 4.5;
+    const lift = driving ? Math.max(0, vehicleHeight - 1.4) : 0;
     const target = new Vector3(
       feet[0],
-      (feet[1] ?? 0) + (driving ? 1.1 : 1.45),
+      (feet[1] ?? 0) + (driving ? 1.1 + lift : 1.45),
       feet[2],
     );
     const desired = new Vector3(
@@ -43,7 +45,11 @@ export class FollowCamera {
     camera.position.copy(target).addScaledVector(desired, this.distance);
     // Keep the collision pivot inside the capsule; frame the view at head height.
     camera.lookAt(
-      new Vector3(feet[0], (feet[1] ?? 0) + (driving ? 1.5 : 1.8), feet[2]),
+      new Vector3(
+        feet[0],
+        (feet[1] ?? 0) + (driving ? 1.5 + lift : 1.8),
+        feet[2],
+      ),
     );
     return this.distance;
   }

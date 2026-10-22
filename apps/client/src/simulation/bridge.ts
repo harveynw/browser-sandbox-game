@@ -83,12 +83,20 @@ function unpack<T extends { version: number }>(
   );
 }
 let initialized: Promise<unknown> | undefined;
+let wasmMemory: WebAssembly.Memory | undefined;
+export function simulationMemoryBytes(): number {
+  return wasmMemory?.buffer.byteLength ?? 0;
+}
 /** Async initialization is shared; failures allow an explicit retry. */
 export async function initializeSimulation(): Promise<void> {
-  initialized ??= init().catch((error: unknown) => {
-    initialized = undefined;
-    throw new BridgeError(`WASM load failed: ${String(error)}`);
-  });
+  initialized ??= init()
+    .then((output) => {
+      wasmMemory = output.memory;
+    })
+    .catch((error: unknown) => {
+      initialized = undefined;
+      throw new BridgeError(`WASM load failed: ${String(error)}`);
+    });
   await initialized;
 }
 /** Own one static BVH and one controlled character or car. Free on teardown; never rebuild on step/reset. */

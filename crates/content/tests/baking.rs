@@ -172,3 +172,91 @@ fn duplicate_colliders_and_unsafe_asset_urls_fail() {
             .contains("unsafe asset path")
     );
 }
+
+#[test]
+fn full_city_bakes_six_districts_ring_named_anchors_and_reserved_jobs_deterministically() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let a = bake::bake(&source).unwrap();
+    let b = bake::bake(&source).unwrap();
+    assert_eq!(a.files, b.files);
+    assert_eq!(a.manifest.chunks.len(), 36);
+    assert_eq!(a.manifest.districts.len(), 6);
+    assert_eq!(a.manifest.bounds.min, [-384.0, -2.0, -384.0]);
+    assert_eq!(
+        a.manifest
+            .vehicle_templates
+            .iter()
+            .map(|t| t.id.as_str())
+            .collect::<Vec<_>>(),
+        ["compact", "van", "sport"]
+    );
+    assert_eq!(
+        a.manifest
+            .parking
+            .iter()
+            .filter(|p| p.mission_reserved)
+            .count(),
+        8
+    );
+    for id in [
+        "terminal_quay",
+        "delivery_market",
+        "garage_quay",
+        "terminal_civic",
+        "terminal_trial",
+        "recovery_docks",
+        "repair_ironworks",
+    ] {
+        assert!(a.manifest.zones.iter().any(|z| z.id == id));
+    }
+    assert!(a.files["collision.json"].len() < 2 * 1024 * 1024);
+    assert!(
+        collision(&a)
+            .colliders
+            .iter()
+            .filter(|c| c.role == ColliderRole::Boundary)
+            .all(|c| c.center[0].abs() == 383.5 || c.center[2].abs() == 383.5)
+    );
+    for axis in 0..2 {
+        let lines = if axis == 0 {
+            &a.manifest.roads.x
+        } else {
+            &a.manifest.roads.z
+        };
+        assert!(lines.contains(&-352.0) && lines.contains(&352.0));
+    }
+}
+#[test]
+fn full_city_rejects_unreachable_trial_gate_reused_recovery_slot_and_ground_hole() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let mut bad = source.clone();
+    if let content::MissionObjective::Recovery { parking_ids, .. } =
+        &mut bad.mission_templates[2].objective
+    {
+        parking_ids[1] = parking_ids[0].clone();
+    }
+    assert!(bake::bake(&bad).unwrap_err().contains("duplicate recovery"));
+    let mut p = bake::bake(&source).unwrap();
+    let mut c = collision(&p);
+    if let content::MissionObjective::TimeTrial { checkpoints, .. } =
+        &mut p.manifest.mission_templates[1].objective
+    {
+        checkpoints[1] = [-200.0, 0.0, -200.0];
+    }
+    rehash(&mut p);
+    assert!(
+        validate::package(&p.manifest, &c, &p.files)
+            .unwrap_err()
+            .contains("trial gate disconnected")
+    );
+    let mut p = bake::bake(&source).unwrap();
+    c.colliders[0].half_extents[0] -= 1.0;
+    p.manifest.content_hash = canonical::manifest_hash(&p.manifest).unwrap();
+    assert!(
+        validate::package(&p.manifest, &c, &p.files)
+            .unwrap_err()
+            .contains("ground must support")
+    );
+}

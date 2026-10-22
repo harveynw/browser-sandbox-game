@@ -2,7 +2,9 @@
 
 Implementation specification for an original GTA-inspired, third-person, multiplayer 3D browser game. The server is authoritative Rust and uses [harveynw/net-crate](https://github.com/harveynw/net-crate). The browser uses TypeScript, Three.js, and a shared Rust movement library compiled to WebAssembly.
 
-**Status: T01–T11 complete — a playable multiplayer courier slice.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Press E at a compact’s left door to enter; WASD drives, Space applies the handbrake, and E exits when stopped. Find the cyan Quay terminal and press E / F to accept the courier job. Follow the gold route to Market, stop inside the delivery ring for one second, and earn 150 credits. Esc opens the cancellation menu. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). See the [courier demonstration](docs/25-courier-slice.md) for the verified delivery and screenshots. The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
+**Status: T01–T12 complete — a playable six-district city with streaming visuals.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Press E at a car’s left door to enter; WASD drives, Space applies the handbrake, and E exits when stopped. Find the cyan Quay terminal and press E / F to accept the courier job. Follow the gold route to Market, stop inside the delivery ring for one second, and earn 150 credits. Esc opens the cancellation menu. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). See the [courier demonstration](docs/25-courier-slice.md) for the verified delivery and screenshots. The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
+
+The [full-city guide](docs/26-full-city.md) records navigation, streaming, provenance, budgets and verification. The next milestone is T13, traffic and pedestrians.
 
 ## Run the walkthrough
 
@@ -25,18 +27,19 @@ The scripted connection diagnostic is now [localhost:5173/diagnostic](http://loc
 | Command | Current behavior |
 |---|---|
 | `npm run dev` | Generate bridge/build WASM, then loopback Vite on port 5173; fails if occupied |
-| `npm run check` | Generated drift, strict TS, lint/formatting, 187 TS tests (including release WASM/seeded netcode), Clippy, and 78 Rust tests |
+| `npm run check` | Generated drift, strict TS, lint/formatting, 194 TS tests (including release WASM/seeded netcode), Clippy, and 83 Rust tests |
 | `npm run build` | Generate contracts/content, compile native Rust/package WASM, type-check, bundle frontend |
 | `npm run sim:trace` | Replay the native 60-second character trace against 13 saved checkpoints |
 | `npm run build:wasm` | Package release WASM + web JS/declarations using pinned wasm-bindgen CLI |
-| `cargo test --workspace --locked` | Run 23 simulation, 1 bridge, 8 content, 9 protocol, 35 server and 2 drift tests |
+| `cargo test --workspace --locked` | Run 25 simulation, 1 bridge, 10 content, 9 protocol, 36 server and 2 drift tests |
 | `cargo run -p server --locked` | Start authoritative WS/RTC on 127.0.0.1:3000 and local HTTP issuer on 127.0.0.1:3001 |
 | `npm run protocol:generate` / `protocol:check` | Generate contracts/fixtures or detect drift without modifying files |
 | `npm run content:generate` / `content:check` | Generate content contracts or detect contract/baked-package drift |
 | `npm run bridge:generate` / `bridge:check` | Generate separate local bridge TS/schemas or detect drift |
-| `npm run content:bake` | Validate/bake slice, generate content contracts and publish the immutable package/index |
+| `npm run content:bake` | Validate/bake city and regression slice, generate contracts and publish both immutable indexes |
+| `npm run content:audit` | Report city downloads and managed-buffer budgets after building |
 
-Protocol tests now run in both languages; the temporary zero-test allowance is removed. The release WASM bridge is packaged with wasm-bindgen-cli 0.2.129; wasm-pack is not needed. Local bridge DTOs are generated separately from network envelopes. Content baking is implemented; authoring lives in `content/source/slice.json`. The pinned net-crate dependency is active. The localhost issuer uses HttpOnly guest cookies and expiring one-use tickets backed by bounded memory profiles. State is discarded on process exit. [21 — Authoritative sessions](docs/21-authoritative-sessions.md) documents the interfaces and limits.
+Protocol tests now run in both languages; the temporary zero-test allowance is removed. The release WASM bridge is packaged with wasm-bindgen-cli 0.2.129; wasm-pack is not needed. Local bridge DTOs are generated separately from network envelopes. Content baking is implemented; runtime authoring lives in `content/source/city.json`; the slice remains a regression fixture. The pinned net-crate dependency is active. The localhost issuer uses HttpOnly guest cookies and expiring one-use tickets backed by bounded memory profiles. State is discarded on process exit. [21 — Authoritative sessions](docs/21-authoritative-sessions.md) documents the interfaces and limits.
 
 Simulation usage: [19 — Native character simulation](docs/19-native-character-simulation.md) and [20 — WASM bridge](docs/20-wasm-bridge.md). Open [localhost:5173/simulation](http://localhost:5173/simulation), click **Run trace**, and expect PASS for 1,800 ticks / 13 checkpoints. The browser and production bundle agree with native checkpoints within 1 cm. No game server is required for this diagnostic.
 

@@ -1,3 +1,4 @@
+import { simulationMemoryBytes } from "../simulation/bridge";
 import { courierGuidance } from "./courier";
 import type { CharacterMotor } from "@port-meridian/protocol";
 import type { LoadedPackage } from "@port-meridian/content";
@@ -31,6 +32,7 @@ export class GameApp {
   private readonly leave = document.createElement("button");
   private readonly cross = document.createElement("div");
   private readonly hud = document.createElement("div");
+  private readonly minimap = document.createElement("canvas");
   private readonly debug = document.createElement("output");
   private renderer: GameRenderer | undefined;
   private queries: PredictionWorld | undefined;
@@ -57,7 +59,7 @@ export class GameApp {
   private readonly cancelCourier = document.createElement("button");
   private readonly courierInfo = document.createElement("p");
   constructor(private readonly root: HTMLElement) {
-    document.title = "Port Meridian — explore Old Quay";
+    document.title = "Port Meridian — explore the city";
     document.body.classList.add("game-mode");
     root.className = "game-app";
     this.canvas.setAttribute("aria-label", "Port Meridian third-person game");
@@ -66,7 +68,7 @@ export class GameApp {
     title.textContent = "Port Meridian";
     const kicker = document.createElement("p");
     kicker.className = "stage";
-    kicker.textContent = "Old Quay / Market Grid";
+    kicker.textContent = "Port Meridian / Six districts";
     this.status.setAttribute("role", "status");
     const instructions = document.createElement("p");
     instructions.textContent =
@@ -74,7 +76,7 @@ export class GameApp {
     const note = document.createElement("p");
     note.className = "game-note";
     note.textContent =
-      "Walk to a parked compact, press E at its left door, then drive. Find the cyan Quay terminal and press E / F for a courier job. Deliver to the gold Market marker for 150 credits.";
+      "Walk to a parked car, press E at its left door, then drive. Find the cyan Quay terminal and press E / F for a courier job. Deliver to the gold Market marker for 150 credits.";
     this.play.textContent = "Play";
     this.resume.textContent = "Resume / mouse look";
     this.leave.textContent = "Leave game";
@@ -197,8 +199,15 @@ export class GameApp {
     this.cross.className = "game-debug-cross";
     this.cross.setAttribute("aria-hidden", "true");
     this.cross.hidden = true;
+    this.minimap.hidden = true;
+    this.minimap.width = 256;
+    this.minimap.height = 256;
+    this.minimap.className = "city-minimap";
+    this.minimap.setAttribute("role", "img");
+    this.minimap.setAttribute("aria-label", "City minimap");
     root.replaceChildren(
       this.canvas,
+      this.minimap,
       this.cross,
       this.hud,
       debugPanel,
@@ -295,7 +304,7 @@ export class GameApp {
     this.setPhase(
       unsupported ? "fatal" : "menu",
       unsupported ??
-        "Explore the harbour district. Start the local game server, then choose Play.",
+        "Explore six city districts. Start the local game server, then choose Play.",
     );
     this.frame = requestAnimationFrame((now) => this.animate(now));
   }
@@ -434,7 +443,11 @@ export class GameApp {
       const localMotor = this.session?.presentation(now) ?? this.motor;
       const remotes = this.session?.remoteSamples(now) ?? [];
       if (!this.contextLost && this.renderer && this.queries && localMotor) {
-        this.renderer.pose(localMotor, this.session?.isDriving);
+        this.renderer.pose(
+          localMotor,
+          this.session?.isDriving,
+          this.session?.controlledVehicleTemplate,
+        );
         this.renderer.remotes(remotes);
         const mission = this.session?.currentMission;
         this.renderer.setMissionTarget(
@@ -449,6 +462,7 @@ export class GameApp {
           this.queries,
           this.reduced,
           this.session?.isDriving,
+          this.session?.controlledVehicleTemplate?.dimensions[1],
         );
         this.cameraDistance = distance;
         this.renderer.render(distance);
@@ -457,6 +471,9 @@ export class GameApp {
         this.lastHud = now;
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
+        this.minimap.hidden = this.phase !== "playing";
+        if (localMotor) this.renderer?.drawMinimap(this.minimap, localMotor);
+        const streaming = this.renderer?.streamingMetrics;
         const mission = this.session?.currentMission ?? null;
         const guidance = courierGuidance(
           mission,
@@ -471,7 +488,7 @@ export class GameApp {
         const drivingStatus = this.session?.isDriving
           ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
           : "";
-        this.debug.textContent = `${this.connection} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
+        this.debug.textContent = `${this.connection} · chunks ${streaming?.resident ?? 0}/36 pending ${streaming?.pending ?? 0} fallback ${streaming?.failed ?? 0} · matrices ${((streaming?.matrixBytes ?? 0) / 1024).toFixed(0)} KiB · WASM ${(simulationMemoryBytes() / 1048576).toFixed(1)} MiB · draws ${streaming?.drawCalls ?? 0} tris ${streaming?.triangles ?? 0} geoms ${streaming?.geometries ?? 0} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
         this.hud.textContent =
           this.phase === "playing"
             ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`

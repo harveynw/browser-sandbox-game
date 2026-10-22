@@ -1,4 +1,4 @@
-%% Frontend module system — current implementation through T11.
+%% Frontend module system — current implementation through T12.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -20,11 +20,11 @@ flowchart TD
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, characters and cars<br/>Terminal and private courier route / marker"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, characters and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route"]:::gfx
     camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]
-    content["packages/content/<br/>Load and verify map assets"]:::content
+    content["packages/content/<br/>Full collision / config preload<br/>Hashed visual ChunkStream · 192 / 256 m"]:::content
     protocol["packages/protocol/<br/>Message encoding and validation"]:::net
     wasm["packages/sim-wasm/<br/>Shared Rust simulation in WASM"]:::sim
   end
@@ -45,7 +45,8 @@ flowchart TD
   session -->|"baselines / remote snapshots"| replica
   replica -.->|"sampled vehicle proxies for replay"| bridge
   session -->|"load assets"| content
-  content -.->|"verified map assets"| game
+  content -.->|"verified physics + initial assets"| game
+  renderer <-->|"bounded visual loading / disposal"| content
   session -.->|"private courier status + local / remote poses"| game
   game -->|"map and actor poses"| renderer
   game -->|"pose and look input"| camera

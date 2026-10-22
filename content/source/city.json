@@ -1,0 +1,939 @@
+{
+  "schema_version": 1,
+  "world_asset_id": "port_meridian_v1",
+  "bounds": {
+    "min": [-384, -2, -384],
+    "max": [384, 64, 384]
+  },
+  "roads": {
+    "x": [-352, -256, -128, 0, 128, 256, 352],
+    "z": [-352, -256, -128, 0, 128, 256, 352],
+    "carriageway_width": 12,
+    "sidewalk_width": 3
+  },
+  "buildings": {
+    "grid": 4,
+    "size": 20,
+    "spacing": 8,
+    "setback": 12,
+    "seed": 424242
+  },
+  "reservations": [
+    {
+      "id": "plaza_quay",
+      "rect": {
+        "min": [-192.0, 168.0],
+        "max": [-168.0, 192.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_apron",
+      "rect": {
+        "min": [-168.0, 168.0],
+        "max": [-148.0, 200.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_01_clear",
+      "rect": {
+        "min": [-155.0, 171.0],
+        "max": [-149.0, 181.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_02_clear",
+      "rect": {
+        "min": [-155.0, 187.0],
+        "max": [-149.0, 197.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "market_clear",
+      "rect": {
+        "min": [-52.0, 44.0],
+        "max": [-36.0, 60.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "garage_clear",
+      "rect": {
+        "min": [-230.0, 38.0],
+        "max": [-210.0, 58.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "spawn_driveway",
+      "rect": {
+        "min": [-168.0, 177.0],
+        "max": [-128.0, 183.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_01_driveway",
+      "rect": {
+        "min": [-152.0, 173.0],
+        "max": [-128.0, 179.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_02_driveway",
+      "rect": {
+        "min": [-152.0, 189.0],
+        "max": [-128.0, 195.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "market_driveway",
+      "rect": {
+        "min": [-47.0, 0],
+        "max": [-41.0, 44.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "garage_driveway",
+      "rect": {
+        "min": [-256, 45.0],
+        "max": [-230.0, 51.0]
+      },
+      "clear": true
+    },
+    {
+      "id": "tower_clear",
+      "rect": {
+        "min": [-222.0, 210.0],
+        "max": [-210.0, 222.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "canopy_clear",
+      "rect": {
+        "min": [-48.0, 82.0],
+        "max": [-36.0, 94.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "beacon_clear",
+      "rect": {
+        "min": [-226.0, 22.0],
+        "max": [-214.0, 34.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "plaza_civic",
+      "rect": {
+        "min": [28, -192],
+        "max": [60, -168]
+      },
+      "clear": true
+    },
+    {
+      "id": "civic_driveway",
+      "rect": {
+        "min": [-3, -183],
+        "max": [48, -177]
+      },
+      "clear": true
+    },
+    {
+      "id": "trial_start",
+      "rect": {
+        "min": [-8, -264],
+        "max": [8, -248]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_lot",
+      "rect": {
+        "min": [288, 168],
+        "max": [312, 192]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_apron",
+      "rect": {
+        "min": [282, 162],
+        "max": [318, 198]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_driveway",
+      "rect": {
+        "min": [256, 171],
+        "max": [312, 189]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_01_clear",
+      "rect": {
+        "min": [288, 168],
+        "max": [294, 180]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_02_clear",
+      "rect": {
+        "min": [294, 168],
+        "max": [300, 180]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_03_clear",
+      "rect": {
+        "min": [300, 168],
+        "max": [306, 180]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_04_clear",
+      "rect": {
+        "min": [306, 168],
+        "max": [312, 180]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_05_clear",
+      "rect": {
+        "min": [288, 180],
+        "max": [294, 192]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_06_clear",
+      "rect": {
+        "min": [294, 180],
+        "max": [300, 192]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_07_clear",
+      "rect": {
+        "min": [300, 180],
+        "max": [306, 192]
+      },
+      "clear": true
+    },
+    {
+      "id": "recovery_docks_08_clear",
+      "rect": {
+        "min": [306, 180],
+        "max": [312, 192]
+      },
+      "clear": true
+    },
+    {
+      "id": "repair_forecourt",
+      "rect": {
+        "min": [210, -190],
+        "max": [230, -170]
+      },
+      "clear": true
+    },
+    {
+      "id": "repair_driveway",
+      "rect": {
+        "min": [220, -183],
+        "max": [256, -177]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_van_clear",
+      "rect": {
+        "min": [69, -186],
+        "max": [75, -174]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_van_driveway",
+      "rect": {
+        "min": [72, -183],
+        "max": [128, -177]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_iron_sport_clear",
+      "rect": {
+        "min": [213, -158],
+        "max": [219, -146]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_iron_sport_driveway",
+      "rect": {
+        "min": [213, -152],
+        "max": [219, -128]
+      },
+      "clear": true
+    },
+    {
+      "id": "civic_clock_clear",
+      "rect": {
+        "min": [67.0, -221.0],
+        "max": [77.0, -211.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "iron_chimney_clear",
+      "rect": {
+        "min": [211.0, -221.0],
+        "max": [221.0, -211.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "docks_crane_west_clear",
+      "rect": {
+        "min": [293.0, 211.0],
+        "max": [307.0, 221.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "docks_crane_east_clear",
+      "rect": {
+        "min": [325.0, 211.0],
+        "max": [339.0, 221.0]
+      },
+      "clear": false
+    },
+    {
+      "id": "heights_park_clear",
+      "rect": {
+        "min": [-235.0, -229.0],
+        "max": [-197.0, -203.0]
+      },
+      "clear": false
+    }
+  ],
+  "accesses": [
+    {
+      "id": "spawn_access",
+      "position": [-180, 0, 180],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "spawn_driveway"
+    },
+    {
+      "id": "terminal_access",
+      "position": [-172, 0, 180],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "spawn_driveway"
+    },
+    {
+      "id": "parking_01_access",
+      "position": [-152, 0, 176],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "parking_01_driveway"
+    },
+    {
+      "id": "parking_02_access",
+      "position": [-152, 0, 192],
+      "road_axis": "x",
+      "road_center": -128,
+      "driveway_id": "parking_02_driveway"
+    },
+    {
+      "id": "market_access",
+      "position": [-44, 0, 52],
+      "road_axis": "z",
+      "road_center": 0,
+      "driveway_id": "market_driveway"
+    },
+    {
+      "id": "garage_access",
+      "position": [-220, 0, 48],
+      "road_axis": "x",
+      "road_center": -256,
+      "driveway_id": "garage_driveway"
+    },
+    {
+      "id": "civic_spawn_access",
+      "position": [40, 0, -180],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "civic_driveway"
+    },
+    {
+      "id": "civic_terminal_access",
+      "position": [48, 0, -180],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "civic_driveway"
+    },
+    {
+      "id": "trial_access",
+      "position": [0, 0, -256],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "trial_start"
+    },
+    {
+      "id": "recovery_access",
+      "position": [300, 0, 180],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_01_access",
+      "position": [291, 0, 174],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_02_access",
+      "position": [297, 0, 174],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_03_access",
+      "position": [303, 0, 174],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_04_access",
+      "position": [309, 0, 174],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_05_access",
+      "position": [291, 0, 186],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_06_access",
+      "position": [297, 0, 186],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_07_access",
+      "position": [303, 0, 186],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "recovery_docks_08_access",
+      "position": [309, 0, 186],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "recovery_driveway"
+    },
+    {
+      "id": "repair_access",
+      "position": [220, 0, -180],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "repair_driveway"
+    },
+    {
+      "id": "parking_civic_van_access",
+      "position": [72, 0, -180],
+      "road_axis": "x",
+      "road_center": 128,
+      "driveway_id": "parking_civic_van_driveway"
+    },
+    {
+      "id": "parking_iron_sport_access",
+      "position": [216, 0, -152],
+      "road_axis": "z",
+      "road_center": -128,
+      "driveway_id": "parking_iron_sport_driveway"
+    }
+  ],
+  "spawns": [
+    {
+      "id": "spawn_quay",
+      "position": [-180, 0, 180],
+      "yaw": 0,
+      "safe_radius": 2.5,
+      "reservation_id": "plaza_quay",
+      "access_id": "spawn_access"
+    },
+    {
+      "id": "spawn_civic",
+      "position": [40, 0, -180],
+      "yaw": 0,
+      "safe_radius": 2.5,
+      "reservation_id": "plaza_civic",
+      "access_id": "civic_spawn_access"
+    }
+  ],
+  "parking": [
+    {
+      "id": "parking_quay_01",
+      "position": [-152, 0, 176],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "reservation_id": "parking_01_clear",
+      "access_id": "parking_01_access",
+      "mission_reserved": false
+    },
+    {
+      "id": "parking_quay_02",
+      "position": [-152, 0, 192],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "reservation_id": "parking_02_clear",
+      "access_id": "parking_02_access",
+      "mission_reserved": false
+    },
+    {
+      "id": "recovery_docks_01",
+      "position": [291, 0, 174],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_01_clear",
+      "access_id": "recovery_docks_01_access"
+    },
+    {
+      "id": "recovery_docks_02",
+      "position": [297, 0, 174],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_02_clear",
+      "access_id": "recovery_docks_02_access"
+    },
+    {
+      "id": "recovery_docks_03",
+      "position": [303, 0, 174],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_03_clear",
+      "access_id": "recovery_docks_03_access"
+    },
+    {
+      "id": "recovery_docks_04",
+      "position": [309, 0, 174],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_04_clear",
+      "access_id": "recovery_docks_04_access"
+    },
+    {
+      "id": "recovery_docks_05",
+      "position": [291, 0, 186],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_05_clear",
+      "access_id": "recovery_docks_05_access"
+    },
+    {
+      "id": "recovery_docks_06",
+      "position": [297, 0, 186],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_06_clear",
+      "access_id": "recovery_docks_06_access"
+    },
+    {
+      "id": "recovery_docks_07",
+      "position": [303, 0, 186],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_07_clear",
+      "access_id": "recovery_docks_07_access"
+    },
+    {
+      "id": "recovery_docks_08",
+      "position": [309, 0, 186],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": true,
+      "mission_reserved": true,
+      "reservation_id": "recovery_docks_08_clear",
+      "access_id": "recovery_docks_08_access"
+    },
+    {
+      "id": "parking_civic_van",
+      "position": [72, 0, -180],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_civic_van_clear",
+      "access_id": "parking_civic_van_access"
+    },
+    {
+      "id": "parking_iron_sport",
+      "position": [216, 0, -152],
+      "yaw": 0,
+      "template_id": "sport",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_iron_sport_clear",
+      "access_id": "parking_iron_sport_access"
+    }
+  ],
+  "zones": [
+    {
+      "id": "terminal_quay",
+      "center": [-172, 0, 180],
+      "radius": 3,
+      "kind": "terminal",
+      "reservation_id": "plaza_quay",
+      "access_id": "terminal_access",
+      "allowed_templates": ["courier_quay_market", "recovery_docks_quay"]
+    },
+    {
+      "id": "delivery_market",
+      "center": [-44, 0, 52],
+      "radius": 5,
+      "kind": "delivery",
+      "reservation_id": "market_clear",
+      "access_id": "market_access",
+      "allowed_templates": []
+    },
+    {
+      "id": "garage_quay",
+      "center": [-220, 0, 48],
+      "radius": 5,
+      "kind": "garage",
+      "reservation_id": "garage_clear",
+      "access_id": "garage_access",
+      "allowed_templates": []
+    },
+    {
+      "id": "terminal_civic",
+      "center": [48, 0, -180],
+      "radius": 3,
+      "kind": "terminal",
+      "reservation_id": "plaza_civic",
+      "access_id": "civic_terminal_access",
+      "allowed_templates": ["recovery_docks_quay"]
+    },
+    {
+      "id": "terminal_trial",
+      "center": [0, 0, -256],
+      "radius": 3,
+      "kind": "terminal",
+      "reservation_id": "trial_start",
+      "access_id": "trial_access",
+      "allowed_templates": ["trial_city_ring"]
+    },
+    {
+      "id": "recovery_docks",
+      "center": [300, 0, 180],
+      "radius": 5,
+      "kind": "garage",
+      "reservation_id": "recovery_lot",
+      "access_id": "recovery_access",
+      "allowed_templates": []
+    },
+    {
+      "id": "repair_ironworks",
+      "center": [220, 0, -180],
+      "radius": 5,
+      "kind": "repair",
+      "reservation_id": "repair_forecourt",
+      "access_id": "repair_access",
+      "allowed_templates": []
+    }
+  ],
+  "mission_templates": [
+    {
+      "id": "courier_quay_market",
+      "terminal_zone_id": "terminal_quay",
+      "duration_ticks": 5400,
+      "reward_credits": 150,
+      "objective": {
+        "kind": "courier",
+        "data": {
+          "destination_zone_id": "delivery_market",
+          "dwell_ticks": 30,
+          "max_speed": 2
+        }
+      }
+    },
+    {
+      "id": "trial_city_ring",
+      "terminal_zone_id": "terminal_trial",
+      "duration_ticks": 3600,
+      "reward_credits": 200,
+      "objective": {
+        "kind": "time_trial",
+        "data": {
+          "checkpoints": [
+            [0, 0, -256],
+            [256, 0, -256],
+            [256, 0, 128],
+            [0, 0, 256],
+            [-256, 0, 128],
+            [-256, 0, -256],
+            [0, 0, -256]
+          ],
+          "gate_radius": 8
+        }
+      }
+    },
+    {
+      "id": "recovery_docks_quay",
+      "terminal_zone_id": "terminal_quay",
+      "duration_ticks": 5400,
+      "reward_credits": 250,
+      "objective": {
+        "kind": "recovery",
+        "data": {
+          "parking_ids": [
+            "recovery_docks_01",
+            "recovery_docks_02",
+            "recovery_docks_03",
+            "recovery_docks_04",
+            "recovery_docks_05",
+            "recovery_docks_06",
+            "recovery_docks_07",
+            "recovery_docks_08"
+          ],
+          "garage_zone_id": "garage_quay"
+        }
+      }
+    }
+  ],
+  "vehicle_templates": [
+    {
+      "id": "compact",
+      "dimensions": [1.8, 1.4, 4.2],
+      "top_speed": 22,
+      "reverse_speed": 7,
+      "acceleration": 7,
+      "brake": 12,
+      "wheelbase": 2.5,
+      "health": 100,
+      "visual_asset_id": "compact_greybox",
+      "seat_offset": [0, 0.8, -0.25],
+      "exit_offsets": [
+        [-1.5, 0, 0],
+        [1.5, 0, 0],
+        [0, 0, 3]
+      ]
+    },
+    {
+      "id": "van",
+      "dimensions": [2, 2.2, 5.2],
+      "top_speed": 18,
+      "reverse_speed": 5,
+      "acceleration": 5,
+      "brake": 10,
+      "wheelbase": 3.2,
+      "health": 160,
+      "visual_asset_id": "van_greybox",
+      "seat_offset": [0, 1, -0.25],
+      "exit_offsets": [
+        [-1.5, 0, 0],
+        [1.5, 0, 0],
+        [0, 0, 3]
+      ]
+    },
+    {
+      "id": "sport",
+      "dimensions": [1.9, 1.25, 4.5],
+      "top_speed": 30,
+      "reverse_speed": 8,
+      "acceleration": 9,
+      "brake": 14,
+      "wheelbase": 2.7,
+      "health": 90,
+      "visual_asset_id": "sport_greybox",
+      "seat_offset": [0, 0.7, -0.25],
+      "exit_offsets": [
+        [-1.5, 0, 0],
+        [1.5, 0, 0],
+        [0, 0, 3]
+      ]
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "quay_water_tower",
+      "position": [-216, 0, 216],
+      "size": [6, 24, 6],
+      "color": "#e89b43"
+    },
+    {
+      "id": "market_canopy",
+      "position": [-42, 0, 88],
+      "size": [10, 10, 10],
+      "color": "#3cbd91"
+    },
+    {
+      "id": "garage_beacon",
+      "position": [-220, 0, 28],
+      "size": [4, 18, 4],
+      "color": "#de6754"
+    },
+    {
+      "id": "civic_clock",
+      "position": [72, 0, -216],
+      "size": [8, 30, 8],
+      "color": "#eee9db"
+    },
+    {
+      "id": "iron_chimney",
+      "position": [216, 0, -216],
+      "size": [8, 36, 8],
+      "color": "#ba5148"
+    },
+    {
+      "id": "docks_crane_west",
+      "position": [300, 0, 216],
+      "size": [12, 30, 8],
+      "color": "#4a8cba"
+    },
+    {
+      "id": "docks_crane_east",
+      "position": [332, 0, 216],
+      "size": [12, 28, 8],
+      "color": "#4a8cba"
+    },
+    {
+      "id": "heights_park_pavilion",
+      "position": [-216, 0, -216],
+      "size": [12, 8, 12],
+      "color": "#65825e"
+    }
+  ],
+  "sim_config": {
+    "schema_version": 1,
+    "tick_rate": 30,
+    "character": {
+      "height": 1.8,
+      "radius": 0.35,
+      "walk_speed": 4,
+      "sprint_speed": 7,
+      "ground_acceleration": 30,
+      "air_acceleration": 10,
+      "jump_speed": 5.5,
+      "jump_cooldown_ticks": 6,
+      "gravity": 18,
+      "max_fall_speed": 30,
+      "skin": 0.02,
+      "slope_limit_degrees": 45,
+      "step_height": 0.25,
+      "ground_snap": 0.15,
+      "turn_speed": 12
+    },
+    "vehicle": {
+      "rolling_resistance": 1.5,
+      "handbrake": 8,
+      "steering_slow": 0.55,
+      "steering_fast": 0.2,
+      "steering_rate": 2.5,
+      "max_yaw_rate": 1.8,
+      "translation_substep": 0.25,
+      "yaw_substep": 0.03,
+      "max_substeps": 8
+    }
+  },
+  "districts": [
+    {
+      "id": "north_heights",
+      "name": "North Heights",
+      "rect": {
+        "min": [-384, -384],
+        "max": [-128, 0]
+      },
+      "color": "#8fa98a"
+    },
+    {
+      "id": "civic_center",
+      "name": "Civic Center",
+      "rect": {
+        "min": [-128, -384],
+        "max": [128, 0]
+      },
+      "color": "#bac3c0"
+    },
+    {
+      "id": "ironworks",
+      "name": "Ironworks",
+      "rect": {
+        "min": [128, -384],
+        "max": [384, 0]
+      },
+      "color": "#a08478"
+    },
+    {
+      "id": "old_quay",
+      "name": "Old Quay",
+      "rect": {
+        "min": [-384, 0],
+        "max": [-128, 384]
+      },
+      "color": "#9b8170"
+    },
+    {
+      "id": "market_grid",
+      "name": "Market Grid",
+      "rect": {
+        "min": [-128, 0],
+        "max": [128, 384]
+      },
+      "color": "#b5a17b"
+    },
+    {
+      "id": "east_docks",
+      "name": "East Docks",
+      "rect": {
+        "min": [128, 0],
+        "max": [384, 384]
+      },
+      "color": "#738f9d"
+    }
+  ]
+}

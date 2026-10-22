@@ -35,9 +35,9 @@ fn generated() -> Result<Files, String> {
     files.insert(format!("{base}/canonical-fixture.json").into(),serde_json::to_vec_pretty(&serde_json::json!({"value":example,"canonical":String::from_utf8(bytes.clone()).map_err(|e|e.to_string())?,"sha256":canonical::sha256(&bytes)})).map_err(|e|e.to_string())?);
     Ok(files)
 }
-fn baked() -> Result<(Files, WorldManifest), String> {
+fn baked_source(name: &str) -> Result<(Files, WorldManifest), String> {
     let source: Authoring = serde_json::from_slice(
-        &fs::read(root().join("content/source/slice.json")).map_err(|e| e.to_string())?,
+        &fs::read(root().join(format!("content/source/{name}.json"))).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
     let package = content::bake::bake(&source)?;
@@ -61,10 +61,16 @@ fn baked() -> Result<(Files, WorldManifest), String> {
         ),
     };
     files.insert(
-        "apps/client/public/content/slice.json".into(),
+        format!("apps/client/public/content/{name}.json").into(),
         canonical::bytes(&index)?,
     );
     Ok((files, package.manifest))
+}
+fn baked() -> Result<(Files, WorldManifest), String> {
+    let (mut slice, _) = baked_source("slice")?;
+    let (city, manifest) = baked_source("city")?;
+    slice.extend(city);
+    Ok((slice, manifest))
 }
 fn write(files: &Files) -> Result<(), String> {
     for (relative, bytes) in files {
@@ -126,17 +132,19 @@ pub fn bake() -> Result<(), String> {
     generate()?;
     let (files, m) = baked()?;
     // Publish index only after every immutable asset has been written.
-    let index = PathBuf::from("apps/client/public/content/slice.json");
+    let indexes = [
+        PathBuf::from("apps/client/public/content/slice.json"),
+        PathBuf::from("apps/client/public/content/city.json"),
+    ];
     let assets = files
         .iter()
-        .filter(|(k, _)| *k != &index)
+        .filter(|(k, _)| !indexes.contains(k))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
     write(&assets)?;
-    write(&BTreeMap::from([(
-        index,
-        files[Path::new("apps/client/public/content/slice.json")].clone(),
-    )]))?;
+    for index in indexes {
+        write(&BTreeMap::from([(index.clone(), files[&index].clone())]))?;
+    }
     println!(
         "Baked {} assets: {} ({} road nodes, {} pedestrian nodes)",
         files.len(),

@@ -30,7 +30,8 @@
     "sim:trace": "cargo run -p xtask --locked -- character-trace",
     "bridge:generate": "cargo run -p xtask --locked -- generate-bridge",
     "bridge:check": "cargo run -p xtask --locked -- check-bridge",
-    "predev": "npm run bridge:generate && npm run build:wasm"
+    "predev": "npm run bridge:generate && npm run build:wasm",
+    "content:audit": "node tools/audit-content.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

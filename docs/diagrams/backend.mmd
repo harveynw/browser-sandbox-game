@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T11.
+%% Backend module system — current implementation through T12.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -6,7 +6,7 @@ flowchart TD
   subgraph group_0["crates/server/src/ — startup and world"]
     main["main.rs<br/>Startup and main loop"]:::app
     scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
-    loader["content_loader.rs<br/>Verify and load world content"]:::content
+    loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
     missions["missions.rs<br/>Courier dwell, failure and reward lifecycle"]:::sim
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
@@ -23,7 +23,7 @@ flowchart TD
     protocol["crates/protocol/<br/>Messages, codecs and limits"]:::net
   end
     browser["Browser frontend"]:::other
-    assets["Baked content package<br/>Map, collision and configuration"]:::content
+    assets["Baked content package<br/>Six districts · collision / configuration<br/>Visual streaming belongs to browser"]:::content
     net["net-crate<br/>WebSocket + WebRTC server"]:::other
 
   main -->|"load at startup"| loader

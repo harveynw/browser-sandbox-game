@@ -188,6 +188,30 @@
       ],
       "type": "object"
     },
+    "District": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "rect": {
+          "$ref": "#/$defs/Rect"
+        }
+      },
+      "required": [
+        "color",
+        "id",
+        "name",
+        "rect"
+      ],
+      "type": "object"
+    },
     "Landmark": {
       "additionalProperties": false,
       "properties": {
@@ -379,6 +403,9 @@
         "id": {
           "type": "string"
         },
+        "mission_reserved": {
+          "type": "boolean"
+        },
         "position": {
           "items": {
             "format": "double",
@@ -405,6 +432,7 @@
       "required": [
         "access_id",
         "id",
+        "mission_reserved",
         "position",
         "reservation_id",
         "secured",
@@ -769,6 +797,12 @@
     "buildings": {
       "$ref": "#/$defs/BuildingRecipe"
     },
+    "districts": {
+      "items": {
+        "$ref": "#/$defs/District"
+      },
+      "type": "array"
+    },
     "landmarks": {
       "items": {
         "$ref": "#/$defs/Landmark"
@@ -830,6 +864,7 @@
     "accesses",
     "bounds",
     "buildings",
+    "districts",
     "landmarks",
     "mission_templates",
     "parking",

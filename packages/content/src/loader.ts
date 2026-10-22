@@ -45,6 +45,9 @@ export interface LoadedPackage {
   debug: DebugOverlay;
   chunks: VisualChunk[];
   vehicleVisuals: VisualChunk[];
+  backdrop: VisualChunk;
+  minimap: VisualChunk;
+  loadChunk: (id: string, signal?: AbortSignal) => Promise<VisualChunk>;
 }
 async function boundedBytes(
   response: Response,
@@ -88,21 +91,47 @@ function parse<T extends { schema_version: number }>(
     throw new Error("Content schema/version validation failed");
   return value;
 }
-/** Fetch all simplified collision and four primitive chunks. No sockets or game server. */
+/** Physics always loads in full; gameplay may request only its spawn visual chunk. */
 export async function loadPackage(
   indexUrl: URL,
   signal?: AbortSignal,
   fetcher: typeof fetch = fetch,
+  options: { streamVisuals?: boolean } = {},
 ): Promise<LoadedPackage> {
   const controller = new AbortController();
   const combined = signal
     ? AbortSignal.any([signal, controller.signal])
     : controller.signal;
-  const request = async (url: URL, hash?: string, limit = 2 * 1024 * 1024) => {
-    const bytes = await boundedBytes(
-      await fetcher(url, { signal: combined, cache: "no-cache" }),
-      limit,
-    );
+  const request = async (
+    url: URL,
+    hash?: string,
+    limit = 2 * 1024 * 1024,
+    extra?: AbortSignal,
+    retries = 2,
+  ) => {
+    const cancellation = extra ? AbortSignal.any([combined, extra]) : combined;
+    const receive = async () =>
+      boundedBytes(
+        await fetcher(url, {
+          signal: AbortSignal.any([
+            combined,
+            AbortSignal.timeout(8000),
+            ...(extra ? [extra] : []),
+          ]),
+          cache: "no-cache",
+        }),
+        limit,
+      );
+    let bytes: Uint8Array;
+    for (let attempt = 0; ; attempt++) {
+      cancellation.throwIfAborted();
+      try {
+        bytes = await receive();
+        break;
+      } catch (error) {
+        if (cancellation.aborted || attempt >= retries) throw error;
+      }
+    }
     if (hash && (await sha256(bytes)) !== hash)
       throw new Error("Content asset SHA-256 mismatch");
     return bytes;
@@ -126,20 +155,41 @@ export async function loadPackage(
     if (
       manifest.content_hash !== index.content_hash ||
       (await manifestHash(manifest)) !== index.content_hash ||
-      manifest.chunks.length !== 4 ||
-      manifest.vehicle_visuals.length !== 1
+      manifest.chunks.length < 1 ||
+      manifest.chunks.length > 36 ||
+      manifest.vehicle_visuals.length < 1 ||
+      manifest.vehicle_visuals.length > 3
     )
       throw new Error("Manifest hash/count mismatch");
+    const spawn = manifest.spawns[0];
+    if (!spawn) throw new Error("Missing spawn");
+    const selected = options.streamVisuals
+      ? manifest.chunks.filter(
+          (c) =>
+            spawn.position[0] >= c.bounds.min[0] &&
+            spawn.position[0] < c.bounds.max[0] &&
+            spawn.position[2] >= c.bounds.min[2] &&
+            spawn.position[2] < c.bounds.max[2],
+        )
+      : manifest.chunks;
     const refs = [
       { url: manifest.collision_url, hash: manifest.collision_sha256 },
       { url: manifest.sim_config_url, hash: manifest.sim_config_hash },
       { url: manifest.debug_url, hash: manifest.debug_sha256 },
-      ...manifest.chunks.map((c) => ({ url: c.visual_url, hash: c.sha256 })),
+      ...selected.map((c) => ({ url: c.visual_url, hash: c.sha256 })),
       ...manifest.vehicle_visuals.map((v) => ({ url: v.url, hash: v.sha256 })),
+      { url: manifest.backdrop.url, hash: manifest.backdrop.sha256 },
+      { url: manifest.minimap.url, hash: manifest.minimap.sha256 },
+    ];
+    const allRefs = [
+      ...refs,
+      ...manifest.chunks
+        .filter((c) => !selected.includes(c))
+        .map((c) => ({ url: c.visual_url, hash: c.sha256 })),
     ];
     if (
-      new Set(refs.map((r) => r.url)).size !== refs.length ||
-      refs.some(
+      new Set(allRefs.map((r) => r.url)).size !== allRefs.length ||
+      allRefs.some(
         (r) =>
           !/^[a-z0-9_-]+\.json$/.test(r.url) || !/^[a-f0-9]{64}$/.test(r.hash),
       )
@@ -161,16 +211,13 @@ export async function loadPackage(
       if (!value) throw new Error("Missing content bytes");
       return value;
     };
-    const chunks = manifest.chunks.map((ref, i) => {
+    const chunks = selected.map((ref, i) => {
       const chunk = parse(get(i + 3), validators.chunk);
       if (chunk.id !== ref.id) throw new Error("Chunk ID mismatch");
       return chunk;
     });
     const vehicleVisuals = manifest.vehicle_visuals.map((ref, i) => {
-      const visual = parse(
-        get(3 + manifest.chunks.length + i),
-        validators.chunk,
-      );
+      const visual = parse(get(3 + selected.length + i), validators.chunk);
       if (visual.id !== ref.id) throw new Error("Vehicle visual ID mismatch");
       return visual;
     });
@@ -179,7 +226,39 @@ export async function loadPackage(
     const debug = parse(get(2), validators.debug);
     if (JSON.stringify(debug.colliders) !== JSON.stringify(collision.colliders))
       throw new Error("Collision/debug mismatch");
-    return { manifest, collision, sim, debug, chunks, vehicleVisuals };
+    const auxiliary = 3 + selected.length + manifest.vehicle_visuals.length;
+    const backdrop = parse(get(auxiliary), validators.chunk);
+    const minimap = parse(get(auxiliary + 1), validators.chunk);
+    const loadChunk = async (
+      id: string,
+      signal?: AbortSignal,
+    ): Promise<VisualChunk> => {
+      const ref = manifest.chunks.find((c) => c.id === id);
+      if (!ref) throw new Error("Unknown visual chunk");
+      const chunk = parse(
+        await request(
+          new URL(ref.visual_url, manifestUrl),
+          ref.sha256,
+          2 * 1024 * 1024,
+          signal,
+          0,
+        ),
+        validators.chunk,
+      );
+      if (chunk.id !== id) throw new Error("Chunk ID mismatch");
+      return chunk;
+    };
+    return {
+      manifest,
+      collision,
+      sim,
+      debug,
+      chunks,
+      vehicleVisuals,
+      backdrop,
+      minimap,
+      loadChunk,
+    };
   } catch (error) {
     controller.abort();
     throw error;

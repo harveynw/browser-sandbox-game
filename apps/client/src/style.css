@@ -304,3 +304,19 @@ select {
   width: 2px;
   height: 20px;
 }
+
+.city-minimap {
+  position: fixed;
+  z-index: 1;
+  right: 1rem;
+  bottom: 9rem;
+  width: 160px !important;
+  height: 160px !important;
+  border: 2px solid #bce8da;
+  border-radius: 0.5rem;
+  pointer-events: none;
+}
+
+.city-minimap[hidden] {
+  display: none;
+}

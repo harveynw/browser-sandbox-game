@@ -154,3 +154,47 @@ describe("baked native content consumed by the browser loader", () => {
     ).rejects.toThrow();
   });
 });
+
+it("retries transient bootstrap failures twice", async () => {
+  let failures = 0;
+  const transient: typeof fetch = async (input, init) => {
+    if (String(input) === String(indexUrl) && failures++ < 2)
+      return new Response("unavailable", { status: 503 });
+    return mockFetch(input, init);
+  };
+  await loadPackage(indexUrl, undefined, transient);
+  expect(failures).toBe(3);
+});
+
+it("boots a streamed city with complete physics and verifies later distant chunks", async () => {
+  const cityUrl = new URL("http://localhost/content/city.json");
+  const requests: string[] = [];
+  const fetcher: typeof fetch = async (input, init) => {
+    requests.push(String(input));
+    return mockFetch(input, init);
+  };
+  const data = await loadPackage(cityUrl, undefined, fetcher, {
+    streamVisuals: true,
+  });
+  expect(data.manifest.chunks).toHaveLength(36);
+  expect(data.manifest.districts).toHaveLength(6);
+  expect(data.chunks).toHaveLength(1);
+  expect(data.vehicleVisuals).toHaveLength(3);
+  expect(data.collision.colliders.length).toBeGreaterThan(300);
+  expect(data.backdrop.id).toBe("backdrop");
+  expect(data.minimap.id).toBe("minimap");
+  const distant = data.manifest.chunks.find(
+    (c) => !data.chunks.some((loaded) => loaded.id === c.id),
+  );
+  if (!distant) throw new Error("missing distant chunk");
+  expect(requests.some((r) => r.endsWith(distant.visual_url))).toBe(false);
+  expect((await data.loadChunk(distant.id)).id).toBe(distant.id);
+  const corrupt: typeof fetch = async (input, init) =>
+    String(input).endsWith(distant.visual_url)
+      ? new Response("corrupt distant art")
+      : mockFetch(input, init);
+  const other = await loadPackage(cityUrl, undefined, corrupt, {
+    streamVisuals: true,
+  });
+  await expect(other.loadChunk(distant.id)).rejects.toThrow("SHA-256 mismatch");
+});

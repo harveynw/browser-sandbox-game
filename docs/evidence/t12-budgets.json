@@ -1,0 +1,245 @@
+{
+  "contentHash": "1bbfceac46cadc4262a397c510856a4158cc7ca7425bcd7266e32d39bc076e63",
+  "districts": 6,
+  "chunks": 36,
+  "staticColliders": 385,
+  "files": 45,
+  "rawBytes": 666200,
+  "gzipBytes": 62477,
+  "initialRawBytes": 327048,
+  "initialGzipBytes": 31221,
+  "allBuildCodeGzipBytes": 689958,
+  "conservativeFirstPlayGzipBytes": 721179,
+  "collisionBytes": 41461,
+  "maxDetailedResidentChunks": 24,
+  "maxConcurrentRequests": 4,
+  "maxRetainedChunkMatrixBytes": 146944,
+  "minimapPixelBytes": 851968,
+  "assets": [
+    {
+      "name": "backdrop.json",
+      "raw": 46240,
+      "gzip": 4326
+    },
+    {
+      "name": "chunk_0_0.json",
+      "raw": 8900,
+      "gzip": 846
+    },
+    {
+      "name": "chunk_0_1.json",
+      "raw": 9578,
+      "gzip": 909
+    },
+    {
+      "name": "chunk_0_2.json",
+      "raw": 9492,
+      "gzip": 898
+    },
+    {
+      "name": "chunk_0_3.json",
+      "raw": 9392,
+      "gzip": 889
+    },
+    {
+      "name": "chunk_0_4.json",
+      "raw": 9478,
+      "gzip": 906
+    },
+    {
+      "name": "chunk_0_5.json",
+      "raw": 8550,
+      "gzip": 846
+    },
+    {
+      "name": "chunk_1_0.json",
+      "raw": 9578,
+      "gzip": 888
+    },
+    {
+      "name": "chunk_1_1.json",
+      "raw": 10373,
+      "gzip": 931
+    },
+    {
+      "name": "chunk_1_2.json",
+      "raw": 10639,
+      "gzip": 940
+    },
+    {
+      "name": "chunk_1_3.json",
+      "raw": 10177,
+      "gzip": 920
+    },
+    {
+      "name": "chunk_1_4.json",
+      "raw": 10281,
+      "gzip": 939
+    },
+    {
+      "name": "chunk_1_5.json",
+      "raw": 9228,
+      "gzip": 874
+    },
+    {
+      "name": "chunk_2_0.json",
+      "raw": 9508,
+      "gzip": 873
+    },
+    {
+      "name": "chunk_2_1.json",
+      "raw": 10671,
+      "gzip": 950
+    },
+    {
+      "name": "chunk_2_2.json",
+      "raw": 10578,
+      "gzip": 925
+    },
+    {
+      "name": "chunk_2_3.json",
+      "raw": 10229,
+      "gzip": 919
+    },
+    {
+      "name": "chunk_2_4.json",
+      "raw": 10562,
+      "gzip": 937
+    },
+    {
+      "name": "chunk_2_5.json",
+      "raw": 9144,
+      "gzip": 855
+    },
+    {
+      "name": "chunk_3_0.json",
+      "raw": 9408,
+      "gzip": 868
+    },
+    {
+      "name": "chunk_3_1.json",
+      "raw": 10083,
+      "gzip": 923
+    },
+    {
+      "name": "chunk_3_2.json",
+      "raw": 10469,
+      "gzip": 921
+    },
+    {
+      "name": "chunk_3_3.json",
+      "raw": 10360,
+      "gzip": 908
+    },
+    {
+      "name": "chunk_3_4.json",
+      "raw": 10453,
+      "gzip": 929
+    },
+    {
+      "name": "chunk_3_5.json",
+      "raw": 9046,
+      "gzip": 855
+    },
+    {
+      "name": "chunk_4_0.json",
+      "raw": 9494,
+      "gzip": 887
+    },
+    {
+      "name": "chunk_4_1.json",
+      "raw": 10293,
+      "gzip": 938
+    },
+    {
+      "name": "chunk_4_2.json",
+      "raw": 10562,
+      "gzip": 950
+    },
+    {
+      "name": "chunk_4_3.json",
+      "raw": 10453,
+      "gzip": 939
+    },
+    {
+      "name": "chunk_4_4.json",
+      "raw": 10546,
+      "gzip": 936
+    },
+    {
+      "name": "chunk_4_5.json",
+      "raw": 9130,
+      "gzip": 865
+    },
+    {
+      "name": "chunk_5_0.json",
+      "raw": 8558,
+      "gzip": 840
+    },
+    {
+      "name": "chunk_5_1.json",
+      "raw": 9228,
+      "gzip": 904
+    },
+    {
+      "name": "chunk_5_2.json",
+      "raw": 9144,
+      "gzip": 880
+    },
+    {
+      "name": "chunk_5_3.json",
+      "raw": 9046,
+      "gzip": 872
+    },
+    {
+      "name": "chunk_5_4.json",
+      "raw": 8890,
+      "gzip": 899
+    },
+    {
+      "name": "chunk_5_5.json",
+      "raw": 8204,
+      "gzip": 825
+    },
+    {
+      "name": "collision.json",
+      "raw": 41461,
+      "gzip": 2761
+    },
+    {
+      "name": "compact_greybox.json",
+      "raw": 300,
+      "gzip": 194
+    },
+    {
+      "name": "debug.json",
+      "raw": 47234,
+      "gzip": 3885
+    },
+    {
+      "name": "manifest.json",
+      "raw": 127266,
+      "gzip": 15193
+    },
+    {
+      "name": "minimap.json",
+      "raw": 52865,
+      "gzip": 3053
+    },
+    {
+      "name": "sim-config.json",
+      "raw": 514,
+      "gzip": 299
+    },
+    {
+      "name": "sport_greybox.json",
+      "raw": 302,
+      "gzip": 193
+    },
+    {
+      "name": "van_greybox.json",
+      "raw": 293,
+      "gzip": 189
+    }
+  ]
+}

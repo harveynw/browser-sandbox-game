@@ -45,6 +45,9 @@ export class ReplicaStore {
   private frozen: RenderActor[] = [];
   private loading = false;
   ignored = 0;
+  template(id: number): string | undefined {
+    return this.visible.get(id)?.descriptor.template_id;
+  }
   get size(): number {
     return this.visible.size;
   }

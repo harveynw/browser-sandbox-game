@@ -14,7 +14,7 @@ export type Axis = "x" | "z";
 
 export type SpawnPoint = { id: string, position: [number, number, number], yaw: number, safe_radius: number, reservation_id: string, access_id: string, };
 
-export type ParkingSpawn = { id: string, position: [number, number, number], yaw: number, template_id: string, secured: boolean, reservation_id: string, access_id: string, };
+export type ParkingSpawn = { id: string, position: [number, number, number], yaw: number, template_id: string, secured: boolean, mission_reserved: boolean, reservation_id: string, access_id: string, };
 
 export type Zone = { id: string, center: [number, number, number], radius: number, kind: ZoneKind, reservation_id: string, access_id: string, allowed_templates: Array<string>, };
 
@@ -36,7 +36,9 @@ export type BuildingRecipe = { grid: number, size: number, spacing: number, setb
 
 export type Landmark = { id: string, position: [number, number, number], size: [number, number, number], color: string, };
 
-export type Authoring = { schema_version: number, world_asset_id: string, bounds: Bounds, roads: Roads, buildings: BuildingRecipe, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, landmarks: Array<Landmark>, sim_config: SimConfig, };
+export type District = { id: string, name: string, rect: Rect, color: string, };
+
+export type Authoring = { schema_version: number, world_asset_id: string, bounds: Bounds, roads: Roads, buildings: BuildingRecipe, districts: Array<District>, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, landmarks: Array<Landmark>, sim_config: SimConfig, };
 
 export type ColliderRole = "ground" | "boundary" | "building" | "landmark";
 
@@ -68,7 +70,7 @@ export type ChunkAsset = { id: string, cx: number, cz: number, visual_url: strin
 
 export type VisualAsset = { id: string, url: string, sha256: string, };
 
-export type WorldManifest = { schema_version: number, world_asset_id: string, content_hash: string, sim_config_hash: string, sim_config_url: string, bounds: Bounds, roads: Roads, collision_url: string, collision_sha256: string, debug_url: string, debug_sha256: string, chunks: Array<ChunkAsset>, road_graph: RoadGraph, pedestrian_graph: RoadGraph, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, vehicle_visuals: Array<VisualAsset>, };
+export type WorldManifest = { schema_version: number, world_asset_id: string, content_hash: string, sim_config_hash: string, sim_config_url: string, bounds: Bounds, roads: Roads, collision_url: string, collision_sha256: string, debug_url: string, debug_sha256: string, chunks: Array<ChunkAsset>, districts: Array<District>, backdrop: VisualAsset, minimap: VisualAsset, road_graph: RoadGraph, pedestrian_graph: RoadGraph, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, vehicle_visuals: Array<VisualAsset>, };
 
 export type PackageIndex = { schema_version: number, content_hash: string, manifest_url: string, manifest_sha256: string, };
 

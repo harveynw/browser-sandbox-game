@@ -916,3 +916,37 @@ fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driv
     assert_eq!(w.sessions[&p].epoch, 2);
     assert!(t.sent.iter().any(|(target,_,m)| *target==p && matches!(&m.message,ServerMessage::PlayerStatus(v) if v.credits.0==150 && v.completed_jobs==1 && v.mission.as_ref().is_some_and(|m|m.phase==MissionPhase::Completed))));
 }
+
+#[test]
+fn full_city_installs_three_public_classes_without_spawning_recovery_reservations() {
+    let content = WorldContent::load_index(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
+        "city.json",
+    )
+    .unwrap();
+    let mut w = World::new(content).unwrap();
+    let mut a = MemoryProfiles::default();
+    let mut t = FakeTransport::default();
+    assert_eq!(w.vehicles.len(), 4);
+    assert!(w.vehicles.values().any(|v| v.template.id == "van"));
+    assert!(w.vehicles.values().any(|v| v.template.id == "sport"));
+    for id in w.vehicles.keys().copied().collect::<Vec<_>>() {
+        let p = peer(id);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        at_door(&mut w, p, id);
+        step(&mut w, &mut a, &mut t);
+        vehicle_action(
+            &w,
+            &mut t,
+            p,
+            1,
+            1,
+            Action::EnterVehicle(EnterVehicle {
+                vehicle_id: EntityId(id),
+            }),
+        );
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.vehicles[&id].state.driver_id, w.sessions[&p].player);
+    }
+}

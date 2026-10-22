@@ -194,7 +194,8 @@
       "template_id": "compact",
       "secured": false,
       "reservation_id": "parking_01_clear",
-      "access_id": "parking_01_access"
+      "access_id": "parking_01_access",
+      "mission_reserved": false
     },
     {
       "id": "parking_quay_02",
@@ -203,7 +204,8 @@
       "template_id": "compact",
       "secured": false,
       "reservation_id": "parking_02_clear",
-      "access_id": "parking_02_access"
+      "access_id": "parking_02_access",
+      "mission_reserved": false
     }
   ],
   "zones": [
@@ -321,5 +323,6 @@
       "yaw_substep": 0.03,
       "max_substeps": 8
     }
-  }
+  },
+  "districts": []
 }

@@ -62,3 +62,22 @@ it("shortens immediately at walls, eases outward, and uses the movement yaw and 
   hit = 0;
   expect(follow.update(camera, feet, 0, 0, 0.016, world)).toBe(0);
 });
+
+it("lifts the van driving view above its taller body while keeping compact and walking framing", () => {
+  const camera = new PerspectiveCamera(65),
+    follow = new FollowCamera();
+  let origin: number[] = [];
+  const world = {
+    spherecastStatic: (q: StaticSphereQuery) => {
+      origin = q.origin;
+      return { version: 1, hit: null };
+    },
+  };
+  follow.update(camera, [0, 0, 0], 0, -0.15, 0.1, world, true, true, 2.2);
+  expect(origin[1]).toBeCloseTo(1.9);
+  expect(camera.position.y).toBeGreaterThan(2.9);
+  camera.updateMatrixWorld();
+  expect(new Vector3(0, 2.3, 0).project(camera).y).toBeCloseTo(0);
+  follow.update(camera, [0, 0, 0], 0, -0.15, 0.1, world, true, true, 1.4);
+  expect(origin[1]).toBeCloseTo(1.1);
+});
