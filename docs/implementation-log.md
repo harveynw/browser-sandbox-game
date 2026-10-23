@@ -549,3 +549,7 @@ Verification:
 Limitations: full trial/recovery completion and repair-payment edge cases were verified in native scenarios that arrange poses/economic delays, not additional live playthroughs. Profiles and queued economic work remain memory-only until T17. Safe exit can wait for clear doors. Greybox presentation/audio polish and real-RTC 16-player performance, impairment and soak measurements retain their later milestone scope.
 
 Next action: stop for milestone review. **T17 — Local SQLite profiles** is next and has not started.
+
+## Terminal prompt clarification — 24 October 2026
+
+A Chrome screenshot showed the unconditional “F choose courier / recovery” hint while 153 m from Quay and paused. The HUD now says to approach within 3 m when out of range, displays F only while gameplay input is active nearby, and points to the menu choices when paused nearby. Interaction and server eligibility are unchanged. Verification: strict TypeScript, targeted ESLint, four guidance tests and the production client build pass; the separate live in-app session confirmed out-of-range and nearby-paused guidance. Chrome itself was not controlled.

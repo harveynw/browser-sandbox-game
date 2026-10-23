@@ -558,6 +558,7 @@ export class GameApp {
           this.assets?.manifest.mission_templates.find(
             (t) => t.id === mission?.template_id,
           ),
+          this.input.active,
         );
         const jobs = this.session?.nearbyJobs(now) ?? [];
         const key = jobs.map((t) => t.id).join(",");

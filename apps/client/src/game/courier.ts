@@ -6,13 +6,24 @@ export function courierGuidance(
   position: readonly number[] | undefined,
   terminalPosition?: readonly number[],
   template?: MissionTemplate,
+  inputActive = true,
 ): string {
   if (!mission) {
-    const distance =
+    const metres =
       position && terminalPosition
-        ? `${Math.round(Math.hypot((terminalPosition[0] ?? 0) - (position[0] ?? 0), (terminalPosition[2] ?? 0) - (position[2] ?? 0)))} m`
-        : "nearby";
-    return `Jobs: cyan Quay terminal · ${distance} · F choose courier / recovery · Trial start: north city ring [0, -256] · Repairs: Ironworks [220, -180]`;
+        ? Math.hypot(
+            (terminalPosition[0] ?? 0) - (position[0] ?? 0),
+            (terminalPosition[2] ?? 0) - (position[2] ?? 0),
+          )
+        : undefined;
+    const distance = metres === undefined ? "" : ` · ${Math.round(metres)} m`;
+    const action =
+      metres !== undefined && metres <= 3
+        ? inputActive
+          ? "F choose courier / recovery"
+          : "Choose courier / recovery from this menu"
+        : "Approach within 3 m to choose courier / recovery";
+    return `Jobs: cyan Quay terminal${distance} · ${action} · Trial start: north city ring [0, -256] · Repairs: Ironworks [220, -180]`;
   }
   const kind = template?.objective.kind ?? "courier";
   const title =
