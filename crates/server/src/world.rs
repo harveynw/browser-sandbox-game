@@ -8,7 +8,7 @@ use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t14-local";
+pub const BUILD_ID: &str = "t15-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -20,7 +20,7 @@ pub struct Player {
     pub id: EntityId,
     pub state: CharacterState,
     pub display_name: DisplayName,
-    slot: usize,
+    pub(crate) slot: usize,
 }
 pub struct Session {
     pub id: Option<String>,
@@ -35,6 +35,7 @@ pub struct Session {
     actions: BTreeMap<u32, ActionResult>,
     last_request: u32,
     pub weapon: crate::combat::Weapon,
+    pub wanted: crate::police::Wanted,
     pub mission: Option<crate::missions::Courier>,
     status_revision: u32,
     pub(crate) status_dirty: bool,
@@ -69,10 +70,11 @@ pub struct World {
     pub vehicles: BTreeMap<u32, crate::vehicles::Vehicle>,
     pub population: crate::population::Population,
     pub(crate) combat: crate::combat::Combat,
+    pub police: crate::police::Police,
     pub(crate) content: WorldContent,
     config: SimConfig,
     pub(crate) collision: CollisionWorld,
-    next_entity: u32,
+    pub(crate) next_entity: u32,
     output: VecDeque<(PeerKey, Delivery, ServerEnvelope)>,
     closing: BTreeMap<PeerKey, &'static str>,
 }
@@ -136,7 +138,20 @@ impl World {
             vehicles.keys().copied(),
             424242,
         )?;
-        Ok(Self {
+        let mut police = crate::police::Police::new(&content.manifest);
+        for (&id, car) in &vehicles {
+            if content.manifest.parking.iter().any(|slot| {
+                slot.secured
+                    && crate::police::distance(
+                        slot.position.map(|v| v as f32),
+                        car.state.motor.position.0.map(|v| v.0),
+                    ) < 0.1
+            }) {
+                police.secured.insert(id);
+            }
+        }
+        let mut world = Self {
+            police,
             combat: Default::default(),
             population,
             tick: 0,
@@ -151,7 +166,9 @@ impl World {
             vehicles,
             output: VecDeque::new(),
             closing: BTreeMap::new(),
-        })
+        };
+        world.direct_police(0, &[])?;
+        Ok(world)
     }
     pub fn build(&self) -> ServerHello {
         ServerHello {
@@ -194,6 +211,7 @@ impl World {
                 car.state.driver_id = None;
                 car.stop();
             }
+            self.police.release(id.0);
             self.players.remove(&id.0);
         }
         if let (Some(profile), Some(id)) = (&session.profile, &session.id) {
@@ -245,9 +263,19 @@ impl World {
                     (
                         EntityDescriptor {
                             id: v.id,
-                            entity_kind: EntityKind::Vehicle,
+                            entity_kind: if self.police.units.contains_key(&id) {
+                                EntityKind::Police
+                            } else {
+                                EntityKind::Vehicle
+                            },
                             template_id: TemplateId(v.template.id.clone()),
-                            display_name: None,
+                            display_name: if self.police.secured.contains(&id) {
+                                Some(DisplayName(format!("Secured {}", v.template.id)))
+                            } else if self.police.units.contains_key(&id) {
+                                Some(DisplayName("Police patrol".into()))
+                            } else {
+                                None
+                            },
                         },
                         EntityState::Vehicle(v.state.clone()),
                     ),
@@ -333,8 +361,8 @@ impl World {
             server_tick: tick,
             credits: p.credits,
             completed_jobs: p.completed_jobs,
-            heat: Heat(0),
-            pursuit: Pursuit::Clear,
+            heat: Heat(s.wanted.heat),
+            pursuit: s.wanted.pursuit,
             magazine: Magazine(s.weapon.magazine),
             reload_end_tick: s.weapon.reload_end,
             mission: s.mission.as_ref().map(|m| m.view()),
@@ -425,7 +453,8 @@ impl World {
             return ActionCode::Unavailable;
         }
         let player = &self.players[&id.0];
-        if player.state.health.0 == 0
+        if s.wanted.arrest_pending
+            || player.state.health.0 == 0
             || matches!(
                 player.state.mode,
                 CharacterMode::Downed | CharacterMode::Arrested
@@ -536,7 +565,10 @@ impl World {
                 if !s.visible.contains_key(&vehicle_id) {
                     return ActionCode::OutOfRange;
                 }
-                if car.state.driver_id.is_some() || !self.population.can_enter(vehicle_id) {
+                if car.state.driver_id.is_some()
+                    || self.police.units.contains_key(&vehicle_id)
+                    || !self.population.can_enter(vehicle_id)
+                {
                     return ActionCode::Occupied;
                 }
                 if car.state.disabled || car.state.health.0 == 0 {
@@ -566,6 +598,14 @@ impl World {
                 self.collision.exclude_vehicle(None);
                 if !clear {
                     return ActionCode::OutOfRange;
+                }
+                if self.police.secured.contains(&vehicle_id) {
+                    self.report_crime(
+                        id.0,
+                        crate::police::CrimeId::Theft(self.tick, vehicle_id),
+                        crate::police::CrimeKind::Theft,
+                        feet,
+                    );
                 }
                 let car = self
                     .vehicles
@@ -1079,6 +1119,7 @@ impl World {
                             actions: BTreeMap::new(),
                             last_request: 0,
                             weapon: Default::default(),
+                            wanted: Default::default(),
                             mission: None,
                             status_revision: 1,
                             status_dirty: false,
@@ -1139,6 +1180,13 @@ impl World {
                 .inputs
                 .remove(&next)
                 .unwrap_or_else(|| sim_core::neutral_input(next, player.state.motor.yaw));
+            let input = if s.wanted.arrest_pending {
+                let mut neutral = sim_core::neutral_input(next, player.state.motor.yaw);
+                neutral.buttons = Buttons(4);
+                neutral
+            } else {
+                input
+            };
             s.inputs.retain(|tick, _| *tick > next);
             actor_inputs.insert(player.state.vehicle_id.map_or(id, |v| v.0), input);
         }
@@ -1153,6 +1201,7 @@ impl World {
                 yaw: p.state.motor.yaw.0,
             })
             .collect();
+        self.direct_police(next, &observers)?;
         self.population.direct(
             next,
             &observers,
@@ -1188,6 +1237,7 @@ impl World {
             &self.content.manifest,
             &mut self.collision,
         )?;
+        self.decide_police(next, &observers)?;
         // Preserve intended pedestrian motion for swept impact queries. Resolving
         // new car overlaps first would erase the contact before damage observes it.
         self.population
@@ -1203,6 +1253,10 @@ impl World {
             let input = actor_inputs
                 .get(&car.id.0)
                 .cloned()
+                .or_else(|| {
+                    self.police
+                        .vehicle_input(car.id.0, next, car.state.motor.speed.0)
+                })
                 .or_else(|| {
                     self.population
                         .vehicle_input(car.id.0, next, car.state.motor.speed.0)
@@ -1286,6 +1340,7 @@ impl World {
             }
         }
         self.advance_combat();
+        self.advance_police()?;
         for peer in failed {
             self.disconnect(peer, profiles);
             self.closing.insert(peer, "unsafe motor input/state");

@@ -1,6 +1,10 @@
 import { simulationMemoryBytes } from "../simulation/bridge";
 import { courierGuidance } from "./courier";
-import type { CharacterMotor } from "@port-meridian/protocol";
+import type {
+  CharacterMode,
+  CharacterMotor,
+  Pursuit,
+} from "@port-meridian/protocol";
 import type { LoadedPackage } from "@port-meridian/content";
 import type { PredictionWorld } from "../simulation/bridge";
 import { GameSession } from "../net/session";
@@ -32,6 +36,10 @@ export class GameApp {
   private readonly leave = document.createElement("button");
   private carHealth: number | null = null;
   private magazine = 12;
+  private heat = 0;
+  private pursuit: Pursuit = "clear";
+  private arrestStart: number | null = null;
+  private mode: CharacterMode = "on_foot";
   private reloadEnd: number | null = null;
   private respawnTick: number | null = null;
   private protectedUntil: number | null = null;
@@ -404,6 +412,7 @@ export class GameApp {
           this.ownerTick = owner.server_tick;
           this.motor = owner.player_state.motor;
           this.health = owner.player_state.health;
+          this.mode = owner.player_state.mode;
           this.carHealth =
             owner.state.kind === "vehicle" ? owner.state.data.health : null;
         },
@@ -416,6 +425,11 @@ export class GameApp {
           if (this.session === session) {
             this.credits = status.credits;
             this.magazine = status.magazine;
+            this.heat = status.heat;
+            if (status.pursuit === "arresting" && this.pursuit !== "arresting")
+              this.arrestStart = status.server_tick;
+            if (status.pursuit !== "arresting") this.arrestStart = null;
+            this.pursuit = status.pursuit;
             this.reloadEnd = status.reload_end_tick;
             this.respawnTick = status.respawn_tick;
             this.protectedUntil = status.protected_until_tick;
@@ -485,6 +499,11 @@ export class GameApp {
         this.renderer.setMissionTarget(
           mission?.phase === "active" ? mission.target_position : null,
         );
+        const aiming =
+          this.input.active &&
+          this.input.aiming &&
+          this.health > 0 &&
+          this.mode === "on_foot";
         const distance = this.camera.update(
           this.renderer.camera,
           localMotor.position,
@@ -495,16 +514,10 @@ export class GameApp {
           this.reduced,
           this.session?.isDriving,
           this.session?.controlledVehicleTemplate?.dimensions[1],
-          this.input.active && this.input.aiming && this.health > 0,
+          aiming,
         );
         this.cameraDistance = distance;
-        this.renderer.render(
-          distance,
-          this.input.active &&
-            this.input.aiming &&
-            this.health > 0 &&
-            !this.session?.isDriving,
-        );
+        this.renderer.render(distance, aiming);
       }
       if (now - this.lastHud > 100) {
         this.lastHud = now;
@@ -532,12 +545,14 @@ export class GameApp {
         this.debug.textContent = `${this.connection} · chunks ${streaming?.resident ?? 0}/36 pending ${streaming?.pending ?? 0} fallback ${streaming?.failed ?? 0} · matrices ${((streaming?.matrixBytes ?? 0) / 1024).toFixed(0)} KiB · WASM ${(simulationMemoryBytes() / 1048576).toFixed(1)} MiB · draws ${streaming?.drawCalls ?? 0} tris ${streaming?.triangles ?? 0} geoms ${streaming?.geometries ?? 0} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · look ${this.input.yaw.toFixed(3)}, ${this.input.pitch.toFixed(3)} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} (pedestrians ${remotes.filter((r) => r.descriptor.entity_kind === "pedestrian").length}, cars ${remotes.filter((r) => r.descriptor.entity_kind === "vehicle").length}) · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
         const estimated = this.session?.estimatedTick(now) ?? 0;
         const combat =
-          this.health <= 0
-            ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
-            : `${this.magazine}/12${this.session?.isDriving ? " · Weapon holstered" : this.reloadEnd !== null ? " · Reloading" : " · RMB / Q aim · click fire · R reload"}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Spawn protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
+          this.mode === "arrested"
+            ? `Arrested · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
+            : this.health <= 0
+              ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
+              : `${this.magazine}/12${this.session?.isDriving ? " · Weapon holstered" : this.reloadEnd !== null ? " · Reloading" : " · RMB / Q aim · click fire · R reload"}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Spawn protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
         this.hud.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · ${combat} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
+            ? `Health ${this.health} · ${combat} · Heat ${"●".repeat(this.heat)}${"○".repeat(3 - this.heat)} · ${this.pursuit === "arresting" ? `Arrest ${Math.min(100, Math.max(0, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100)))}% · move to escape` : this.pursuit === "searching" ? "Searching · stay out of sight" : this.pursuit === "pursuing" ? "Police pursuit · break line of sight" : "Clear"} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
             : "Port Meridian · Walking and driving";
       }
     } catch (error) {

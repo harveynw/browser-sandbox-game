@@ -244,7 +244,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t14-local" ||
+      info.build_id !== "t15-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -584,7 +584,10 @@ export class GameSession {
     const local = this.presentation(now);
     if (!local || !this.assets) return undefined;
     return this.remoteSamples(now)
-      .filter((a) => a.state.kind === "vehicle")
+      .filter(
+        (a) =>
+          a.state.kind === "vehicle" && a.descriptor.entity_kind !== "police",
+      )
       .map((a) => {
         const template = this.assets?.manifest.vehicle_templates.find(
           (t) => t.id === a.descriptor.template_id,
@@ -667,12 +670,13 @@ export class GameSession {
     if (this.driving)
       return `E exit when stopped · WASD drive · Space handbrake${job}`;
     const target = this.target(now);
+    const secured = target?.descriptor.display_name?.startsWith("Secured ");
     return target?.state.kind === "vehicle"
       ? target.state.data.disabled || target.state.data.health === 0
         ? "Vehicle disabled · awaiting a clear parking respawn"
         : target.state.data.driver_id
           ? "Vehicle occupied"
-          : `E enter ${target.descriptor.template_id} · Car health ${target.state.data.health}${job}`
+          : `E enter ${target.descriptor.template_id} · Car health ${target.state.data.health}${secured ? " · Secured: police witnesses add heat" : ""}${job}`
       : terminal && !this.mission
         ? "E / F accept courier · 150 credits"
         : "Walk to the left door of a parked car · E enter";

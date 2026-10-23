@@ -453,7 +453,7 @@ export class GameRenderer {
       let group = this.remoteActors.get(actor.id);
       if (!group) {
         group = new THREE.Group();
-        if (actor.descriptor.entity_kind === "vehicle") {
+        if (actor.state.kind === "vehicle") {
           const template = this.assets.manifest.vehicle_templates.find(
             (t) => t.id === actor.descriptor.template_id,
           );
@@ -479,6 +479,21 @@ export class GameRenderer {
             );
             group.add(mesh);
           }
+          if (actor.descriptor.entity_kind === "police") {
+            let material = this.carMaterials.get("police-beacon");
+            if (!material) {
+              material = new THREE.MeshStandardMaterial({
+                color: "#307bff",
+                emissive: "#103a90",
+              });
+              this.carMaterials.set("police-beacon", material);
+              this.materials.add(material);
+            }
+            const beacon = new THREE.Mesh(this.cube, material);
+            beacon.position.set(0, 1.65, 0);
+            beacon.scale.set(1.1, 0.18, 0.35);
+            group.add(beacon);
+          }
         } else {
           const body = new THREE.Mesh(this.capsule, this.remoteMaterial);
           body.position.y = 0.87;
@@ -492,10 +507,7 @@ export class GameRenderer {
         this.scene.add(group);
       }
       const body = group.children[0];
-      if (
-        body instanceof THREE.Mesh &&
-        actor.descriptor.entity_kind !== "vehicle"
-      )
+      if (body instanceof THREE.Mesh && actor.state.kind !== "vehicle")
         body.material = actor.stale
           ? this.staleMaterial
           : actor.descriptor.entity_kind === "pedestrian"

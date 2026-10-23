@@ -515,7 +515,7 @@
       "position": [-152, 0, 192],
       "yaw": 0,
       "template_id": "compact",
-      "secured": false,
+      "secured": true,
       "reservation_id": "parking_02_clear",
       "access_id": "parking_02_access",
       "mission_reserved": false

@@ -927,10 +927,11 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     let mut w = World::new(content).unwrap();
     let mut a = MemoryProfiles::default();
     let mut t = FakeTransport::default();
-    assert_eq!(w.vehicles.len(), 4);
+    assert_eq!(w.population.pools.len(), 4);
+    assert_eq!(w.police.units.len(), 2);
     assert!(w.vehicles.values().any(|v| v.template.id == "van"));
     assert!(w.vehicles.values().any(|v| v.template.id == "sport"));
-    for id in w.vehicles.keys().copied().collect::<Vec<_>>() {
+    for id in w.population.pools.keys().copied().collect::<Vec<_>>() {
         let p = peer(id);
         join(&mut w, &mut a, &mut t, p, None);
         ready(&mut w, &mut a, &mut t, p);
@@ -1473,4 +1474,296 @@ fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
     }
     assert!(!w.vehicles[&1].state.disabled);
     assert_eq!(w.vehicles[&1].state.health.0, 100);
+}
+
+fn police_setup() -> (World, MemoryProfiles, FakeTransport) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    (
+        World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap(),
+        MemoryProfiles::default(),
+        FakeTransport::default(),
+    )
+}
+fn keep_alive(w: &World, t: &mut FakeTransport, p: PeerKey) {
+    batch(w, t, p, w.tick + 1, 0, 0, w.sessions[&p].epoch);
+}
+#[test]
+fn police_hear_real_shots_once_publish_private_heat_and_clear_targets_on_rejoin() {
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    let q = peer(1);
+    let cookie = join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    let id = w.sessions[&p].player.unwrap().0;
+    fire(&w, &mut t, p, 1, 0.0);
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    assert_eq!(w.sessions[&q].wanted.heat, 0);
+    assert_eq!(w.sessions[&p].weapon.magazine, 11);
+    assert!(t.sent.iter().any(|(target,_,m)| *target==p && matches!(&m.message,ServerMessage::PlayerStatus(s) if s.heat.0==1 && s.pursuit==Pursuit::Pursuing)));
+    assert!(!t.sent.iter().any(|(target, _, m)| *target == q
+        && matches!(&m.message,ServerMessage::PlayerStatus(s) if s.heat.0>0)));
+    for _ in 0..10 {
+        step(&mut w, &mut a, &mut t);
+    }
+    fire(&w, &mut t, p, 2, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    assert_eq!(w.sessions[&p].weapon.magazine, 10);
+    assert!(w.police.units.values().any(|u| u.target == Some(id)));
+    w.disconnect(p, &mut a);
+    assert!(w.police.units.values().all(|u| u.target != Some(id)));
+    join(&mut w, &mut a, &mut t, p, Some(&cookie));
+    ready(&mut w, &mut a, &mut t, p);
+    assert_eq!(w.sessions[&p].wanted.heat, 0);
+    assert_eq!(w.sessions[&p].wanted.pursuit, Pursuit::Clear);
+    assert_ne!(w.sessions[&p].player.unwrap().0, id);
+}
+#[test]
+fn unseen_target_is_not_tracked_and_escapes_after_search_timer() {
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    let known = w.sessions[&p].wanted.last_known;
+    let id = w.sessions[&p].player.unwrap().0;
+    // Fixture relocation simulates an unseen escape; police must retain the observed point.
+    w.players.get_mut(&id).unwrap().state.motor =
+        sim_core::spawn_character([340.0, 0.02, -340.0], 0.0).unwrap();
+    let last_seen = w.sessions[&p].wanted.last_seen;
+    while w.tick < last_seen + 150 {
+        keep_alive(&w, &mut t, p);
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+    }
+    assert_eq!(w.sessions[&p].wanted.pursuit, Pursuit::Searching);
+    assert_eq!(w.sessions[&p].wanted.last_known, known);
+    for _ in 0..599 {
+        keep_alive(&w, &mut t, p);
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+    }
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 0);
+    assert_eq!(w.sessions[&p].wanted.pursuit, Pursuit::Clear);
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::PlayerStatus(s) if s.heat.0==0 && s.pursuit==Pursuit::Clear)));
+}
+#[test]
+fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss() {
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    // Accept the real courier before arranging the stationary arrest fixture.
+    let id = w.sessions[&p].player.unwrap().0;
+    w.players.get_mut(&id).unwrap().state.motor =
+        sim_core::spawn_character([-172.0, 0.02, 180.0], 0.0).unwrap();
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    assert!(w.sessions[&p].mission.is_some());
+    let unit = *w.police.units.keys().next().unwrap();
+    let position = w.vehicles[&unit].state.motor.position.0.map(|v| v.0);
+    let yaw = w.vehicles[&unit].state.motor.yaw.0;
+    let target = sim_core::anchor(&w.vehicles[&unit].state.motor, [0.0, 0.02, -5.0]);
+    w.players.get_mut(&id).unwrap().state.motor = sim_core::spawn_character(target, yaw).unwrap();
+    fire(&w, &mut t, p, 2, yaw);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    let credits = w.sessions[&p].profile.as_ref().unwrap().credits;
+    let epoch = w.sessions[&p].epoch;
+    for _ in 0..180 {
+        keep_alive(&w, &mut t, p);
+        step(&mut w, &mut a, &mut t);
+        if w.players[&id].state.mode == CharacterMode::Arrested {
+            break;
+        }
+    }
+    assert_eq!(
+        w.players[&id].state.mode,
+        CharacterMode::Arrested,
+        "cop began at {position:?}; now {:?}, target {:?}",
+        w.vehicles[&unit].state.motor,
+        w.players[&id].state.motor
+    );
+    assert_eq!(w.sessions[&p].epoch, epoch + 1);
+    assert_eq!(
+        w.sessions[&p].mission.as_ref().unwrap().phase,
+        server::missions::Phase::Failed
+    );
+    assert_eq!(w.sessions[&p].wanted.heat, 0);
+    let arrested = w.players[&id].state.motor.position.clone();
+    let due = w.sessions[&p].weapon.respawn.unwrap();
+    while w.tick < due - 1 {
+        batch(
+            &w,
+            &mut t,
+            p,
+            w.tick + 1,
+            32767,
+            32767,
+            w.sessions[&p].epoch,
+        );
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+        assert_eq!(w.players[&id].state.motor.position, arrested);
+    }
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].state.mode, CharacterMode::OnFoot);
+    assert_eq!(w.sessions[&p].epoch, epoch + 2);
+    assert_eq!(w.sessions[&p].profile.as_ref().unwrap().credits, credits);
+    assert_eq!(w.sessions[&p].weapon.magazine, 12);
+    assert!(w.sessions[&p].mission.is_none());
+}
+#[test]
+fn sixteen_wanted_guests_share_at_most_eight_police_with_rotating_fair_assignments() {
+    let (mut w, mut a, mut t) = police_setup();
+    for n in 0..16 {
+        let p = peer(n);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+    }
+    let ids: BTreeSet<_> = w.players.keys().copied().collect();
+    let mut assigned = BTreeSet::new();
+    for turn in 1..=16 {
+        w.tick = turn * 150 - 1;
+        for n in 0..16 {
+            let p = peer(n);
+            let s = w.sessions.get_mut(&p).unwrap();
+            s.wanted.heat = 3;
+            s.wanted.pursuit = Pursuit::Pursuing;
+            s.wanted.last_seen = w.tick;
+            s.wanted.last_known = w.players[&s.player.unwrap().0]
+                .state
+                .motor
+                .position
+                .0
+                .map(|v| v.0);
+            keep_alive(&w, &mut t, p);
+        }
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+        assert!(w.police.units.len() <= 8);
+        assigned.extend(w.police.units.values().filter_map(|u| u.target));
+    }
+    assert_eq!(w.police.units.len(), 8);
+    assert_eq!(assigned, ids);
+}
+#[test]
+fn secured_theft_is_witnessed_once_and_police_cars_cannot_be_possessed() {
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::EntityShow(s) if s.descriptor.id.0==2 && s.descriptor.display_name.as_ref().is_some_and(|n|n.0.starts_with("Secured ")))));
+    let secured = 2;
+    let unit = *w.police.units.keys().next().unwrap();
+    let position = w.vehicles[&secured].state.motor.position.0.map(|v| v.0);
+    w.vehicles.get_mut(&unit).unwrap().state.motor =
+        sim_core::spawn_vehicle([position[0], 0.0, position[2] + 8.0], 0.0).unwrap();
+    at_door(&mut w, p, secured);
+    step(&mut w, &mut a, &mut t);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(secured),
+        }),
+    );
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(secured),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].wanted.heat, 1);
+    assert_eq!(w.sessions[&p].epoch, 2);
+    vehicle_action(&w, &mut t, p, 2, 2, Action::ExitVehicle(Empty {}));
+    step(&mut w, &mut a, &mut t);
+    let unit = *w.police.units.keys().next().unwrap();
+    at_door(&mut w, p, unit);
+    step(&mut w, &mut a, &mut t);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        3,
+        w.sessions[&p].epoch,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(unit),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert!(w.vehicles[&unit].state.driver_id.is_none());
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==3 && r.code==ActionCode::Occupied)));
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::EntityShow(s) if s.descriptor.entity_kind==EntityKind::Police && matches!(s.state,EntityState::Vehicle(_)))));
+}
+#[test]
+fn arrest_safely_releases_a_stationary_driver_and_rejects_old_epoch_inputs() {
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let unit = *w.police.units.keys().next().unwrap();
+    let car = 1;
+    at_door(&mut w, p, car);
+    step(&mut w, &mut a, &mut t);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    let id = w.sessions[&p].player.unwrap().0;
+    // Put a stationary police fixture behind the public compact on its clear parking aisle.
+    let pos = w.vehicles[&car].state.motor.position.0.map(|v| v.0);
+    w.vehicles.get_mut(&unit).unwrap().state.motor =
+        sim_core::spawn_vehicle([pos[0], 0.0, pos[2] + 5.0], 0.0).unwrap();
+    let s = w.sessions.get_mut(&p).unwrap();
+    s.wanted.heat = 1;
+    s.wanted.pursuit = Pursuit::Pursuing;
+    s.wanted.last_seen = w.tick;
+    s.wanted.last_known = pos;
+    let epoch = s.epoch;
+    for _ in 0..240 {
+        keep_alive(&w, &mut t, p);
+        step(&mut w, &mut a, &mut t);
+        if w.players[&id].state.mode == CharacterMode::Arrested {
+            break;
+        }
+    }
+    assert_eq!(
+        w.players[&id].state.mode,
+        CharacterMode::Arrested,
+        "police {:?}, driver {:?}",
+        w.vehicles[&unit].state.motor,
+        w.players[&id].state.motor
+    );
+    assert_eq!(w.players[&id].state.vehicle_id, None);
+    assert_eq!(w.vehicles[&car].state.driver_id, None);
+    assert_eq!(w.sessions[&p].epoch, epoch + 1);
+    let stopped = w.vehicles[&car].state.motor.position.clone();
+    batch(&w, &mut t, p, w.tick + 1, 0, 32767, epoch);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.vehicles[&car].state.motor.position, stopped);
+    assert!(w.metrics.stale_epochs > 0);
 }

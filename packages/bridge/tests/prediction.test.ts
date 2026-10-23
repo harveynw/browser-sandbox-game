@@ -318,3 +318,29 @@ it("generates the same fixed-tick motor across 30, 60 and 144 Hz render schedule
   expect(results[1]).toEqual(results[0]);
   expect(results[2]).toEqual(results[0]);
 });
+it("freezes an arrested owner under held controls and resumes only with the respawn epoch", async () => {
+  const w = await world(),
+    clock = new ServerClock();
+  const p = new LocalPrediction(w, clock, () => {
+    throw new Error("unexpected resync");
+  });
+  const arrested = owner(10);
+  arrested.player_state.mode = "arrested";
+  if (arrested.state.kind === "character")
+    arrested.state.data.mode = "arrested";
+  clock.observe(10, 0);
+  p.install(arrested, 0);
+  const position = structuredClone(w.currentState().motor.position);
+  for (let frame = 0; frame < 5; frame++) p.advance(frame * 33, () => controls);
+  expect(w.currentState().motor.position).toEqual(position);
+  expect(
+    [...p.history.values()].every(
+      (h) => h.input.move_z === 0 && h.input.buttons === 0,
+    ),
+  ).toBe(true);
+  const tick = p.tick;
+  p.install(owner(tick, initial, 2), 165);
+  p.advance(198, () => controls);
+  expect(w.currentState().motor.position).not.toEqual(position);
+  w.free();
+});

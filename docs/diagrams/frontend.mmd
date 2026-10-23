@@ -1,11 +1,11 @@
-%% Frontend module system — current implementation through T14.
+%% Frontend module system — current implementation through T15.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["apps/client/src/ — application"]
     main["main.ts<br/>Page routing"]:::app
-    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Private courier guidance / cancellation"]:::app
+    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Private courier, heat / pursuit and arrest feedback"]:::app
     input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
   end
@@ -16,11 +16,11 @@ flowchart TD
     replica["world/replica.ts<br/>Player / NPC state and interpolation"]:::net
   end
   subgraph group_2["apps/client/src/ — simulation"]
-    prediction["simulation/prediction.ts<br/>Local prediction and reconciliation"]:::sim
+    prediction["simulation/prediction.ts<br/>Local prediction and reconciliation<br/>Freeze disabled character controls"]:::sim
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route<br/>Pooled shot / impact effects and pistol"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route<br/>Pooled shot / impact effects and pistol<br/>Police car beacons"]:::gfx
     camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks · first-person aim"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]
@@ -47,7 +47,7 @@ flowchart TD
   session -->|"load assets"| content
   content -.->|"verified physics + initial assets"| game
   renderer <-->|"bounded visual loading / disposal"| content
-  session -.->|"private courier status + local / remote poses"| game
+  session -.->|"private courier / police status + local / remote poses"| game
   game -->|"map and actor poses"| renderer
   game -->|"pose and look input"| camera
   camera -.->|"spherecast"| bridge

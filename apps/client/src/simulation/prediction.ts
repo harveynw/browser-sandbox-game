@@ -155,7 +155,20 @@ export class LocalPrediction {
   private step(input: InputFrame): void {
     this.prepare(input.tick, this.owner?.controlled_entity_id ?? 0);
     this.previous = this.current;
-    this.current = this.world.step(input).motor;
+    if (
+      this.owner?.state.kind === "character" &&
+      this.owner.player_state.mode !== "on_foot"
+    ) {
+      input = neutral(input.tick, this.current?.yaw ?? 0);
+      this.world.reset({
+        version: 1,
+        tick: input.tick,
+        control_epoch: this.owner.control_epoch,
+        controlled_entity_id: this.owner.controlled_entity_id,
+        motor: this.current ?? this.owner.player_state.motor,
+      });
+      this.current = this.world.currentState().motor;
+    } else this.current = this.world.step(input).motor;
     this.history.set(input.tick, { input, motor: this.current });
   }
   advance(now: number, sample: () => Controls): InputFrame[] {

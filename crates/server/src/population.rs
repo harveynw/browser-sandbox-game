@@ -72,13 +72,13 @@ pub struct PopulationMetrics {
     pub replans: u64,
     pub blocked_spawns: u64,
 }
-struct Navigation {
-    points: BTreeMap<u32, [f32; 3]>,
+pub(crate) struct Navigation {
+    pub(crate) points: BTreeMap<u32, [f32; 3]>,
     edges: BTreeMap<u32, Vec<(u32, f32, EdgeKind)>>,
-    candidates: Vec<(u32, u32, [f32; 3], f32)>,
+    pub(crate) candidates: Vec<(u32, u32, [f32; 3], f32)>,
 }
 impl Navigation {
-    fn new(graph: &RoadGraph, walking: bool) -> Self {
+    pub(crate) fn new(graph: &RoadGraph, walking: bool) -> Self {
         let points: BTreeMap<_, _> = graph
             .nodes
             .iter()
@@ -113,7 +113,7 @@ impl Navigation {
             candidates,
         }
     }
-    fn nearest(&self, p: [f32; 3]) -> Option<u32> {
+    pub(crate) fn nearest(&self, p: [f32; 3]) -> Option<u32> {
         self.points
             .keys()
             .filter(|id| self.edges.contains_key(id))
@@ -124,7 +124,7 @@ impl Navigation {
             })
             .copied()
     }
-    fn path(&self, from: u32, goal: u32) -> VecDeque<u32> {
+    pub(crate) fn path(&self, from: u32, goal: u32) -> VecDeque<u32> {
         let mut cost = BTreeMap::from([(from, 0.0_f32)]);
         let mut previous = BTreeMap::new();
         let mut visited = BTreeSet::new();
@@ -805,7 +805,7 @@ fn spawn_region(p: [f32; 3], observers: &[Observer]) -> bool {
     observers.iter().any(|o| distance(p, o.position) <= 160.0)
         && observers.iter().all(|o| distance(p, o.position) >= 40.0)
 }
-fn hidden(p: [f32; 3], observers: &[Observer], collision: &CollisionWorld) -> bool {
+pub(crate) fn hidden(p: [f32; 3], observers: &[Observer], collision: &CollisionWorld) -> bool {
     observers.iter().all(|o| {
         let a = [o.position[0], o.position[1] + 1.7, o.position[2]];
         // Check head and body to avoid spawning a tall actor behind a low obstacle.

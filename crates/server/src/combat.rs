@@ -177,6 +177,23 @@ impl World {
                     end: Vec3(end.map(Scalar)),
                     hit_entity_id: hit,
                 });
+                let cause = crate::police::CrimeId::Shot(self.combat.event);
+                self.report_crime(id.0, cause, crate::police::CrimeKind::Shot, origin);
+                if let Some((target, is_car)) = target
+                    && hit.is_some()
+                    && (!is_car || self.police.units.contains_key(&target))
+                {
+                    self.report_crime(
+                        id.0,
+                        cause,
+                        if is_car {
+                            crate::police::CrimeKind::PoliceCar(target)
+                        } else {
+                            crate::police::CrimeKind::Harm
+                        },
+                        end,
+                    );
+                }
                 self.combat_event(event, origin, Some((peer, s)));
                 // A shooter cannot down another guest through an occupied vehicle.
                 self.process_disabled();
@@ -289,9 +306,36 @@ impl World {
                         (contact.collider_id, id, true),
                         self.tick.saturating_add(15),
                     );
-                    self.damage_vehicle(contact.collider_id, damage, own_driver);
+                    if self.damage_vehicle(contact.collider_id, damage, own_driver)
+                        && self.police.units.contains_key(&contact.collider_id)
+                        && let Some(actor) = own_driver
+                    {
+                        let p = self.vehicles[&contact.collider_id]
+                            .state
+                            .motor
+                            .position
+                            .0
+                            .map(|v| v.0);
+                        self.report_crime(
+                            actor.0,
+                            crate::police::CrimeId::Impact(self.tick, id),
+                            crate::police::CrimeKind::PoliceCar(contact.collider_id),
+                            p,
+                        );
+                    }
                 }
                 if self.damage_vehicle(id, damage, attacker) {
+                    if self.police.units.contains_key(&id)
+                        && let Some(actor) = attacker
+                    {
+                        let p = self.vehicles[&id].state.motor.position.0.map(|v| v.0);
+                        self.report_crime(
+                            actor.0,
+                            crate::police::CrimeId::Impact(self.tick, contact.collider_id),
+                            crate::police::CrimeKind::PoliceCar(id),
+                            p,
+                        );
+                    }
                     let position = self.vehicles[&id].state.motor.position.0.map(|v| v.0);
                     let event = WorldEvent::Impact(Impact {
                         event_id: self.event_id(),
@@ -339,6 +383,20 @@ impl World {
                 .pairs
                 .insert((car, ped, true), self.tick.saturating_add(15));
             self.damage_pedestrian(ped, damage);
+            if let Some(actor) = self.vehicles[&car].state.driver_id {
+                let p = self.population.pedestrians[&ped]
+                    .state
+                    .motor
+                    .position
+                    .0
+                    .map(|v| v.0);
+                self.report_crime(
+                    actor.0,
+                    crate::police::CrimeId::Impact(self.tick, car),
+                    crate::police::CrimeKind::Harm,
+                    p,
+                );
+            }
             let position = self.population.pedestrians[&ped]
                 .state
                 .motor
@@ -357,7 +415,7 @@ impl World {
         }
         self.process_disabled();
     }
-    fn clear_spawn(&self, position: [f32; 3], except: Option<u32>) -> bool {
+    pub(crate) fn clear_spawn(&self, position: [f32; 3], except: Option<u32>) -> bool {
         !self
             .collision
             .overlaps_character(position, QueryFilter::MOVEMENT)
@@ -372,7 +430,7 @@ impl World {
                     || distance(position, p.state.motor.position.0.map(|v| v.0)) > 1.0
             })
     }
-    fn safe_spawn(&self, near: [f32; 3], except: Option<u32>) -> Option<[f32; 3]> {
+    pub(crate) fn safe_spawn(&self, near: [f32; 3], except: Option<u32>) -> Option<[f32; 3]> {
         let mut candidates = Vec::new();
         for spawn in &self.content.manifest.spawns {
             for x in -3..=3 {
@@ -517,6 +575,8 @@ impl World {
                         player.state.mode = CharacterMode::OnFoot;
                         player.state.vehicle_id = None;
                         s.mission = None;
+                        s.wanted = Default::default();
+                        self.police.release(id.0);
                         s.weapon = Weapon {
                             protected_until: Some(self.tick.saturating_add(90)),
                             ..Default::default()
@@ -542,6 +602,9 @@ impl World {
             .map(|(&id, &state)| (id, state))
             .collect();
         for (id, (due, retries)) in disabled {
+            if self.police.units.contains_key(&id) {
+                continue;
+            }
             let Some(car) = self.vehicles.get(&id) else {
                 self.combat.disabled.remove(&id);
                 continue;
