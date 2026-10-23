@@ -249,7 +249,7 @@ impl Population {
                 continue;
             };
             let p = car.state.motor.position.0.map(|v| v.0);
-            if car.state.driver_id.is_some() {
+            if car.state.driver_id.is_some() || car.state.disabled || car.state.health.0 == 0 {
                 brain.far_since = None;
                 continue;
             }
@@ -270,6 +270,9 @@ impl Population {
         let mut remove = Vec::new();
         for (&id, ped) in &mut self.pedestrians {
             let p = ped.state.motor.position.0.map(|v| v.0);
+            if ped.state.health.0 == 0 {
+                continue;
+            }
             let far = aged_far(tick, p, observers, &mut ped.far_since);
             let stuck = tick.saturating_sub(ped.progress_at) >= 450;
             if (far || stuck) && hidden(p, observers, collision) {
@@ -395,6 +398,12 @@ impl Population {
         Ok(())
     }
     /// A traffic car's AI driver is retained until it parks in an authored spot.
+    pub fn release_ai(&mut self, id: u32) {
+        if let Some(b) = self.traffic.get_mut(&id) {
+            b.phase = TrafficPhase::Available;
+        }
+        self.intersections.release(id);
+    }
     pub fn can_enter(&self, id: u32) -> bool {
         self.traffic
             .get(&id)
@@ -427,7 +436,11 @@ impl Population {
         for id in &ids {
             let car = &vehicles[id];
             let b = self.traffic.get_mut(id).expect("traffic brain");
-            if car.state.driver_id.is_some() || b.phase == TrafficPhase::Available {
+            if car.state.driver_id.is_some()
+                || car.state.disabled
+                || car.state.health.0 == 0
+                || b.phase == TrafficPhase::Available
+            {
                 continue;
             }
             let p = car.state.motor.position.0.map(|v| v.0);
@@ -497,7 +510,11 @@ impl Population {
         for id in ids {
             let car = &vehicles[&id];
             let b = self.traffic.get_mut(&id).expect("traffic brain");
-            if car.state.driver_id.is_some() || b.phase == TrafficPhase::Available {
+            if car.state.driver_id.is_some()
+                || car.state.disabled
+                || car.state.health.0 == 0
+                || b.phase == TrafficPhase::Available
+            {
                 self.intersections.release(id);
                 continue;
             }
@@ -726,6 +743,9 @@ impl Population {
         config: &SimConfig,
     ) -> Result<(), String> {
         for ped in self.pedestrians.values_mut() {
+            if ped.state.health.0 == 0 {
+                continue;
+            }
             let mut input = ped.input.clone();
             input.tick = tick;
             let result = sim_core::step_character(

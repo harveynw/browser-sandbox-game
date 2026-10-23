@@ -1,4 +1,5 @@
 pub mod admission;
+pub mod combat;
 pub mod content_loader;
 pub mod control;
 pub mod missions;

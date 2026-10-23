@@ -403,7 +403,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
     assert!(w.players.is_empty());
 }
 #[test]
-fn actions_are_unavailable_and_duplicate_requests_return_the_cached_result() {
+fn full_magazine_reload_is_rejected_and_duplicate_requests_return_the_cached_result() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
@@ -430,7 +430,7 @@ fn actions_are_unavailable_and_duplicate_requests_return_the_cached_result() {
         .collect();
     assert_eq!(results.len(), 2);
     assert_eq!(results[0], results[1]);
-    assert_eq!(results[0].code, ActionCode::Unavailable);
+    assert_eq!(results[0].code, ActionCode::Cooldown);
 }
 
 #[test]
@@ -1075,4 +1075,402 @@ fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
     ready(&mut w, &mut a, &mut t, p);
     assert_eq!(w.sessions[&p].phase, SessionPhase::Playing);
     assert_eq!(w.sessions[&p].epoch, 2);
+}
+
+fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
+    vehicle_action(
+        w,
+        t,
+        p,
+        request,
+        w.sessions[&p].epoch,
+        Action::Fire(Fire {
+            aim_yaw: Yaw(yaw),
+            aim_pitch: Pitch(-0.05),
+        }),
+    );
+}
+#[test]
+fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driving() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let car = 1;
+    let pos = w.vehicles[&car].state.motor.position.0.map(|v| v.0);
+    let player = w.sessions[&p].player.unwrap().0;
+    w.players.get_mut(&player).unwrap().state.motor =
+        sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
+    let initial = w.vehicles[&car].state.health.0;
+    fire(&w, &mut t, p, 1, 0.0);
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.vehicles[&car].state.health.0, initial - 25);
+    assert_eq!(w.sessions[&p].weapon.magazine, 11);
+    assert_eq!(
+        t.sent
+            .iter()
+            .filter(|(_, _, m)| matches!(
+                &m.message,
+                ServerMessage::WorldEvent(WorldEvent::Shot(_))
+            ))
+            .count(),
+        1
+    );
+    fire(&w, &mut t, p, 2, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].weapon.magazine, 11);
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==2 && r.code==ActionCode::Cooldown)));
+    vehicle_action(&w, &mut t, p, 3, 1, Action::Reload(Empty {}));
+    step(&mut w, &mut a, &mut t);
+    let end = w.sessions[&p].weapon.reload_end.unwrap();
+    fire(&w, &mut t, p, 4, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].weapon.magazine, 11);
+    while w.tick < end - 1 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.sessions[&p].weapon.magazine, 11);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].weapon.magazine, 12);
+    w.sessions.get_mut(&p).unwrap().weapon.magazine = 0;
+    fire(&w, &mut t, p, 5, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==5 && r.code==ActionCode::NoAmmo)));
+    vehicle_action(&w, &mut t, p, 6, 1, Action::Reload(Empty {}));
+    step(&mut w, &mut a, &mut t);
+    at_door(&mut w, p, car);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        7,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert!(w.sessions[&p].weapon.reload_end.is_none());
+    fire(&w, &mut t, p, 8, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.sessions[&p].weapon.magazine, 0);
+}
+#[test]
+fn shots_ignore_players_and_do_not_damage_another_guests_occupied_car() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    let q = peer(1);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    let car = 1;
+    let pos = w.vehicles[&car].state.motor.position.0.map(|v| v.0);
+    let shooter = w.sessions[&p].player.unwrap().0;
+    let other = w.sessions[&q].player.unwrap().0;
+    w.players.get_mut(&shooter).unwrap().state.motor =
+        sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
+    w.players.get_mut(&other).unwrap().state.motor =
+        sim_core::spawn_character([pos[0], 0.02, pos[2] + 5.0], 0.0).unwrap();
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&other].state.health.0, 100);
+    assert_eq!(w.vehicles[&car].state.health.0, 75);
+    at_door(&mut w, q, car);
+    vehicle_action(
+        &w,
+        &mut t,
+        q,
+        1,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(car),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    for _ in 0..9 {
+        step(&mut w, &mut a, &mut t);
+    }
+    fire(&w, &mut t, p, 2, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.vehicles[&car].state.health.0, 75);
+    assert_eq!(w.players[&other].state.health.0, 100);
+}
+
+#[test]
+fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    // Accept an ordinary courier before driving; downing must beat any completion.
+    let player = w.sessions[&p].player.unwrap().0;
+    w.players.get_mut(&player).unwrap().state.motor =
+        sim_core::spawn_character([-172.0, 0.02, 180.0], 0.0).unwrap();
+    courier_action(&w, &mut t, p, 1);
+    step(&mut w, &mut a, &mut t);
+    assert!(w.sessions[&p].mission.is_some());
+    at_door(&mut w, p, 1);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        2,
+        1,
+        Action::EnterVehicle(EnterVehicle {
+            vehicle_id: EntityId(1),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    let car = w.vehicles.get_mut(&1).unwrap();
+    car.state.health = VehicleHealth(1);
+    // Building 6 occupies x [-232,-212], z [80,100]. Sweep into its south face.
+    car.state.motor = sim_core::spawn_vehicle([-222.0, 0.0, 102.5], 0.0).unwrap();
+    car.state.motor.speed = Scalar(22.0);
+    car.state.motor.velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
+    for _ in 0..6 {
+        batch(&w, &mut t, p, w.tick + 1, 0, 32767, 2);
+        step(&mut w, &mut a, &mut t);
+        if w.players[&player].state.mode == CharacterMode::Downed {
+            break;
+        }
+    }
+    assert!(w.vehicles[&1].state.disabled);
+    assert_eq!(w.vehicles[&1].state.driver_id, None);
+    assert_eq!(w.players[&player].state.mode, CharacterMode::Downed);
+    assert_eq!(w.players[&player].state.health.0, 0);
+    assert_eq!(w.sessions[&p].epoch, 3);
+    assert_eq!(
+        w.sessions[&p].mission.as_ref().unwrap().phase,
+        server::missions::Phase::Failed
+    );
+    let until = w.sessions[&p].weapon.respawn.unwrap();
+    let position = w.players[&player].state.motor.position.clone();
+    while w.tick < until - 1 {
+        batch(&w, &mut t, p, w.tick + 1, 32767, 32767, 3);
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.players[&player].state.motor.position, position);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&player].state.health.0, 100);
+    assert_eq!(w.players[&player].state.mode, CharacterMode::OnFoot);
+    assert_eq!(w.sessions[&p].epoch, 4);
+    assert_eq!(w.sessions[&p].weapon.magazine, 12);
+    assert!(w.sessions[&p].weapon.protected_until.unwrap() > w.tick);
+    assert!(w.sessions[&p].mission.is_none());
+    let fresh = w.players[&player].state.motor.position.clone();
+    batch(&w, &mut t, p, w.tick + 1, 0, 32767, 3);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&player].state.motor.position.0[0], fresh.0[0]);
+    assert_eq!(w.players[&player].state.motor.position.0[2], fresh.0[2]);
+    // The disabled vehicle waits 900 ticks, independently of the player's respawn.
+    for _ in 0..910 {
+        if w.tick.is_multiple_of(60) {
+            batch(&w, &mut t, p, w.tick + 1, 0, 0, 4);
+        }
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(!w.vehicles[&1].state.disabled);
+    assert_eq!(w.vehicles[&1].state.health.0, 100);
+    assert!(
+        t.sent.iter().any(|(_, _, m)| matches!(
+            &m.message,
+            ServerMessage::WorldEvent(WorldEvent::Impact(_))
+        ))
+    );
+}
+
+#[test]
+fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
+    let mut a = MemoryProfiles::default();
+    let mut t = FakeTransport::default();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    for _ in 0..35 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let ped = *w.population.pedestrians.keys().next().unwrap();
+    let player = w.sessions[&p].player.unwrap().0;
+    w.players.get_mut(&player).unwrap().state.motor =
+        sim_core::spawn_character([-222.0, 0.02, 115.0], 0.0).unwrap();
+    w.population.pedestrians.get_mut(&ped).unwrap().state.motor =
+        sim_core::spawn_character([-222.0, 0.02, 65.0], 0.0).unwrap();
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.population.pedestrians[&ped].state.health.0, 100);
+    for request in 2..=5 {
+        for _ in 0..9 {
+            step(&mut w, &mut a, &mut t);
+        }
+        w.players.get_mut(&player).unwrap().state.motor =
+            sim_core::spawn_character([-128.0, 0.02, 120.0], 0.0).unwrap();
+        w.population.pedestrians.get_mut(&ped).unwrap().state.motor =
+            sim_core::spawn_character([-128.0, 0.02, 110.0], 0.0).unwrap();
+        fire(&w, &mut t, p, request, 0.0);
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.population.pedestrians[&ped].state.health.0, 0);
+    assert_eq!(
+        w.population.pedestrians[&ped].phase,
+        server::population::PedestrianPhase::Incapacitated
+    );
+    let downed = w.tick;
+    for _ in 0..298 {
+        if w.tick.is_multiple_of(60) {
+            batch(&w, &mut t, p, w.tick + 1, 0, 0, 1);
+        }
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(w.population.pedestrians.contains_key(&ped));
+    assert_eq!(w.tick, downed + 298);
+    step(&mut w, &mut a, &mut t);
+    assert!(!w.population.pedestrians.contains_key(&ped));
+    assert!(w.population.pedestrians.len() <= 32);
+}
+
+#[test]
+fn static_impacts_apply_once_per_counterpart_per_fifteen_ticks() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let crash = |w: &mut World| {
+        let car = w.vehicles.get_mut(&1).unwrap();
+        car.state.motor = sim_core::spawn_vehicle([-222.0, 0.0, 102.1], 0.0).unwrap();
+        car.state.motor.speed = Scalar(22.0);
+        car.state.motor.velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
+    };
+    crash(&mut w);
+    step(&mut w, &mut a, &mut t);
+    let first = w.vehicles[&1].state.health.0;
+    assert!((50..100).contains(&first));
+    for _ in 0..14 {
+        crash(&mut w);
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.vehicles[&1].state.health.0, first);
+    }
+    crash(&mut w);
+    step(&mut w, &mut a, &mut t);
+    assert!(w.vehicles[&1].state.health.0 < first);
+}
+#[test]
+fn car_contacts_damage_both_cars_but_never_another_players_occupied_car() {
+    for occupied in [false, true] {
+        let (mut w, mut a, mut t) = setup();
+        let p = peer(0);
+        let q = peer(1);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        join(&mut w, &mut a, &mut t, q, None);
+        ready(&mut w, &mut a, &mut t, q);
+        if occupied {
+            for (peer, id) in [(p, 1), (q, 2)] {
+                at_door(&mut w, peer, id);
+                vehicle_action(
+                    &w,
+                    &mut t,
+                    peer,
+                    1,
+                    1,
+                    Action::EnterVehicle(EnterVehicle {
+                        vehicle_id: EntityId(id),
+                    }),
+                );
+                step(&mut w, &mut a, &mut t);
+            }
+        }
+        w.vehicles.get_mut(&1).unwrap().state.motor =
+            sim_core::spawn_vehicle([-128.0, 0.0, 130.4], 0.0).unwrap();
+        w.vehicles.get_mut(&2).unwrap().state.motor =
+            sim_core::spawn_vehicle([-128.0, 0.0, 126.0], 0.0).unwrap();
+        w.vehicles.get_mut(&1).unwrap().state.motor.speed = Scalar(22.0);
+        w.vehicles.get_mut(&1).unwrap().state.motor.velocity =
+            Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
+        step(&mut w, &mut a, &mut t);
+        if occupied {
+            assert_eq!(w.vehicles[&1].state.health.0, 100);
+            assert_eq!(w.vehicles[&2].state.health.0, 100);
+            for p in w.players.values() {
+                assert_eq!(p.state.health.0, 100);
+            }
+        } else {
+            assert!(w.vehicles[&1].state.health.0 < 100);
+            assert!(w.vehicles[&2].state.health.0 < 100);
+        }
+    }
+}
+
+#[test]
+fn moving_vehicle_damages_pedestrians_through_the_world_swept_query() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
+    let mut a = MemoryProfiles::default();
+    let mut t = FakeTransport::default();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    for _ in 0..35 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let ped = *w.population.pedestrians.keys().next().unwrap();
+    w.population.pedestrians.get_mut(&ped).unwrap().state.motor =
+        sim_core::spawn_character([-128.0, 0.02, 124.0], 0.0).unwrap();
+    let car = w.vehicles.get_mut(&1).unwrap();
+    car.state.motor = sim_core::spawn_vehicle([-128.0, 0.0, 130.0], 0.0).unwrap();
+    car.state.motor.speed = Scalar(22.0);
+    car.state.motor.velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
+    for _ in 0..12 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(
+        w.population.pedestrians[&ped].state.health.0 < 100,
+        "physical recovery must not erase the authoritative impact"
+    );
+}
+#[test]
+fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    let q = peer(1);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    let shooter = w.sessions[&p].player.unwrap().0;
+    let blocker = w.sessions[&q].player.unwrap().0;
+    w.players.get_mut(&shooter).unwrap().state.motor =
+        sim_core::spawn_character([-152.0, 0.02, 186.0], 0.0).unwrap();
+    for request in 1..=4 {
+        fire(&w, &mut t, p, request, 0.0);
+        step(&mut w, &mut a, &mut t);
+        for _ in 0..9 {
+            step(&mut w, &mut a, &mut t);
+        }
+    }
+    assert!(w.vehicles[&1].state.disabled);
+    w.players.get_mut(&blocker).unwrap().state.motor =
+        sim_core::spawn_character([-148.5, 0.02, 176.0], 0.0).unwrap();
+    for _ in 0..910 {
+        if w.tick.is_multiple_of(60) {
+            batch(&w, &mut t, p, w.tick + 1, 0, 0, 1);
+            batch(&w, &mut t, q, w.tick + 1, 0, 0, 1);
+        }
+        step(&mut w, &mut a, &mut t);
+        t.sent.clear();
+    }
+    assert!(
+        w.vehicles[&1].state.disabled,
+        "occupied parking must defer respawn"
+    );
+    w.players.get_mut(&blocker).unwrap().state.motor =
+        sim_core::spawn_character([-180.0, 0.02, 180.0], 0.0).unwrap();
+    for _ in 0..31 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(!w.vehicles[&1].state.disabled);
+    assert_eq!(w.vehicles[&1].state.health.0, 100);
 }

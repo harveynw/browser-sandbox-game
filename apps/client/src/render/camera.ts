@@ -15,8 +15,9 @@ export class FollowCamera {
     reducedMotion = false,
     driving = false,
     vehicleHeight = 1.4,
+    aiming = false,
   ): number {
-    const range = driving ? 7 : 4.5;
+    const range = aiming && !driving ? 0.1 : driving ? 7 : 4.5;
     const lift = driving ? Math.max(0, vehicleHeight - 1.4) : 0;
     const target = new Vector3(
       feet[0],
@@ -43,6 +44,20 @@ export class FollowCamera {
       this.distance +=
         (allowed - this.distance) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.2));
     camera.position.copy(target).addScaledVector(desired, this.distance);
+    if (aiming && !driving) {
+      camera.lookAt(
+        target
+          .clone()
+          .add(
+            new Vector3(
+              -Math.sin(yaw) * Math.cos(pitch),
+              Math.sin(pitch),
+              -Math.cos(yaw) * Math.cos(pitch),
+            ).multiplyScalar(80),
+          ),
+      );
+      return this.distance;
+    }
     // Keep the collision pivot inside the capsule; frame the view at head height.
     camera.lookAt(
       new Vector3(

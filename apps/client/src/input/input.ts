@@ -13,6 +13,8 @@ const bound = new Set([
   "Space",
   "KeyE",
   "KeyF",
+  "KeyR",
+  "KeyQ",
 ]);
 export class InputState {
   readonly keys = new Set<string>();
@@ -21,12 +23,17 @@ export class InputState {
   sensitivity = 0.002;
   invert = false;
   active = false;
+  aiming = false;
+  private fire = false;
+  private reload = false;
   private jump = false;
   private interact = false;
   private job = false;
   press(code: string, repeat = false): void {
     if (!this.active || !bound.has(code)) return;
     this.keys.add(code);
+    if (code === "KeyQ" && !repeat) this.aiming = !this.aiming;
+    if (code === "KeyR" && !repeat) this.reload = true;
     if (code === "Space" && !repeat) this.jump = true;
     if (code === "KeyE" && !repeat) this.interact = true;
     if (code === "KeyF" && !repeat) this.job = true;
@@ -36,6 +43,9 @@ export class InputState {
   }
   clear(): void {
     this.keys.clear();
+    this.aiming = false;
+    this.fire = false;
+    this.reload = false;
     this.jump = false;
     this.interact = false;
     this.job = false;
@@ -55,6 +65,21 @@ export class InputState {
         this.pitch + y * this.sensitivity * (this.invert ? -1 : 1),
       ),
     );
+  }
+  mouseButton(button: number, down: boolean): void {
+    if (!this.active) return;
+    if (button === 2) this.aiming = down;
+    if (button === 0 && down && this.aiming) this.fire = true;
+  }
+  consumeFire(): boolean {
+    const fire = this.active && this.aiming && this.fire;
+    this.fire = false;
+    return fire;
+  }
+  consumeReload(): boolean {
+    const reload = this.active && this.reload;
+    this.reload = false;
+    return reload;
   }
   consumeInteract(): boolean {
     const value = this.active && this.interact;
@@ -78,9 +103,10 @@ export class InputState {
         (Number(down("KeyW", "ArrowUp")) - Number(down("KeyS", "ArrowDown"))) *
         32767,
       look_yaw: this.yaw,
-      look_pitch: -this.pitch,
+      look_pitch: this.pitch,
       buttons:
-        (down("ShiftLeft", "ShiftRight") ? 1 : 0) |
+        (!this.aiming && down("ShiftLeft", "ShiftRight") ? 1 : 0) |
+        (!driving && this.active && this.aiming ? 8 : 0) |
         (driving ? (down("Space") ? 4 : 0) : this.active && this.jump ? 2 : 0),
     };
     this.jump = false;
@@ -166,7 +192,8 @@ export function bindInput(
   canvas.addEventListener(
     "mousedown",
     (event) => {
-      if (dragMode && state.active && event.button === 0) {
+      if (ownsFocus()) state.mouseButton(event.button, true);
+      if (dragMode && state.active && event.button === 0 && !state.aiming) {
         dragging = true;
         previousX = event.clientX;
         previousY = event.clientY;
@@ -177,7 +204,8 @@ export function bindInput(
   );
   window.addEventListener(
     "mouseup",
-    () => {
+    (event) => {
+      state.mouseButton(event.button, false);
       dragging = false;
     },
     options,

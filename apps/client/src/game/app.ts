@@ -30,6 +30,12 @@ export class GameApp {
   private readonly play = document.createElement("button");
   private readonly resume = document.createElement("button");
   private readonly leave = document.createElement("button");
+  private carHealth: number | null = null;
+  private magazine = 12;
+  private reloadEnd: number | null = null;
+  private respawnTick: number | null = null;
+  private protectedUntil: number | null = null;
+  private hitUntil = 0;
   private readonly cross = document.createElement("div");
   private readonly hud = document.createElement("div");
   private readonly minimap = document.createElement("canvas");
@@ -390,6 +396,7 @@ export class GameApp {
           if (owner.control_epoch !== this.controlEpoch) {
             this.controlEpoch = owner.control_epoch;
             this.input.keys.clear();
+            this.input.aiming = false;
             this.input.yaw =
               owner.state.kind === "vehicle" ? 0 : owner.player_state.motor.yaw;
             this.camera.reset();
@@ -397,9 +404,22 @@ export class GameApp {
           this.ownerTick = owner.server_tick;
           this.motor = owner.player_state.motor;
           this.health = owner.player_state.health;
+          this.carHealth =
+            owner.state.kind === "vehicle" ? owner.state.data.health : null;
+        },
+        worldEvent: (event, own) => {
+          this.renderer?.effect(event);
+          if (own && event.kind === "shot" && event.data.hit_entity_id !== null)
+            this.hitUntil = performance.now() + 300;
         },
         playerStatus: (status) => {
-          if (this.session === session) this.credits = status.credits;
+          if (this.session === session) {
+            this.credits = status.credits;
+            this.magazine = status.magazine;
+            this.reloadEnd = status.reload_end_tick;
+            this.respawnTick = status.respawn_tick;
+            this.protectedUntil = status.protected_until_tick;
+          }
         },
       },
     );
@@ -436,8 +456,20 @@ export class GameApp {
       if (!this.contextLost && this.phase === "playing") {
         if (this.input.consumeInteract()) this.session?.interact();
         if (this.input.consumeJob()) this.session?.useTerminal();
+        if (this.input.consumeFire() && this.health > 0)
+          this.session?.fire(this.input.yaw, this.input.pitch);
+        if (this.input.consumeReload() && this.health > 0)
+          this.session?.reload();
         this.session?.advance(now, () =>
-          this.input.sample(this.session?.isDriving),
+          this.health > 0
+            ? this.input.sample(this.session?.isDriving)
+            : {
+                move_x: 0,
+                move_z: 0,
+                look_yaw: this.input.yaw,
+                look_pitch: 0,
+                buttons: 0,
+              },
         );
       }
       const localMotor = this.session?.presentation(now) ?? this.motor;
@@ -463,12 +495,21 @@ export class GameApp {
           this.reduced,
           this.session?.isDriving,
           this.session?.controlledVehicleTemplate?.dimensions[1],
+          this.input.active && this.input.aiming && this.health > 0,
         );
         this.cameraDistance = distance;
-        this.renderer.render(distance);
+        this.renderer.render(
+          distance,
+          this.input.active &&
+            this.input.aiming &&
+            this.health > 0 &&
+            !this.session?.isDriving,
+        );
       }
       if (now - this.lastHud > 100) {
         this.lastHud = now;
+        this.cross.style.color = now < this.hitUntil ? "#ffcf68" : "";
+        this.cross.textContent = now < this.hitUntil ? "×" : "+";
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
         this.minimap.hidden = this.phase !== "playing";
@@ -486,12 +527,17 @@ export class GameApp {
         this.cancelCourier.hidden =
           this.phase !== "playing" || mission?.phase !== "active";
         const drivingStatus = this.session?.isDriving
-          ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
+          ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h · Car health ${this.carHealth}${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
           : "";
-        this.debug.textContent = `${this.connection} · chunks ${streaming?.resident ?? 0}/36 pending ${streaming?.pending ?? 0} fallback ${streaming?.failed ?? 0} · matrices ${((streaming?.matrixBytes ?? 0) / 1024).toFixed(0)} KiB · WASM ${(simulationMemoryBytes() / 1048576).toFixed(1)} MiB · draws ${streaming?.drawCalls ?? 0} tris ${streaming?.triangles ?? 0} geoms ${streaming?.geometries ?? 0} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} (pedestrians ${remotes.filter((r) => r.descriptor.entity_kind === "pedestrian").length}, cars ${remotes.filter((r) => r.descriptor.entity_kind === "vehicle").length}) · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
+        this.debug.textContent = `${this.connection} · chunks ${streaming?.resident ?? 0}/36 pending ${streaming?.pending ?? 0} fallback ${streaming?.failed ?? 0} · matrices ${((streaming?.matrixBytes ?? 0) / 1024).toFixed(0)} KiB · WASM ${(simulationMemoryBytes() / 1048576).toFixed(1)} MiB · draws ${streaming?.drawCalls ?? 0} tris ${streaming?.triangles ?? 0} geoms ${streaming?.geometries ?? 0} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · look ${this.input.yaw.toFixed(3)}, ${this.input.pitch.toFixed(3)} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} (pedestrians ${remotes.filter((r) => r.descriptor.entity_kind === "pedestrian").length}, cars ${remotes.filter((r) => r.descriptor.entity_kind === "vehicle").length}) · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
+        const estimated = this.session?.estimatedTick(now) ?? 0;
+        const combat =
+          this.health <= 0
+            ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
+            : `${this.magazine}/12${this.session?.isDriving ? " · Weapon holstered" : this.reloadEnd !== null ? " · Reloading" : " · RMB / Q aim · click fire · R reload"}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Spawn protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
         this.hud.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
+            ? `Health ${this.health} · ${combat} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
             : "Port Meridian · Walking and driving";
       }
     } catch (error) {

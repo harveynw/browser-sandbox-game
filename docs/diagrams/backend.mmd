@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T13.
+%% Backend module system — current implementation through T14.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -8,6 +8,7 @@ flowchart TD
     scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
     loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
+    combat["combat.rs<br/>Server pistol and hit queries<br/>Damage, cooldowns and safe respawns"]:::sim
     missions["missions.rs<br/>Courier dwell, failure and reward lifecycle"]:::sim
     population["population.rs<br/>1 Hz director · 5 Hz NPC decisions<br/>Pool tags, lane paths and intersection reservations"]:::sim
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
@@ -47,6 +48,9 @@ flowchart TD
   transport -.->|"coalescing / budgets"| replication
   transport -->|"encode / decode"| protocol
   replication -->|"packet sizing"| protocol
+  world <-->|"weapon intent · impacts · life state"| combat
+  combat -->|"ray / swept box-capsule queries"| sim
+  combat -->|"Shot / Impact and control epochs"| transport
   world -->|"evaluate courier after movement"| missions
   world <-->|"commit reward event / profile values"| admission
   world -->|"private mission and credits status"| transport

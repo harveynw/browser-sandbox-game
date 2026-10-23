@@ -1,4 +1,4 @@
-%% Frontend module system — current implementation through T13.
+%% Frontend module system — current implementation through T14.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -6,7 +6,7 @@ flowchart TD
   subgraph group_0["apps/client/src/ — application"]
     main["main.ts<br/>Page routing"]:::app
     game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Private courier guidance / cancellation"]:::app
-    input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake"]:::app
+    input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
   end
   subgraph group_1["apps/client/src/ — networking"]
@@ -20,8 +20,8 @@ flowchart TD
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route"]:::gfx
-    camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route<br/>Pooled shot / impact effects and pistol"]:::gfx
+    camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks · first-person aim"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]
     content["packages/content/<br/>Full collision / config preload<br/>Hashed visual ChunkStream · 192 / 256 m"]:::content

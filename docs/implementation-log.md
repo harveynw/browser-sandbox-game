@@ -19,7 +19,7 @@ Latest checkpoint: **T12 complete, 21 October 2026**. The user requested a stop/
 | T11 — Courier vertical slice | Complete |
 | T12 — Full city and content kit | Complete |
 | T13 — Traffic and pedestrians | Complete |
-| T14 — Pistol and damage | Not started |
+| T14 — Pistol and damage | Complete |
 | T15 — Police and heat | Not started |
 | T16 — Remaining jobs and repair | Not started |
 | T17 — Local profile persistence | Not started |
@@ -476,3 +476,27 @@ Verification and corrections:
 Limitations: original greybox visuals and simple waypoint driving; no overtaking, signal phases, combat, damage or police. Dense replication can still drop lower-priority snapshots within the configured budget; overdue records now sort by oldest refresh age before distance. Some distant actors can show the existing stale treatment. Visibility safety uses static occlusion from authoritative guest eye positions, not a trusted client camera report. Full population/frame/memory profiling, target network impairment, native pointer-lock and forced WebGL restoration retain their later verification scope.
 
 Next action: stop for milestone review. **T14 — Pistol and damage** is next and has not started.
+
+## T14 — Pistol, impacts and downing
+
+Status: **complete, 23 October 2026**. Continued after the user's approval of the next milestone. T15 remains unstarted.
+
+Implemented:
+
+- `combat.rs` owns a server-only 12-round magazine, nine-tick fire cooldown, 45-tick reload, spawn protection, shot selection, damage cooldowns and respawn deadlines. The existing action cache makes repeated Fire requests idempotent. Reload cancels on driving/downing; respawn restores ammunition and health. Existing Shot, Impact, PlayerStatus and control-epoch DTOs remain the wire contract.
+- Chest/muzzle-to-endpoint ray queries test static blockers/ground, exact car boxes and NPC capsules. Pistol damage is 25 with an 80 m limit; player capsules neither absorb nor receive shots. Another guest's occupied car blocks fire but cannot receive damage from the shooter, preventing indirect PvP through forced ejection/downing. Shot effects and hit feedback derive from authoritative events; no client hit/completion claims were added.
+- Vehicle contacts expose whether their ID names a static collider or a dynamic car, so overlapping ID namespaces cannot corrupt damage attribution. Crash damage is clamped to 50 and applied once per counterpart per 15 ticks, including both cars where eligible. Relative box/capsule sweeps apply pedestrian impact damage above 4 m/s and exclude players. Nearby authoritative shots/impacts drive T13 fleeing. Pedestrians incapacitate for 300 ticks, then release their slot.
+- Fatal car damage freezes the car, clears possession through actor-aware safe door/nearest supported spawn selection, cancels an active job and sends a reliable downed control epoch. A 150-tick safe respawn restores the player with another epoch and preserves their profile/economy. If all positions are blocked, the zero-health seated car freezes and retries without violating the disabled/driver invariant. Car respawn waits 900 ticks, then retries blocked parking every 30 ticks and considers compatible alternatives after 30 retries. Population pool tags remain unchanged.
+- Added RMB-held / Q-toggle aim, edged left-click fire, R reload, focus/menu cleanup, a ray-aligned first-person camera, original procedural pistol, 32 pooled cosmetic effects, authoritative hit marker/ammunition/reload/protection/downed feedback, disabled-car indication and incapacitated NPC presentation. Updated current module diagrams, README, task statuses, procedural asset provenance and [28 — Combat guide](28-pistol-and-damage.md).
+
+Verification:
+
+- `npm run check` — **PASS**, **197 TypeScript / 102 Rust tests**, generated content/protocol/bridge drift, release WASM, strict typing, lint/format and Clippy with warnings denied. `npm run build` — **PASS**, native workspace, unchanged content package, release WASM and production frontend. The existing large Three.js chunk advisory remains.
+- Eight new real-codec world tests cover duplicate fire/cooldown/empty magazines/reload delay and cancellation; transparent player hit volumes and occupied-car protection; fatal crash, job failure, inert downing, player/car respawn and stale-epoch rejection; walls and pedestrian incapacitation duration; static counterpart cooldowns; symmetric car contacts/no-PvP; real swept pedestrian impacts; and blocked parking respawn. Two shared query tests cover capsule/box rays, range, rotation, swept endpoints, relative motion and near misses. Client tests cover weapon edge/blur cleanup and matching camera/shot direction. Existing deterministic motors, courier, traffic and populated resync regressions remain passing.
+- The new world pedestrian-impact test initially failed: resolving car overlaps before observing damage could move the pedestrian clear and erase the hit. Intended pedestrian movement now runs before vehicle movement, swept impact evaluation follows, and surviving actors recover afterward. The test passes without weakening hit detection or moving actors through static geometry.
+- Final production browser at `localhost:4173` joined the real T14 WS/RTC server as player 5. Ordinary keyboard/mouse input entered aim, fired into clear space (**12 → 11 rounds**), displayed **Reloading**, restored **12 rounds**, and fired again. Measured ordinary mouse turn to the nearby compact produced **four server-confirmed hits**, reducing the magazine **11 → 10 → 9 → 8 → 7** and showing its disabled smoke marker. Walking to its left door displayed **Vehicle disabled · awaiting a clear parking respawn**; E returned `unavailable`. The guest then moved clear of the parking area; returning later showed **Car health 100**, and ordinary E entry/exit worked again. No live health, actor-position or completion injection was used.
+- Saved browser evidence: [confirmed hit](evidence/t14-pistol.jpg), [disabled car](evidence/t14-disabled-car.jpg), [disabled interaction](evidence/t14-disabled-interaction.jpg), [restored car](evidence/t14-car-respawn.jpg). Native crash/respawn/civilian cases arrange fixture poses explicitly; these are not claimed as additional live demonstrations. This remains a local correctness sample, not a populated 16-player or target-impairment benchmark.
+
+Limitations: original greybox weapon/effects, no audio polish, no lag compensation or detailed remote aiming, no explosion/PvP damage and no additional weapons. Police, crime/heat and arrest remain T15. Safe spawn/parking retries can defer respawn when candidates are occupied. Full real-time capacity, memory and impairment measurements remain T19/T20; native pointer-lock/forced WebGL restoration retain their prior verification scope.
+
+Next action: stop for milestone review. **T15 — Police and heat** is next and has not started.

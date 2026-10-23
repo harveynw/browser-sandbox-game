@@ -153,3 +153,36 @@ it("edges terminal interaction and clears it on pause without changing movement"
   input.clear();
   expect(input.consumeJob()).toBe(false);
 });
+
+it("requires active aim for fire edges and clears weapon actions on blur", () => {
+  const input = new InputState();
+  input.mouseButton(2, true);
+  input.mouseButton(0, true);
+  input.press("KeyR");
+  expect(input.consumeFire()).toBe(false);
+  expect(input.consumeReload()).toBe(false);
+  input.active = true;
+  input.mouseButton(0, true);
+  expect(input.consumeFire()).toBe(false);
+  input.mouseButton(2, true);
+  input.mouseButton(0, true);
+  expect(input.consumeFire()).toBe(true);
+  expect(input.consumeFire()).toBe(false);
+  expect(input.sample().buttons & 8).toBe(8);
+  input.press("KeyR");
+  input.press("KeyR", true);
+  expect(input.consumeReload()).toBe(true);
+  expect(input.consumeReload()).toBe(false);
+  input.mouseButton(2, false);
+  expect(input.aiming).toBe(false);
+  input.press("KeyQ");
+  input.press("KeyQ", true);
+  expect(input.aiming).toBe(true);
+  input.mouseButton(0, true);
+  input.press("KeyR");
+  input.clear();
+  input.active = true;
+  expect(input.consumeFire()).toBe(false);
+  expect(input.consumeReload()).toBe(false);
+  expect(input.aiming).toBe(false);
+});

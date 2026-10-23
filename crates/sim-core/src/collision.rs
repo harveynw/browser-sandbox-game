@@ -36,6 +36,7 @@ pub struct CharacterCastOptions {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Contact {
+    pub vehicle: bool,
     pub collider_id: u32,
     pub normal: [f32; 3],
 }
@@ -440,6 +441,7 @@ impl CollisionQueries for CollisionWorld {
             |hit| {
                 if contacts.len() < 16 {
                     contacts.push(Contact {
+                        vehicle: self.colliders[hit.handle].user_data >> 64 != 0,
                         collider_id: metadata(&self.colliders[hit.handle]).0,
                         normal: hit.hit.normal1.to_array(),
                     });
@@ -529,6 +531,7 @@ impl CollisionQueries for CollisionWorld {
                     .any(|c: &Contact| c.collider_id == id && c.normal == normal)
             {
                 contacts.push(Contact {
+                    vehicle: self.colliders[collision.handle].user_data >> 64 != 0,
                     collider_id: id,
                     normal,
                 });
@@ -689,4 +692,82 @@ impl CollisionQueries for CollisionWorld {
                 normal: hit.normal.to_array(),
             }))
     }
+}
+
+/// Server gameplay hit volumes use the same dimensions as locomotion.
+pub fn ray_character(
+    origin: [f32; 3],
+    direction: [f32; 3],
+    feet: [f32; 3],
+    max: f32,
+) -> Option<f32> {
+    let c = ColliderBuilder::capsule_y(0.55, 0.35)
+        .translation(Vector::new(feet[0], feet[1] + 0.9, feet[2]))
+        .build();
+    c.shape().cast_ray(
+        c.position(),
+        &rapier3d::parry::query::Ray::new(
+            Vector::from_array(origin),
+            Vector::from_array(direction),
+        ),
+        max,
+        true,
+    )
+}
+pub fn ray_vehicle(
+    origin: [f32; 3],
+    direction: [f32; 3],
+    position: [f32; 3],
+    yaw: f32,
+    dimensions: [f32; 3],
+    max: f32,
+) -> Option<f32> {
+    let c = vehicle_shape(position, yaw, dimensions);
+    c.shape().cast_ray(
+        c.position(),
+        &rapier3d::parry::query::Ray::new(
+            Vector::from_array(origin),
+            Vector::from_array(direction),
+        ),
+        max,
+        true,
+    )
+}
+/// Relative swept box/capsule query, including a moving pedestrian. Car rotation
+/// is sampled at both endpoint poses (motor yaw changes are bounded per tick).
+pub fn vehicle_hits_character(
+    from: [f32; 3],
+    to: [f32; 3],
+    yaw: [f32; 2],
+    dimensions: [f32; 3],
+    feet_from: [f32; 3],
+    feet_to: [f32; 3],
+) -> bool {
+    let radius = dimensions[0].hypot(dimensions[2]) / 2.0 + 0.35;
+    for axis in [0, 2] {
+        if from[axis].min(to[axis]) - radius > feet_from[axis].max(feet_to[axis])
+            || from[axis].max(to[axis]) + radius < feet_from[axis].min(feet_to[axis])
+        {
+            return false;
+        }
+    }
+    let ped = ColliderBuilder::capsule_y(0.55, 0.35)
+        .translation(Vector::new(feet_from[0], feet_from[1] + 0.9, feet_from[2]))
+        .build();
+    yaw.into_iter().any(|yaw| {
+        let car = vehicle_shape(from, yaw, dimensions);
+        rapier3d::parry::query::cast_shapes(
+            car.position(),
+            Vector::from_array(std::array::from_fn(|i| to[i] - from[i])),
+            car.shape(),
+            ped.position(),
+            Vector::from_array(std::array::from_fn(|i| feet_to[i] - feet_from[i])),
+            ped.shape(),
+            ShapeCastOptions {
+                max_time_of_impact: 1.0,
+                ..Default::default()
+            },
+        )
+        .is_ok_and(|hit| hit.is_some())
+    })
 }

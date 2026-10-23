@@ -8,7 +8,7 @@ use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t13-local";
+pub const BUILD_ID: &str = "t14-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -34,9 +34,10 @@ pub struct Session {
     pub inputs: BTreeMap<u32, InputFrame>,
     actions: BTreeMap<u32, ActionResult>,
     last_request: u32,
+    pub weapon: crate::combat::Weapon,
     pub mission: Option<crate::missions::Courier>,
     status_revision: u32,
-    status_dirty: bool,
+    pub(crate) status_dirty: bool,
     last_heard: u64,
     deadline: u64,
     last_resync: Option<u64>,
@@ -67,9 +68,10 @@ pub struct World {
     pub metrics: Metrics,
     pub vehicles: BTreeMap<u32, crate::vehicles::Vehicle>,
     pub population: crate::population::Population,
-    content: WorldContent,
+    pub(crate) combat: crate::combat::Combat,
+    pub(crate) content: WorldContent,
     config: SimConfig,
-    collision: CollisionWorld,
+    pub(crate) collision: CollisionWorld,
     next_entity: u32,
     output: VecDeque<(PeerKey, Delivery, ServerEnvelope)>,
     closing: BTreeMap<PeerKey, &'static str>,
@@ -135,6 +137,7 @@ impl World {
             424242,
         )?;
         Ok(Self {
+            combat: Default::default(),
             population,
             tick: 0,
             id: random_id("world-", 16)?,
@@ -160,7 +163,7 @@ impl World {
             snapshot_rate: SnapshotRate(10),
         }
     }
-    fn send(
+    pub(crate) fn send(
         &mut self,
         peer: PeerKey,
         sid: Option<&str>,
@@ -178,7 +181,7 @@ impl World {
             },
         ));
     }
-    fn reliable(&mut self, peer: PeerKey, sid: Option<&str>, message: ServerMessage) {
+    pub(crate) fn reliable(&mut self, peer: PeerKey, sid: Option<&str>, message: ServerMessage) {
         self.send(peer, sid, Delivery::Reliable, message);
     }
     fn cleanup(&mut self, session: &Session, profiles: &mut MemoryProfiles) {
@@ -202,7 +205,7 @@ impl World {
             self.cleanup(&session, profiles);
         }
     }
-    fn owner(&self, session: &Session) -> Result<OwnerState, String> {
+    pub(crate) fn owner(&self, session: &Session) -> Result<OwnerState, String> {
         let id = session.player.ok_or("missing owner")?;
         let player = self.players.get(&id.0).ok_or("missing player")?;
         Ok(OwnerState {
@@ -280,7 +283,12 @@ impl World {
         let player = s.player.expect("authenticated player");
         self.players[&player.0].state.vehicle_id.unwrap_or(player).0
     }
-    fn transition(&mut self, peer: PeerKey, s: &mut Session, ids: &[u32]) -> Result<(), String> {
+    pub(crate) fn transition(
+        &mut self,
+        peer: PeerKey,
+        s: &mut Session,
+        ids: &[u32],
+    ) -> Result<(), String> {
         s.epoch = s.epoch.checked_add(1).ok_or("epoch exhausted")?;
         s.inputs.clear();
         // Refresh both replicas reliably with a fresh visibility generation. Older RTC
@@ -327,11 +335,11 @@ impl World {
             completed_jobs: p.completed_jobs,
             heat: Heat(0),
             pursuit: Pursuit::Clear,
-            magazine: Magazine(12),
-            reload_end_tick: None,
+            magazine: Magazine(s.weapon.magazine),
+            reload_end_tick: s.weapon.reload_end,
             mission: s.mission.as_ref().map(|m| m.view()),
-            respawn_tick: None,
-            protected_until_tick: None,
+            respawn_tick: s.weapon.respawn,
+            protected_until_tick: s.weapon.protected_until,
         })
     }
     fn advance_missions(&mut self, profiles: &mut MemoryProfiles) -> Result<(), String> {
@@ -425,6 +433,9 @@ impl World {
         {
             return ActionCode::Dead;
         }
+        if matches!(action, Action::Fire(_) | Action::Reload(_)) {
+            return self.weapon_action(peer, s, action);
+        }
         match action {
             Action::AcceptMission(request) => {
                 if s.mission.is_some() {
@@ -482,6 +493,7 @@ impl World {
                 let Some(deadline) = self.tick.checked_add(template.duration_ticks) else {
                     return ActionCode::Unavailable;
                 };
+                s.weapon.protected_until = None;
                 s.mission = Some(crate::missions::Courier {
                     id: instance,
                     template: template.id.clone(),
@@ -559,6 +571,9 @@ impl World {
                     .vehicles
                     .get_mut(&vehicle_id)
                     .expect("validated vehicle");
+                s.weapon.reload_end = None;
+                s.weapon.protected_until = None;
+                s.status_dirty = true;
                 car.state.driver_id = Some(id);
                 car.idle_ticks = 0;
                 let player = self.players.get_mut(&id.0).expect("validated player");
@@ -797,6 +812,9 @@ impl World {
             ClientMessage::ClientReady(ready) if s.phase == SessionPhase::Loading => {
                 if ready.baseline_id.0 != s.baseline {
                     return Ok(());
+                }
+                if s.baseline == 1 {
+                    s.weapon.protected_until = Some(self.tick.saturating_add(90));
                 }
                 s.phase = SessionPhase::Playing;
                 profiles.activate(
@@ -1060,6 +1078,7 @@ impl World {
                             inputs: BTreeMap::new(),
                             actions: BTreeMap::new(),
                             last_request: 0,
+                            weapon: Default::default(),
                             mission: None,
                             status_revision: 1,
                             status_dirty: false,
@@ -1149,6 +1168,19 @@ impl World {
                 .map(|v| v.proxy())
                 .collect::<Vec<_>>(),
         )?;
+        self.register_vehicle_homes();
+        let previous_cars: BTreeMap<_, _> = self
+            .vehicles
+            .iter()
+            .map(|(&id, v)| (id, v.state.motor.clone()))
+            .collect();
+        let previous_peds: BTreeMap<_, _> = self
+            .population
+            .pedestrians
+            .iter()
+            .map(|(&id, p)| (id, p.state.motor.position.0.map(|v| v.0)))
+            .collect();
+        let mut impacts = Vec::new();
         self.population.decide(
             next,
             &self.vehicles,
@@ -1156,8 +1188,17 @@ impl World {
             &self.content.manifest,
             &mut self.collision,
         )?;
+        // Preserve intended pedestrian motion for swept impact queries. Resolving
+        // new car overlaps first would erase the contact before damage observes it.
+        self.population
+            .step_pedestrians(next, &self.collision, &self.config)?;
         for car_id in self.vehicles.keys().copied().collect::<Vec<_>>() {
             let car = self.vehicles.get_mut(&car_id).ok_or("missing vehicle")?;
+            if car.state.disabled || car.state.health.0 == 0 {
+                car.idle_ticks = car.idle_ticks.saturating_add(1);
+                car.stop();
+                continue;
+            }
             self.collision.exclude_vehicle(Some(car.id.0));
             let input = actor_inputs
                 .get(&car.id.0)
@@ -1178,6 +1219,7 @@ impl World {
                 },
             ) {
                 Ok(result) => {
+                    impacts.push((car_id, result.impact_delta_speed, result.contacts));
                     car.state.motor = result.motor;
                     car.idle_ticks = if car.state.motor.speed.0.abs() < 0.1 {
                         car.idle_ticks.saturating_add(1)
@@ -1210,7 +1252,10 @@ impl World {
                 let car = &self.vehicles[&car_id.0];
                 player.state.motor = sim_core::presentation_motor(&car.state.motor);
                 player.state.motor.position = Vec3(car.seat().map(Scalar));
-            } else if let Some(input) = actor_inputs.get(&id) {
+            } else if player.state.health.0 > 0
+                && player.state.mode == CharacterMode::OnFoot
+                && let Some(input) = actor_inputs.get(&id)
+            {
                 match sim_core::step_character(
                     &player.state.motor,
                     input,
@@ -1225,9 +1270,22 @@ impl World {
                 }
             }
         }
-        self.population
-            .step_pedestrians(next, &self.collision, &self.config)?;
         self.tick = next;
+        self.vehicle_impacts(&previous_cars, impacts, &previous_peds);
+        for ped in self
+            .population
+            .pedestrians
+            .values_mut()
+            .filter(|p| p.state.health.0 > 0)
+        {
+            if let Ok(position) = self
+                .collision
+                .recover_character(ped.state.motor.position.0.map(|v| v.0))
+            {
+                ped.state.motor.position = Vec3(position.map(Scalar));
+            }
+        }
+        self.advance_combat();
         for peer in failed {
             self.disconnect(peer, profiles);
             self.closing.insert(peer, "unsafe motor input/state");

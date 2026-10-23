@@ -81,3 +81,29 @@ it("lifts the van driving view above its taller body while keeping compact and w
   follow.update(camera, [0, 0, 0], 0, -0.15, 0.1, world, true, true, 1.4);
   expect(origin[1]).toBeCloseTo(1.1);
 });
+
+it("aligns aim view with the authoritative chest-origin ray", () => {
+  const camera = new PerspectiveCamera(65),
+    follow = new FollowCamera();
+  const yaw = 0.8,
+    pitch = -0.2,
+    feet = [10, 0, 20];
+  const distance = follow.update(
+    camera,
+    feet,
+    yaw,
+    pitch,
+    0.1,
+    { spherecastStatic: () => ({ version: 1, hit: null }) },
+    true,
+    false,
+    1.4,
+    true,
+  );
+  expect(distance).toBeLessThanOrEqual(0.1);
+  const direction = new Vector3();
+  camera.getWorldDirection(direction);
+  expect(direction.x).toBeCloseTo(-Math.sin(yaw) * Math.cos(pitch));
+  expect(direction.y).toBeCloseTo(Math.sin(pitch));
+  expect(direction.z).toBeCloseTo(-Math.cos(yaw) * Math.cos(pitch));
+});

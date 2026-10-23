@@ -8,7 +8,7 @@ import {
   type Primitive,
 } from "@port-meridian/content";
 import type { RenderActor } from "../world/replica";
-import type { CharacterMotor } from "@port-meridian/protocol";
+import type { CharacterMotor, WorldEvent } from "@port-meridian/protocol";
 export class GameRenderer {
   readonly graphics: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -21,6 +21,48 @@ export class GameRenderer {
     roughness: 0.8,
     transparent: true,
   });
+  private readonly effectSlots: {
+    line: THREE.Line;
+    marker: THREE.Mesh;
+    until: number;
+  }[] = [];
+  private effectCursor = 0;
+  private readonly pistol = new THREE.Group();
+  effect(event: WorldEvent): void {
+    let slot = this.effectSlots[this.effectCursor++ % 32];
+    if (!slot) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array(6), 3),
+      );
+      const material = new THREE.LineBasicMaterial({ color: "#ffe595" });
+      const markerMaterial = new THREE.MeshBasicMaterial({ color: "#ffb061" });
+      const line = new THREE.Line(geometry, material),
+        marker = new THREE.Mesh(this.cube, markerMaterial);
+      this.geometry.add(geometry);
+      this.materials.add(material);
+      this.materials.add(markerMaterial);
+      this.scene.add(line, marker);
+      slot = { line, marker, until: 0 };
+      this.effectSlots.push(slot);
+    }
+    const end = event.kind === "shot" ? event.data.end : event.data.position;
+    if (event.kind === "shot") {
+      const positions = slot.line.geometry.getAttribute("position");
+      positions.setXYZ(0, ...event.data.origin);
+      positions.setXYZ(1, ...event.data.end);
+      positions.needsUpdate = true;
+      slot.line.geometry.computeBoundingSphere();
+    }
+    slot.line.visible = event.kind === "shot";
+    slot.marker.position.set(...end);
+    slot.marker.scale.setScalar(
+      event.kind === "impact" ? 0.2 + event.data.severity * 0.4 : 0.12,
+    );
+    slot.marker.visible = true;
+    slot.until = performance.now() + 180;
+  }
   private low = false;
   private readonly palette = new Map<string, THREE.MeshStandardMaterial>();
   private readonly chunks = new Map<string, THREE.Group>();
@@ -69,6 +111,21 @@ export class GameRenderer {
     const cube = new THREE.BoxGeometry(1, 1, 1);
     this.geometry.add(cube);
     this.cube = cube;
+    const gunMaterial = new THREE.MeshStandardMaterial({
+      color: "#58686f",
+      roughness: 0.65,
+    });
+    this.materials.add(gunMaterial);
+    const barrel = new THREE.Mesh(cube, gunMaterial);
+    barrel.scale.set(0.07, 0.07, 0.3);
+    barrel.position.z = -0.1;
+    const grip = new THREE.Mesh(cube, gunMaterial);
+    grip.scale.set(0.06, 0.13, 0.07);
+    grip.position.y = -0.08;
+    this.pistol.add(barrel, grip);
+    this.pistol.visible = false;
+    this.scene.add(this.pistol);
+
     const outside = assets.backdrop.primitives.filter(
       (p) => p.id === "ocean" || p.id === "heights_distant_hill",
     );
@@ -451,9 +508,37 @@ export class GameRenderer {
       );
       group.position.set(...actor.motor.position);
       group.rotation.y = actor.motor.yaw;
+      group.rotation.z =
+        actor.state.kind === "character" && actor.state.data.health === 0
+          ? Math.PI / 2
+          : 0;
+      if (actor.state.kind === "character" && actor.state.data.health === 0)
+        group.position.y += 0.3;
+      if (actor.state.kind === "vehicle") {
+        let smoke = group.getObjectByName("disabled-smoke");
+        if (!smoke && actor.state.data.disabled) {
+          smoke = new THREE.Mesh(this.cube, this.staleMaterial);
+          smoke.name = "disabled-smoke";
+          smoke.position.y = 2.5;
+          smoke.scale.set(0.8, 1.4, 0.8);
+          group.add(smoke);
+        }
+        if (smoke) smoke.visible = actor.state.data.disabled;
+      }
     }
   }
-  render(distance: number): void {
+  render(distance: number, aiming = false): void {
+    this.pistol.visible = aiming;
+    this.pistol.position
+      .set(0.12, -0.12, -0.55)
+      .applyQuaternion(this.camera.quaternion)
+      .add(this.camera.position);
+    this.pistol.quaternion.copy(this.camera.quaternion);
+    for (const slot of this.effectSlots)
+      if (performance.now() >= slot.until) {
+        slot.line.visible = false;
+        slot.marker.visible = false;
+      }
     this.actor.visible = distance > 0.15;
     this.actor.traverse((object) => {
       if (object instanceof THREE.Mesh)

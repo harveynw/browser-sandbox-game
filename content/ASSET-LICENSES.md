@@ -11,3 +11,5 @@
 | Van and sport greyboxes | City vehicle templates and baker | Original procedural bodies/windows; project-controlled content |
 
 No downloaded models, textures, fonts or audio have been added. These records do not assign a new public license to the repository. Three.js and other software dependencies retain their own package licenses; their source is not copied into authored asset files. Add a provenance entry before introducing externally sourced media.
+
+T14 pistol boxes, tracer lines, impact markers and disabled-car smoke blocks are original procedural runtime geometry in `apps/client/src/render/renderer.ts`; no external asset files were added.

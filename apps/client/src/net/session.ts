@@ -8,6 +8,7 @@ import type {
   PlayerStatus,
   MissionView,
   Action,
+  WorldEvent,
 } from "@port-meridian/protocol";
 import { loadPackage, type LoadedPackage } from "@port-meridian/content";
 import { BrowserTransport, type Channel } from "./transport";
@@ -17,6 +18,7 @@ import { ReplicaStore } from "../world/replica";
 import type { PredictionWorld } from "../simulation/bridge";
 
 export interface SessionEvents {
+  worldEvent?: (event: WorldEvent, own: boolean) => void;
   assets?: (assets: LoadedPackage, queries: PredictionWorld) => void;
   owner?: (owner: OwnerState) => void;
   playerStatus?: (status: PlayerStatus) => void;
@@ -43,6 +45,7 @@ export class GameSession {
   private resyncAt = -Infinity;
   private resyncPending = false;
   private statusRevision = 0;
+  private readonly seenEvents = new Set<number>();
   private mission: MissionView | null = null;
   private receivedBytes = 0;
   private sentBytes = 0;
@@ -241,7 +244,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t13-local" ||
+      info.build_id !== "t14-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -453,6 +456,21 @@ export class GameSession {
         this.showStatus();
         break;
       }
+      case "world_event": {
+        const event = message.data;
+        if (!this.seenEvents.has(event.data.event_id)) {
+          this.seenEvents.add(event.data.event_id);
+          if (this.seenEvents.size > 256) {
+            const oldest = this.seenEvents.values().next().value;
+            if (oldest !== undefined) this.seenEvents.delete(oldest);
+          }
+          this.events.worldEvent?.(
+            event,
+            event.kind === "shot" && event.data.shooter_id === this.player,
+          );
+        }
+        break;
+      }
       case "action_result":
         this.actionMessage = message.data.ok
           ? ""
@@ -460,7 +478,7 @@ export class GameSession {
         this.log(`Action: ${message.data.code}`);
         break;
       default:
-        throw new Error(`Unexpected T07 message: ${message.kind}`);
+        throw new Error("Unexpected server message");
     }
   }
   private observeTick(tick: number): void {
@@ -621,6 +639,16 @@ export class GameSession {
       data: { request_id: ++this.requestId, control_epoch: this.epoch, action },
     });
   }
+  fire(yaw: number, pitch: number): void {
+    if (!this.driving)
+      this.requestAction({
+        kind: "fire",
+        data: { aim_yaw: yaw, aim_pitch: pitch },
+      });
+  }
+  reload(): void {
+    if (!this.driving) this.requestAction({ kind: "reload", data: {} });
+  }
   useTerminal(): void {
     const template = this.terminal(performance.now());
     if (template)
@@ -640,9 +668,11 @@ export class GameSession {
       return `E exit when stopped · WASD drive · Space handbrake${job}`;
     const target = this.target(now);
     return target?.state.kind === "vehicle"
-      ? target.state.data.driver_id
-        ? "Vehicle occupied"
-        : `E enter ${target.descriptor.template_id}${job}`
+      ? target.state.data.disabled || target.state.data.health === 0
+        ? "Vehicle disabled · awaiting a clear parking respawn"
+        : target.state.data.driver_id
+          ? "Vehicle occupied"
+          : `E enter ${target.descriptor.template_id} · Car health ${target.state.data.health}${job}`
       : terminal && !this.mission
         ? "E / F accept courier · 150 credits"
         : "Walk to the left door of a parked car · E enter";

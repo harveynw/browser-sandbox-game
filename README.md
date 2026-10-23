@@ -2,9 +2,9 @@
 
 Implementation specification for an original GTA-inspired, third-person, multiplayer 3D browser game. The server is authoritative Rust and uses [harveynw/net-crate](https://github.com/harveynw/net-crate). The browser uses TypeScript, Three.js, and a shared Rust movement library compiled to WebAssembly.
 
-**Status: T01–T13 complete — a playable six-district city with ambient traffic and pedestrians.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Press E at a car’s left door to enter; WASD drives, Space applies the handbrake, and E exits when stopped. Find the cyan Quay terminal and press E / F to accept the courier job. Follow the gold route to Market, stop inside the delivery ring for one second, and earn 150 credits. Esc opens the cancellation menu. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). See the [courier demonstration](docs/25-courier-slice.md) for the verified delivery and screenshots. The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
+**Status: T01–T14 complete — a playable city with traffic, pedestrians, pistol combat and damage.** Play at [localhost:5173](http://localhost:5173/): WASD/arrows, Shift sprint, Space jump, mouse look, Esc menu. On foot: RMB / Q aim, left click fire, R reload. If pointer lock is declined, drag the scene to look. The camera centres the character horizontally, with the head near the green debug cross. Remote players use teal capsules and interpolated server snapshots; local movement uses the shared Rust/WASM motor with authoritative reconciliation. Press E at a car’s left door to enter; WASD drives, Space applies the handbrake, and E exits when stopped. Find the cyan Quay terminal and press E / F to accept the courier job. Follow the gold route to Market, stop inside the delivery ring for one second, and earn 150 credits. Esc opens the cancellation menu. Tools remain at `/map`, `/simulation`, and `/diagnostic`. See the [implementation log](docs/implementation-log.md), [netcode guide](docs/23-prediction-and-replication.md), [client guide](docs/22-browser-walkthrough.md), [content guide](docs/18-content-pipeline.md) and [server guide](docs/21-authoritative-sessions.md). See the [courier demonstration](docs/25-courier-slice.md) for the verified delivery and screenshots. The networking revision remains `77b401b1376b5c8bcb98da2884efcb1e63082ba4`.
 
-The [full-city guide](docs/26-full-city.md) records navigation, streaming, provenance, budgets and verification. The [ambient population guide](docs/27-ambient-population.md) covers traffic, pedestrians and pool limits. The next milestone is T14, pistol and damage.
+The [full-city guide](docs/26-full-city.md) records navigation, streaming, provenance, budgets and verification. The [ambient population guide](docs/27-ambient-population.md) covers traffic, pedestrians and pool limits. The [combat guide](docs/28-pistol-and-damage.md) covers aim/fire/reload, damage and safe respawns. The next milestone is T15, police and heat.
 
 ## Run the walkthrough
 
@@ -27,11 +27,11 @@ The scripted connection diagnostic is now [localhost:5173/diagnostic](http://loc
 | Command | Current behavior |
 |---|---|
 | `npm run dev` | Generate bridge/build WASM, then loopback Vite on port 5173; fails if occupied |
-| `npm run check` | Generated drift, strict TS, lint/formatting, 195 TS tests (including release WASM/seeded netcode), Clippy, and 92 Rust tests |
+| `npm run check` | Generated drift, strict TS, lint/formatting, 197 TS tests (including release WASM/seeded netcode), Clippy, and 102 Rust tests |
 | `npm run build` | Generate contracts/content, compile native Rust/package WASM, type-check, bundle frontend |
 | `npm run sim:trace` | Replay the native 60-second character trace against 13 saved checkpoints |
 | `npm run build:wasm` | Package release WASM + web JS/declarations using pinned wasm-bindgen CLI |
-| `cargo test --workspace --locked` | Run 25 simulation, 1 bridge, 10 content, 9 protocol, 45 server and 2 drift tests |
+| `cargo test --workspace --locked` | Run 27 simulation, 1 bridge, 10 content, 9 protocol, 53 server and 2 drift tests |
 | `cargo run -p server --locked` | Start authoritative WS/RTC on 127.0.0.1:3000 and local HTTP issuer on 127.0.0.1:3001 |
 | `npm run protocol:generate` / `protocol:check` | Generate contracts/fixtures or detect drift without modifying files |
 | `npm run content:generate` / `content:check` | Generate content contracts or detect contract/baked-package drift |

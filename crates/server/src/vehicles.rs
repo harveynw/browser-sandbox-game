@@ -37,6 +37,13 @@ pub fn clear_segment(collision: &CollisionWorld, a: [f32; 3], b: [f32; 3]) -> bo
             .is_ok_and(|hit| hit.is_none_or(|h| h.distance >= distance - 0.01))
 }
 pub fn safe_exit(car: &Vehicle, collision: &CollisionWorld) -> Option<[f32; 3]> {
+    safe_exit_with(car, collision, |_| true)
+}
+pub fn safe_exit_with(
+    car: &Vehicle,
+    collision: &CollisionWorld,
+    eligible: impl Fn([f32; 3]) -> bool,
+) -> Option<[f32; 3]> {
     for offset in &car.template.exit_offsets {
         let mut p = sim_core::anchor(&car.state.motor, *offset);
         let floor = collision
@@ -75,7 +82,7 @@ pub fn safe_exit(car: &Vehicle, collision: &CollisionWorld) -> Option<[f32; 3]> 
                 ),
             ],
         );
-        if clear_segment(collision, door, [p[0], p[1] + 0.9, p[2]]) {
+        if eligible(p) && clear_segment(collision, door, [p[0], p[1] + 0.9, p[2]]) {
             return Some(p);
         }
     }
