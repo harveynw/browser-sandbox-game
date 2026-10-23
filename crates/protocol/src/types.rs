@@ -38,7 +38,7 @@ macro_rules! integer {
     };
 }
 
-integer!(ProtocolVersion, u16, 1, 1, "1");
+integer!(ProtocolVersion, u16, 2, 2, "2");
 integer!(TickRate, u8, 30, 30, "30");
 integer!(SnapshotRate, u8, 10, 10, "10");
 integer!(EntityId, u32, 1, u32::MAX, "number");
@@ -436,6 +436,8 @@ wire_struct!(PlayerStatus {
     revision: Revision, server_tick: Tick, credits: Credits, completed_jobs: u32,
     heat: Heat, pursuit: Pursuit, magazine: Magazine,
     #[serde(deserialize_with = "required_nullable")]
+    repair: Option<RepairView>,
+    #[serde(deserialize_with = "required_nullable")]
     reload_end_tick: Option<Tick>,
     #[serde(deserialize_with = "required_nullable")]
     mission: Option<MissionView>,
@@ -443,6 +445,23 @@ wire_struct!(PlayerStatus {
     respawn_tick: Option<Tick>,
     #[serde(deserialize_with = "required_nullable")]
     protected_until_tick: Option<Tick>,
+});
+string_enum!(RepairPhase {
+    Dwell,
+    DebitPending,
+    RefundPending,
+    Completed,
+    Cancelled,
+    Failed
+});
+wire_struct!(RepairView {
+    vehicle_id: EntityId,
+    zone_id: TemplateId,
+    phase: RepairPhase,
+    price: Credits,
+    #[schemars(range(min = 0, max = 60))]
+    dwell_ticks: u16,
+    code: ActionCode
 });
 string_enum!(Pursuit {
     Clear,

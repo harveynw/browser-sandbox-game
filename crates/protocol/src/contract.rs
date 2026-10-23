@@ -119,6 +119,8 @@ pub fn typescript() -> String {
         MissionView,
         MissionPhase,
         PlayerStatus,
+        RepairView,
+        RepairPhase,
         Pursuit,
         WorldEvent,
         Shot,

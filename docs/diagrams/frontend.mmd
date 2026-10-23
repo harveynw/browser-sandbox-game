@@ -1,11 +1,11 @@
-%% Frontend module system — current implementation through T15.
+%% Frontend module system — current implementation through T16.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["apps/client/src/ — application"]
     main["main.ts<br/>Page routing"]:::app
-    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Private courier, heat / pursuit and arrest feedback"]:::app
+    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Job choices / checkpoints / repair payment feedback<br/>Private heat / pursuit and arrest feedback"]:::app
     diagnostics["game/diagnostics.ts<br/>Compact telemetry · 12-second graphs<br/>Expandable remote entity table"]:::app
     input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
@@ -21,7 +21,7 @@ flowchart TD
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · terminal / private route<br/>Pooled shot / impact effects and pistol<br/>Police car beacons"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · job / repair markers<br/>Private objective target · courier-only route<br/>Pooled shot / impact effects and pistol<br/>Police car beacons"]:::gfx
     camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks · first-person aim"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]
@@ -49,7 +49,7 @@ flowchart TD
   session -->|"load assets"| content
   content -.->|"verified physics + initial assets"| game
   renderer <-->|"bounded visual loading / disposal"| content
-  session -.->|"private courier / police status + local / remote poses"| game
+  session -.->|"private mission / repair / police status + local / remote poses"| game
   game -->|"map and actor poses"| renderer
   game -->|"pose and look input"| camera
   camera -.->|"spherecast"| bridge

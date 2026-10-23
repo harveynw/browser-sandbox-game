@@ -59,7 +59,7 @@ impl Control {
         Self {
             profiles: MemoryProfiles::default(),
             status: Status::default(),
-            build: json!({"protocol_version":1,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
+            build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
         }
     }
     pub fn update(&mut self, world: &World, now: u64, healthy: bool, overloaded: bool) {

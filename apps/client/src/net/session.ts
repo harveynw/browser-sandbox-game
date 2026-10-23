@@ -7,6 +7,7 @@ import type {
   OwnerState,
   PlayerStatus,
   MissionView,
+  RepairView,
   Action,
   WorldEvent,
 } from "@port-meridian/protocol";
@@ -46,6 +47,7 @@ export class GameSession {
   private resyncPending = false;
   private statusRevision = 0;
   private readonly seenEvents = new Set<number>();
+  private repair: RepairView | null = null;
   private mission: MissionView | null = null;
   private receivedBytes = 0;
   private sentBytes = 0;
@@ -221,7 +223,7 @@ export class GameSession {
   }
   private send(message: ClientMessage, channel: Channel = "reliable"): boolean {
     const bytes = encodeClient({
-      v: 1,
+      v: 2,
       world_id: this.world,
       session_id: this.session,
       message,
@@ -244,7 +246,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t15-local" ||
+      info.build_id !== "t16-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -254,7 +256,7 @@ export class GameSession {
     this.send({
       kind: "client_hello",
       data: {
-        protocol_version: 1,
+        protocol_version: 2,
         build_id: info.build_id,
         content_hash: info.content_hash,
         sim_config_hash: info.sim_config_hash,
@@ -382,6 +384,7 @@ export class GameSession {
         if (message.data.revision < this.statusRevision) return;
         this.statusRevision = message.data.revision;
         this.mission = message.data.mission;
+        this.repair = message.data.repair;
         this.events.playerStatus?.(message.data);
         this.log(
           `Private status baseline: credits ${message.data.credits}, revision ${message.data.revision}`,
@@ -615,21 +618,50 @@ export class GameSession {
   estimatedTick(now: number): number {
     return this.clock.estimate(now);
   }
-  private terminal(now: number) {
+  get currentRepair(): RepairView | null {
+    return this.repair;
+  }
+  nearbyJobs(now: number) {
     const motor = this.presentation(now);
-    if (!motor || !this.assets) return undefined;
-    return this.assets.manifest.mission_templates.find((t) => {
-      if (t.objective.kind !== "courier") return false;
-      const zone = this.assets?.manifest.zones.find(
-        (z) => z.id === t.terminal_zone_id,
-      );
-      return (
-        zone &&
-        Math.hypot(
-          motor.position[0] - zone.center[0],
-          motor.position[2] - zone.center[2],
-        ) <= Math.min(3, zone.radius)
-      );
+    if (!motor || !this.assets || this.mission) return [];
+    if (
+      this.repair &&
+      ["dwell", "debit_pending", "refund_pending"].includes(this.repair.phase)
+    )
+      return [];
+    return this.assets.manifest.mission_templates.filter((t) =>
+      this.assets?.manifest.zones.some(
+        (z) =>
+          z.kind === "terminal" &&
+          z.allowed_templates.includes(t.id) &&
+          Math.hypot(
+            motor.position[0] - z.center[0],
+            motor.position[2] - z.center[2],
+          ) <= Math.min(3, z.radius),
+      ),
+    );
+  }
+
+  private terminal(now: number) {
+    return this.nearbyJobs(now)[0];
+  }
+  repairZone(now: number) {
+    const motor = this.presentation(now);
+    return this.driving && motor
+      ? this.assets?.manifest.zones.find(
+          (z) =>
+            z.kind === "repair" &&
+            Math.hypot(
+              motor.position[0] - z.center[0],
+              motor.position[2] - z.center[2],
+            ) <= z.radius,
+        )
+      : undefined;
+  }
+  acceptJob(templateId: string): void {
+    this.requestAction({
+      kind: "accept_mission",
+      data: { template_id: templateId },
     });
   }
   private requestAction(action: Action): void {
@@ -653,20 +685,23 @@ export class GameSession {
     if (!this.driving) this.requestAction({ kind: "reload", data: {} });
   }
   useTerminal(): void {
-    const template = this.terminal(performance.now());
-    if (template)
-      this.requestAction({
-        kind: "accept_mission",
-        data: { template_id: template.id },
-      });
+    const now = performance.now(),
+      zone = this.repairZone(now);
+    if (zone) {
+      this.requestAction({ kind: "repair", data: { zone_id: zone.id } });
+      return;
+    }
+    const template = this.terminal(now);
+    if (template) this.acceptJob(template.id);
   }
   cancelMission(): void {
     this.requestAction({ kind: "cancel_mission", data: {} });
   }
   interactionPrompt(now: number): string {
     const terminal = this.terminal(now);
-    const job =
-      terminal && !this.mission ? " · F accept courier · 150 credits" : "";
+    const job = terminal && !this.mission ? " · F choose a job" : "";
+    if (this.driving && this.repairZone(now))
+      return "F repair · 50 credits · stop for 2 seconds · clear heat required";
     if (this.driving)
       return `E exit when stopped · WASD drive · Space handbrake${job}`;
     const target = this.target(now);
@@ -678,7 +713,7 @@ export class GameSession {
           ? "Vehicle occupied"
           : `E enter ${target.descriptor.template_id} · Car health ${target.state.data.health}${secured ? " · Secured: police witnesses add heat" : ""}${job}`
       : terminal && !this.mission
-        ? "E / F accept courier · 150 credits"
+        ? "F choose a job · E quick accept"
         : "Walk to the left door of a parked car · E enter";
   }
   interact(): void {

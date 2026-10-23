@@ -609,6 +609,16 @@
             "null"
           ]
         },
+        "repair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RepairView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "respawn_tick": {
           "format": "uint32",
           "minimum": 0,
@@ -635,6 +645,7 @@
         "protected_until_tick",
         "pursuit",
         "reload_end_tick",
+        "repair",
         "respawn_tick",
         "revision",
         "server_tick"
@@ -696,8 +707,8 @@
       "type": "object"
     },
     "ProtocolVersion": {
-      "maximum": 1,
-      "minimum": 1,
+      "maximum": 2,
+      "minimum": 2,
       "type": "integer"
     },
     "Pursuit": {
@@ -735,6 +746,52 @@
         "unavailable"
       ],
       "type": "string"
+    },
+    "RepairPhase": {
+      "enum": [
+        "dwell",
+        "debit_pending",
+        "refund_pending",
+        "completed",
+        "cancelled",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "RepairView": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ActionCode"
+        },
+        "dwell_ticks": {
+          "format": "uint16",
+          "maximum": 60,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "phase": {
+          "$ref": "#/$defs/RepairPhase"
+        },
+        "price": {
+          "$ref": "#/$defs/Credits"
+        },
+        "vehicle_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "zone_id": {
+          "$ref": "#/$defs/TemplateId"
+        }
+      },
+      "required": [
+        "code",
+        "dwell_ticks",
+        "phase",
+        "price",
+        "vehicle_id",
+        "zone_id"
+      ],
+      "type": "object"
     },
     "RequestId": {
       "maximum": 4294967295,

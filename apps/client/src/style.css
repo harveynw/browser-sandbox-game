@@ -486,3 +486,12 @@ select {
   z-index: 1;
   background: #0b141e;
 }
+
+.game-job-choices {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+.game-job-choices:empty {
+  display: none;
+}

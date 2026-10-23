@@ -2,7 +2,7 @@
 
 [Index](../README.md) · Timing: [Simulation and netcode](06-simulation-and-netcode.md)
 
-This is the normative v1 wire contract. Implement the types in `crates/protocol`; generate TypeScript and validation schemas. Names in the TypeScript-shaped reference below are exact wire names. All structures use snake_case.
+This is the normative v2 wire contract. Implement the types in `crates/protocol`; generate TypeScript and validation schemas. Names in the TypeScript-shaped reference below are exact wire names. All structures use snake_case.
 
 ## Encoding and compatibility
 
@@ -12,8 +12,8 @@ This is the normative v1 wire contract. Implement the types in `crates/protocol`
 - Integers are bounded Rust `u8/u16/u32/i16` as appropriate. Floats are finite `f32` in simulation, wire float32 or float64 accepted if representable; semantic comparisons in tests allow float rounding. Reject NaN/infinity.
 - Optional fields are explicit `null` (`Option<T>`), never silently omitted. Arrays are arrays; tuples have exact lengths.
 - Enums are adjacently tagged: `#[serde(tag = "kind", content = "data", rename_all = "snake_case")]`. Unit variants are represented by dedicated empty payload structs where needed, so all variants still have `data`.
-- Every envelope has `v: 1`. Exact version match is required. Any wire-shape or interpretation change increments the version; alpha has no rolling compatibility.
-- Reject unknown message kinds. Use strict known fields for v1; do not rely on Serde’s permissive default.
+- Every envelope has `v: 2`. Exact version match is required. Any wire-shape or interpretation change increments the version; alpha has no rolling compatibility.
+- Reject unknown message kinds. Use strict known fields for v2; do not rely on Serde’s permissive default.
 
 Prototype example:
 
@@ -38,7 +38,7 @@ Derive TS and JSON Schema from the same Rust types. `ts-rs` declarations alone a
 
 ```ts
 type Envelope<T> = {
-  v: 1;
+  v: 2;
   world_id: string | null;
   session_id: string | null;
   message: T;
@@ -208,6 +208,7 @@ type MissionView = {
 type PlayerStatus = {
   revision: number; server_tick: Tick;
   credits: number; completed_jobs: number;
+  repair: RepairView | null;
   heat: number; pursuit: "clear" | "pursuing" | "searching" | "arresting";
   magazine: number; reload_end_tick: Tick | null;
   mission: MissionView | null; respawn_tick: Tick | null;
@@ -287,11 +288,11 @@ Test the initial full OwnerState and maximum-sized InputBatch against 1,100 byte
 
 ## T02 implementation notes
 
-The complete v1 contract is now implemented in `crates/protocol` and exported through `packages/protocol`. The generated schemas are also used by the native decoder, after bounded MessagePack preflight and before DTO construction. Native schema validation has remote HTTP/file resolution disabled. The default `codec` Cargo feature includes it; native/WASM consumers needing only shared types can use `default-features = false`.
+The complete v2 contract is now implemented in `crates/protocol` and exported through `packages/protocol`. The generated schemas are also used by the native decoder, after bounded MessagePack preflight and before DTO construction. Native schema validation has remote HTTP/file resolution disabled. The default `codec` Cargo feature includes it; native/WASM consumers needing only shared types can use `default-features = false`.
 
 Schemars normally makes Option fields optional. Generation retains their null union and explicitly requires every declared object property. Serde nullable fields have a required-field deserializer. Both paths therefore reject omission while accepting an explicit null. MessagePack arrays are never substitutes for named struct objects.
 
-Scalar bounds made concrete for the initial v1 implementation:
+Scalar bounds retained in the v2 implementation:
 
 | Field/category | Bound |
 |---|---|
@@ -309,14 +310,20 @@ Scalar bounds made concrete for the initial v1 implementation:
 | Millisecond clocks | Finite, nonnegative f64 up to JavaScript's maximum safe integer |
 | Other scalar motor/vector values | Finite f32 range; world-specific checks remain authoritative |
 
-Display names require 3–20 Unicode scalar values, no control characters, and canonical Unicode whitespace trimming. Detail text has at most 512 UTF-8 bytes and no control characters. Other string/collection limits continue to apply from the preflight scanner. Binary values and reserved prototype-related map keys are rejected because v1 defines no such fields.
+Display names require 3–20 Unicode scalar values, no control characters, and canonical Unicode whitespace trimming. Detail text has at most 512 UTF-8 bytes and no control characters. Other string/collection limits continue to apply from the preflight scanner. Binary values and reserved prototype-related map keys are rejected because v2 defines no such fields.
 
 Integer fields use mathematical integer semantics across languages: float markers containing an exact safe whole number are accepted; fractional values fail. Float endpoints use their f32-rounded constants so Rust-encoded boundary values remain valid. Cross-language tests compare IDs/ticks exactly and allow float roundoff.
 
 World ID must be present and non-null for every game envelope. Hello/Reject use null session IDs; Leave/Disconnect may use null before authentication. Other messages require a session. Stateful identity/phase validation still needs the actual session; stateless decoding alone does not authenticate it.
 
-See the [package API guide](../packages/protocol/README.md) and [implementation log](implementation-log.md) for commands and measured fixture sizes. These clarify the first implemented draft of v1; no previously deployed wire version existed.
+See the [package API guide](../packages/protocol/README.md) and [implementation log](implementation-log.md) for commands and measured fixture sizes. The initial v1 contract shipped with T02; T16 advances the wire to v2 for explicit repair status.
 
 ### T03 diagnostic clarification
 
 Pong is valid on either delivery channel in both codecs and in the shared fixtures. No message shape changed. The localhost diagnostic sets nonce bit 31 for an RTC return path and clears it for WS; the rest is a per-connection counter. This is a temporary diagnostic convention, not a gameplay routing or authentication field. net-crate provides no ingress channel metadata. The browser sends on the selected channel, matches its nonce/time/channel against the response, and declares PASS only after receiving both paths. T07 replaces diagnostic admission with the real session state machine.
+
+## T16 repair status and version 2
+
+Version 2 adds the required nullable `PlayerStatus.repair`. Existing version-1 envelopes are rejected; both game build IDs advance to `t16-local`. Content and local WASM bridge schema versions remain independent and unchanged. `RepairView` contains `vehicle_id`, `zone_id`, `phase` (`dwell`, `debit_pending`, `refund_pending`, `completed`, `cancelled`, `failed`), `price` (exactly 50), `dwell_ticks` (0–60), and an `ActionCode` result in `code`. Active dwell progress is published at 5 Hz, with immediate phase transitions. Initial ActionResult acknowledges reservation; only Completed status and replicated health confirm committed repair. RefundPending explicitly identifies compensation still in flight.
+
+For recovery missions, `checkpoint_index` is 0 for collection, 1 for garage delivery and 2 for a blocked safe exit. Time trials consume gate 0 at driving acceptance; subsequent indices identify the next ordered gate, with a distinct final return gate. MissionView remains private to its owner.

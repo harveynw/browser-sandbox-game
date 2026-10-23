@@ -168,6 +168,12 @@ export function validateServer(
         throw new ProtocolError("action result code/ok mismatch");
       break;
     case "player_status":
+      if (
+        message.data.repair &&
+        (message.data.repair.price !== 50 ||
+          message.data.repair.dwell_ticks > 60)
+      )
+        throw new ProtocolError("invalid repair price or dwell");
       if ((message.data.heat === 0) !== (message.data.pursuit === "clear"))
         throw new ProtocolError("heat/pursuit mismatch");
       break;

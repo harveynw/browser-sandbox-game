@@ -89,10 +89,15 @@ export class GameRenderer {
   private capsule: THREE.CapsuleGeometry;
   private faceMaterial: THREE.MeshStandardMaterial;
   private cube: THREE.BoxGeometry;
-  setMissionTarget(position: readonly number[] | null | undefined): void {
+  setMissionTarget(
+    position: readonly number[] | null | undefined,
+    courier = true,
+    radius = 5,
+  ): void {
     this.missionTarget = position;
     this.missionMarker.visible = !!position;
-    this.courierRoute.visible = !!position;
+    this.courierRoute.visible = !!position && courier;
+    this.missionMarker.children[0]?.scale.setScalar(radius);
     if (position)
       this.missionMarker.position.set(position[0] ?? 0, 0, position[2] ?? 0);
   }
@@ -189,14 +194,24 @@ export class GameRenderer {
     this.materials.add(terminalMaterial);
     this.materials.add(targetMaterial);
     for (const zone of assets.manifest.zones.filter(
-      (z) => z.kind === "terminal",
+      (z) =>
+        z.kind === "terminal" || z.kind === "garage" || z.kind === "repair",
     )) {
-      const ring = new THREE.Mesh(ringGeometry, terminalMaterial);
+      let material = terminalMaterial;
+      if (zone.kind !== "terminal") {
+        material = new THREE.MeshBasicMaterial({
+          color: zone.kind === "repair" ? "#82ef8f" : "#99c4ff",
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        });
+        this.materials.add(material);
+      }
+      const ring = new THREE.Mesh(ringGeometry, material);
       ring.rotation.x = -Math.PI / 2;
       ring.scale.setScalar(zone.radius);
       ring.position.set(zone.center[0], 0.06, zone.center[2]);
       this.scene.add(ring);
-      const pole = new THREE.Mesh(cube, terminalMaterial);
+      const pole = new THREE.Mesh(cube, material);
       pole.position.set(zone.center[0], 1.5, zone.center[2]);
       pole.scale.set(0.3, 3, 0.3);
       this.scene.add(pole);

@@ -1,4 +1,4 @@
-//! Version 1 shared wire contract. Decoding validates shape and stateless rules;
+//! Version 2 shared wire contract. Decoding validates shape and stateless rules;
 //! callers must also validate session context before applying client intent.
 
 #[cfg(feature = "codec")]

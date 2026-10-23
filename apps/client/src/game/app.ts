@@ -1,6 +1,6 @@
 import { Diagnostics } from "./diagnostics";
 import { simulationMemoryBytes } from "../simulation/bridge";
-import { courierGuidance } from "./courier";
+import { courierGuidance, repairGuidance } from "./courier";
 import type {
   CharacterMode,
   CharacterMotor,
@@ -72,6 +72,8 @@ export class GameApp {
   private recoveryTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly reload = document.createElement("button");
   private readonly cancelCourier = document.createElement("button");
+  private readonly jobChoices = document.createElement("div");
+  private jobChoiceKey = "";
   private readonly courierInfo = document.createElement("p");
   constructor(private readonly root: HTMLElement) {
     document.title = "Port Meridian — explore the city";
@@ -91,7 +93,7 @@ export class GameApp {
     const note = document.createElement("p");
     note.className = "game-note";
     note.textContent =
-      "Walk to a parked car, press E at its left door, then drive. Find the cyan Quay terminal and press E / F for a courier job. Deliver to the gold Market marker for 150 credits.";
+      "E enters/exits a parked car. At a cyan terminal, F opens jobs: Quay courier / recovery, or the north ring time trial while driving. Follow the gold marker. In the green Ironworks repair zone, stop and press F to repair for 50 credits.";
     this.play.textContent = "Play";
     this.resume.textContent = "Resume / mouse look";
     this.leave.textContent = "Leave game";
@@ -102,7 +104,7 @@ export class GameApp {
     this.reload.addEventListener("click", () => location.reload(), {
       signal: this.abort.signal,
     });
-    this.cancelCourier.textContent = "Cancel courier";
+    this.cancelCourier.textContent = "Cancel job";
     this.cancelCourier.hidden = true;
     this.cancelCourier.addEventListener(
       "click",
@@ -194,6 +196,7 @@ export class GameApp {
       this.status,
       instructions,
       this.courierInfo,
+      this.jobChoices,
       actions,
       settings,
       note,
@@ -470,7 +473,18 @@ export class GameApp {
     try {
       if (!this.contextLost && this.phase === "playing") {
         if (this.input.consumeInteract()) this.session?.interact();
-        if (this.input.consumeJob()) this.session?.useTerminal();
+        if (this.input.consumeJob()) {
+          if (
+            !this.session?.repairZone(now) &&
+            (this.session?.nearbyJobs(now).length ?? 0) > 1
+          ) {
+            this.input.clear();
+            if (document.pointerLockElement === this.canvas)
+              document.exitPointerLock();
+            this.overlay.hidden = false;
+            this.status.textContent = "Choose a nearby job.";
+          } else this.session?.useTerminal();
+        }
         if (this.input.consumeFire() && this.health > 0)
           this.session?.fire(this.input.yaw, this.input.pitch);
         if (this.input.consumeReload() && this.health > 0)
@@ -497,8 +511,13 @@ export class GameApp {
         );
         this.renderer.remotes(remotes);
         const mission = this.session?.currentMission;
+        const objective = this.assets?.manifest.mission_templates.find(
+          (t) => t.id === mission?.template_id,
+        )?.objective;
         this.renderer.setMissionTarget(
           mission?.phase === "active" ? mission.target_position : null,
+          objective?.kind === "courier",
+          objective?.kind === "time_trial" ? objective.data.gate_radius : 5,
         );
         const aiming =
           this.input.active &&
@@ -536,7 +555,31 @@ export class GameApp {
           localMotor?.position,
           this.assets?.manifest.zones.find((z) => z.kind === "terminal")
             ?.center,
+          this.assets?.manifest.mission_templates.find(
+            (t) => t.id === mission?.template_id,
+          ),
         );
+        const jobs = this.session?.nearbyJobs(now) ?? [];
+        const key = jobs.map((t) => t.id).join(",");
+        if (key !== this.jobChoiceKey) {
+          this.jobChoiceKey = key;
+          this.jobChoices.replaceChildren(
+            ...jobs.map((t) => {
+              const button = document.createElement("button");
+              button.textContent = `${t.objective.kind === "courier" ? "Courier" : t.objective.kind === "recovery" ? "Vehicle recovery" : "Time trial (driving)"} · ${t.reward_credits} credits · ${t.duration_ticks / 30}s`;
+              button.addEventListener(
+                "click",
+                () => {
+                  this.session?.acceptJob(t.id);
+                  void this.capture();
+                },
+                { signal: this.abort.signal },
+              );
+              return button;
+            }),
+          );
+        }
+        this.jobChoices.className = "game-job-choices";
         this.courierInfo.textContent = this.phase === "playing" ? guidance : "";
         this.cancelCourier.hidden =
           this.phase !== "playing" || mission?.phase !== "active";
@@ -565,7 +608,7 @@ export class GameApp {
               : `${this.magazine}/12${this.session?.isDriving ? " · Weapon holstered" : this.reloadEnd !== null ? " · Reloading" : " · RMB / Q aim · click fire · R reload"}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Spawn protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
         this.hud.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · ${combat} · Heat ${"●".repeat(this.heat)}${"○".repeat(3 - this.heat)} · ${this.pursuit === "arresting" ? `Arrest ${Math.min(100, Math.max(0, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100)))}% · move to escape` : this.pursuit === "searching" ? "Searching · stay out of sight" : this.pursuit === "pursuing" ? "Police pursuit · break line of sight" : "Clear"} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}`
+            ? `Health ${this.health} · ${combat} · Heat ${"●".repeat(this.heat)}${"○".repeat(3 - this.heat)} · ${this.pursuit === "arresting" ? `Arrest ${Math.min(100, Math.max(0, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100)))}% · move to escape` : this.pursuit === "searching" ? "Searching · stay out of sight" : this.pursuit === "pursuing" ? "Police pursuit · break line of sight" : "Clear"} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}${this.session?.currentRepair ? `\n${repairGuidance(this.session.currentRepair)}` : ""}`
             : "Port Meridian · Walking and driving";
       }
     } catch (error) {

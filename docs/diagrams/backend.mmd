@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T15.
+%% Backend module system — current implementation through T16.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -10,13 +10,15 @@ flowchart TD
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
     police["police.rs<br/>Authoritative crime witnesses and private heat<br/>Fair capped patrol / pursuit · search / arrest"]:::sim
     combat["combat.rs<br/>Server pistol and hit queries<br/>Damage, cooldowns and safe respawns"]:::sim
-    missions["missions.rs<br/>Courier dwell, failure and reward lifecycle"]:::sim
+    jobs["jobs.rs<br/>Mission acceptance / reward lifecycle<br/>Eight recovery reservations and safe garage exits"]:::sim
+    repairs["repairs.rs<br/>Observed repair dwell / identity validation<br/>Queued debit, application and compensation"]:::sim
+    missions["missions.rs<br/>Courier / recovery dwell and swept trial gates"]:::sim
     population["population.rs<br/>1 Hz director · 5 Hz NPC decisions<br/>Pool tags, lane paths and intersection reservations"]:::sim
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
   end
   subgraph group_1["crates/server/src/ — networking and admission"]
     control["control.rs · HTTP thread<br/>Sessions, tickets and health"]:::net
-    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Atomic idempotent memory rewards"]:::net
+    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Atomic memory ledger · queued repair worker<br/>Reserved compensation capacity"]:::net
     transport["transport.rs · network pump thread<br/>Bounded queues, codecs and channel routing"]:::net
     replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
   end
@@ -57,7 +59,12 @@ flowchart TD
   world <-->|"weapon intent · impacts · life state"| combat
   combat -->|"ray / swept box-capsule queries"| sim
   combat -->|"Shot / Impact and control epochs"| transport
-  world -->|"evaluate courier after movement"| missions
+  world -->|"evaluate jobs after movement"| jobs
+  jobs -->|"pure objective advancement"| missions
+  jobs -->|"reserve / release recovery cars"| vehicles
+  world -->|"advance repair operation"| repairs
+  repairs <-->|"queued debit / refund and committed profile"| admission
+  repairs -->|"revalidate original driver / car / zone / epoch"| vehicles
   world <-->|"commit reward event / profile values"| admission
   world -->|"private mission and credits status"| transport
   world <-->|"spawn / recycle · NPC controls and replicas"| population

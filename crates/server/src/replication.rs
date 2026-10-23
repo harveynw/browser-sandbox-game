@@ -115,7 +115,7 @@ pub fn snapshot(
     records: Vec<StateRecord>,
 ) -> ServerEnvelope {
     ServerEnvelope {
-        v: ProtocolVersion(1),
+        v: ProtocolVersion(2),
         world_id: Some(OpaqueId(world.into())),
         session_id: Some(OpaqueId(session.into())),
         message: ServerMessage::Snapshot(Snapshot {

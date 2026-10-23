@@ -78,6 +78,13 @@ pub fn validate_server(envelope: &ServerEnvelope, delivery: Delivery) -> Result<
             return Err(invalid("action result code/ok mismatch"));
         }
         ServerMessage::PlayerStatus(value) => {
+            if value
+                .repair
+                .as_ref()
+                .is_some_and(|r| r.price.0 != 50 || r.dwell_ticks > 60)
+            {
+                return Err(invalid("invalid repair price or dwell"));
+            }
             if (value.heat.0 == 0) != (value.pursuit == Pursuit::Clear) {
                 return Err(invalid("heat/pursuit mismatch"));
             }

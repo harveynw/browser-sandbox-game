@@ -15,3 +15,5 @@ No downloaded models, textures, fonts or audio have been added. These records do
 T14 pistol boxes, tracer lines, impact markers and disabled-car smoke blocks are original procedural runtime geometry in `apps/client/src/render/renderer.ts`; no external asset files were added.
 
 T15 police cars reuse the original procedural compact and add an original blue roof beacon. The second Quay compact is marked secured in city authoring; the visual assets retain their original provenance.
+
+T16 adds original procedural blue garage and green repair rings/poles, using the existing shared primitives. No third-party assets were added.

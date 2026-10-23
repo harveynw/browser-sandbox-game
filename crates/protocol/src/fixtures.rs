@@ -45,7 +45,7 @@ pub fn decoded_fixture(fixture: &Fixture) -> Result<Value> {
 }
 
 fn envelope(message: Value, pre_auth: bool) -> Value {
-    json!({"v": 1, "world_id": "world-0001",
+    json!({"v": 2, "world_id": "world-0001",
         "session_id": if pre_auth { Value::Null } else { json!("session-0001") },
         "message": message })
 }
@@ -78,7 +78,7 @@ fn input(tick: u32) -> Value {
 fn status() -> Value {
     json!({"revision":1,"server_tick":30,"credits":150,"completed_jobs":1,
         "heat":0,"pursuit":"clear","magazine":12,"reload_end_tick":null,
-        "mission":null,"respawn_tick":null,"protected_until_tick":null})
+        "mission":null,"repair":null,"respawn_tick":null,"protected_until_tick":null})
 }
 
 pub fn positive() -> Result<Vec<Fixture>> {
@@ -117,8 +117,8 @@ pub fn positive() -> Result<Vec<Fixture>> {
         "client_hello",
         "client",
         "client_hello",
-        json!({"protocol_version":1,
-        "build_id":"test-v1","content_hash":hash,"sim_config_hash":hash,
+        json!({"protocol_version":2,
+        "build_id":"test-v2","content_hash":hash,"sim_config_hash":hash,
         "join_ticket":"b".repeat(64),"display_name":"Player 🐈"}),
         r,
     )?;
@@ -179,7 +179,7 @@ pub fn positive() -> Result<Vec<Fixture>> {
         "server_hello",
         "server",
         "server_hello",
-        json!({"protocol_version":1,"build_id":"test-v1",
+        json!({"protocol_version":2,"build_id":"test-v2",
         "content_hash":hash,"sim_config_hash":hash,"tick_rate":30,"snapshot_rate":10}),
         r,
     )?;
@@ -307,6 +307,24 @@ pub fn positive() -> Result<Vec<Fixture>> {
             "action_result",
             json!({"request_id":1,
             "applied_tick":30,"ok":code=="ok","code":code,"affected_entity_id":null}),
+            r,
+        )?;
+    }
+    for phase in [
+        "dwell",
+        "debit_pending",
+        "refund_pending",
+        "completed",
+        "cancelled",
+        "failed",
+    ] {
+        let mut value = status();
+        value["repair"] = json!({"vehicle_id":2,"zone_id":"repair_ironworks","phase":phase,"price":50,"dwell_ticks":60,"code":if phase=="failed" {"insufficient_funds"} else {"ok"}});
+        push(
+            &format!("repair_{phase}"),
+            "server",
+            "player_status",
+            value,
             r,
         )?;
     }
@@ -474,7 +492,8 @@ pub fn negative(positive: &[Fixture]) -> Result<Vec<Fixture>> {
             mutations.push(($name, v));
         }};
     }
-    mutation!("wrong_version", "/v", json!(2));
+    mutation!("wrong_version", "/v", json!(3));
+    mutation!("old_version", "/v", json!(1));
     mutation!("unknown_kind", "/message/kind", json!("teleport"));
     mutation!("zero_epoch", "/message/data/control_epoch", json!(0));
     mutation!(
@@ -643,6 +662,18 @@ pub fn negative(positive: &[Fixture]) -> Result<Vec<Fixture>> {
             "descriptor_mismatch",
             "/message/data/descriptor/entity_kind",
             json!("vehicle"),
+        ),
+        (
+            "repair_dwell",
+            "repair_price",
+            "/message/data/repair/price",
+            json!(51),
+        ),
+        (
+            "repair_dwell",
+            "repair_dwell_overflow",
+            "/message/data/repair/dwell_ticks",
+            json!(61),
         ),
         (
             "status_clear",

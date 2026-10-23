@@ -211,3 +211,9 @@ Memory mode implements the same interface and idempotency semantics. Save no act
 Startup: validate config → load/bake-verified content → apply DB migrations → start workers/control plane → start net listener → transport probe → ready. Fail startup on hash, collision, schema, or bind mismatch.
 
 Shutdown: stop tickets/joins → mark not-ready → notify connected clients → neutralize controls → finish in-flight persistence for at most 5 seconds → close sessions/workers → exit. Uncommitted rewards are not reported as earned. Log outcome and pending IDs for diagnosis.
+
+### T16 memory repair worker
+
+`MemoryProfiles` queues repair economic events with a minimum one-tick completion boundary, up to 32 queued operations and four completions per tick. Tests can delay completion through `repair_delay_ticks`. `World` permits one repair reservation per profile and car and defers mission reward commits while that profile's repair is in flight. Dwell progress is observed for 60 ticks, not supplied by the client. Application rechecks the original session, player, control epoch, car ownership, zone, speed, health and pursuit state; any interruption after submission latches invalidation. Disconnect leaves the operation available for completion/refund, even if the guest rejoins with a different entity or car.
+
+A debit reserves one of the 4,096 ledger entries for its possible `refund:<repair-event>` compensation before committing. Other rewards cannot consume that slot. Successful application releases the unused reservation; compensation atomically replaces it with a refund event. Transient unavailable results retain/retry the same operation ID; committed balance is published only after completion. This remains memory-only and is replaced by durable storage in T17.
