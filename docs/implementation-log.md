@@ -522,3 +522,9 @@ Verification:
 Limitations: original greybox cars/beacons and waypoint driving; police do not shoot or exit into separate officers. Reinforcement, wreck retirement and safe respawn can wait for hidden/clear space. Arrest/driver/budget edge cases use native fixtures rather than additional live demonstrations. Full real-RTC 16-player performance, memory/soak and target impairment remain T19/T20. Native pointer-lock and forced WebGL restoration retain their previous verification limits.
 
 Next action: stop for milestone review. **T16 — Remaining jobs and repair** is next and has not started.
+
+## Client diagnostics readability — 23 October 2026
+
+Replaced the gameplay diagnostics paragraph with a compact 11 px monospace panel, labelled Network/Prediction/Rendering/Streaming sections, aligned numeric values and an expandable entity table. Added client frame-loop FPS/average frame time and timestamped 12-second SVG histories for frame average, RTT and correction distance, capped at 120 samples each. Graphs have explicit units/scales; WASM memory remains labelled separately from browser memory. Entity rows update only while expanded, with a 160 px scroll area and highlighted stale records. The overall panel has a bounded viewport height and responsive layout; the resync action is retained. Updated the frontend ownership diagram. T16 has not started.
+
+Verification: production build, strict TypeScript, ESLint and formatting pass. Live production browser at 549 × 776 verified populated values, all three bounded graphs, a 40-row scrollable entity list and Resync world preserving player 614 while advancing epoch 1 → 2 with real WS/RTC receipts. This is a reversible presentation change; no new simulation tests were added. Existing Vite bundle advisory remains.

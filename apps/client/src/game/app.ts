@@ -1,3 +1,4 @@
+import { Diagnostics } from "./diagnostics";
 import { simulationMemoryBytes } from "../simulation/bridge";
 import { courierGuidance } from "./courier";
 import type {
@@ -47,7 +48,7 @@ export class GameApp {
   private readonly cross = document.createElement("div");
   private readonly hud = document.createElement("div");
   private readonly minimap = document.createElement("canvas");
-  private readonly debug = document.createElement("output");
+  private readonly debug = new Diagnostics();
   private renderer: GameRenderer | undefined;
   private queries: PredictionWorld | undefined;
   private assets: LoadedPackage | undefined;
@@ -199,7 +200,6 @@ export class GameApp {
       links,
     );
     this.hud.className = "game-hud";
-    this.debug.className = "game-debug";
     const debugPanel = document.createElement("details");
     debugPanel.className = "game-metrics";
     const debugSummary = document.createElement("summary");
@@ -209,7 +209,7 @@ export class GameApp {
     resync.addEventListener("click", () => this.session?.requestResync(), {
       signal: this.abort.signal,
     });
-    debugPanel.append(debugSummary, this.debug, resync);
+    debugPanel.append(debugSummary, this.debug.element, resync);
     this.cross.className = "game-debug-cross";
     this.cross.setAttribute("aria-hidden", "true");
     this.cross.hidden = true;
@@ -464,6 +464,7 @@ export class GameApp {
   }
   private animate(now: number): void {
     if (this.disposed) return;
+    this.debug.frame(now - this.previous);
     const dt = Math.max(0, Math.min((now - this.previous) / 1000, 0.1));
     this.previous = now;
     try {
@@ -542,7 +543,19 @@ export class GameApp {
         const drivingStatus = this.session?.isDriving
           ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h · Car health ${this.carHealth}${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
           : "";
-        this.debug.textContent = `${this.connection} · chunks ${streaming?.resident ?? 0}/36 pending ${streaming?.pending ?? 0} fallback ${streaming?.failed ?? 0} · matrices ${((streaming?.matrixBytes ?? 0) / 1024).toFixed(0)} KiB · WASM ${(simulationMemoryBytes() / 1048576).toFixed(1)} MiB · draws ${streaming?.drawCalls ?? 0} tris ${streaming?.triangles ?? 0} geoms ${streaming?.geometries ?? 0} · owner tick ${this.ownerTick} · feet ${this.motor?.position.map((v) => v.toFixed(2)).join(", ") ?? "—"} · look ${this.input.yaw.toFixed(3)}, ${this.input.pitch.toFixed(3)} · camera ${this.cameraDistance.toFixed(2)} m · predicted ${net?.predicted ?? 0} · lead ${net?.lead ?? 0} · RTT ${net?.rtt?.toFixed(1) ?? "?"} ms · correction ${net?.correction.toFixed(3) ?? "0"} m / p95 ${net?.p95.toFixed(3) ?? "0"} m · replay ${net?.replay ?? 0} · ring ${net?.history ?? 0}/128 · remotes ${remotes.length} (pedestrians ${remotes.filter((r) => r.descriptor.entity_kind === "pedestrian").length}, cars ${remotes.filter((r) => r.descriptor.entity_kind === "vehicle").length}) · up ${((net?.up ?? 0) / 1024).toFixed(1)} / down ${((net?.down ?? 0) / 1024).toFixed(1)} KiB/s · ${remotes.map((r) => `${r.id}: ${r.motor.position.map((v) => v.toFixed(2)).join(",")}${r.stale ? " stale" : ""}`).join("; ")}`;
+        this.debug.update({
+          now,
+          connection: this.connection,
+          net,
+          streaming,
+          wasmBytes: simulationMemoryBytes(),
+          ownerTick: this.ownerTick,
+          motor: this.motor,
+          yaw: this.input.yaw,
+          pitch: this.input.pitch,
+          camera: this.cameraDistance,
+          remotes,
+        });
         const estimated = this.session?.estimatedTick(now) ?? 0;
         const combat =
           this.mode === "arrested"

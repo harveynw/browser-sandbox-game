@@ -6,6 +6,7 @@ flowchart TD
   subgraph group_0["apps/client/src/ — application"]
     main["main.ts<br/>Page routing"]:::app
     game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Private courier, heat / pursuit and arrest feedback"]:::app
+    diagnostics["game/diagnostics.ts<br/>Compact telemetry · 12-second graphs<br/>Expandable remote entity table"]:::app
     input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
   end
@@ -33,6 +34,7 @@ flowchart TD
   main -->|"game page"| game
   main -->|"diagnostic pages"| tools
   input -->|"controls"| game
+  game -->|"client frame / network / render samples"| diagnostics
   game -->|"advance frame"| session
   session <-->|"game messages"| transport
   transport <-->|"WS reliable / RTC unreliable"| backend

@@ -256,20 +256,170 @@ main.game-app {
 }
 .game-metrics {
   position: fixed;
-  z-index: 2;
-  top: 1rem;
-  left: 1rem;
-  max-width: calc(100vw - 4rem);
-  background: #142b35e8;
-  padding: 0.6rem;
-  border-radius: 0.4rem;
-  font-size: 0.8rem;
+  z-index: 4;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 120px);
+  overflow: auto;
+  box-sizing: border-box;
+  color: #d1dfeb;
+  background: #0b141e;
+  border: 1px solid #506779;
+  border-radius: 5px;
+  box-shadow: 0 4px 24px #0003;
+  font:
+    11px/1.45 "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    Menlo,
+    monospace;
+  font-variant-numeric: tabular-nums;
+}
+.game-metrics > summary {
+  padding: 8px 10px;
+  color: #a8d9df;
+  font-weight: 600;
+}
+.game-metrics[open] {
+  width: 440px;
+}
+.game-metrics button {
+  margin: 0 10px 10px;
+  padding: 5px 8px;
+  font: inherit;
 }
 .game-debug {
-  display: block;
-  margin-top: 0.5rem;
+  padding: 0 10px 10px;
+}
+.debug-connection {
+  color: #9ed8ac;
+  padding: 3px 0 9px;
   overflow-wrap: anywhere;
 }
+.debug-connection[data-stale="true"],
+.debug-actors tr[data-stale="true"] {
+  color: #f2bb76;
+}
+.debug-charts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.debug-charts figure {
+  margin: 0;
+  min-width: 0;
+  color: #8bd8cd;
+}
+.debug-charts figure:nth-child(2) {
+  color: #9bbef5;
+}
+.debug-charts figure:nth-child(3) {
+  color: #e0b983;
+}
+.debug-charts figcaption {
+  display: flex;
+  flex-direction: column;
+  font-size: 10px;
+}
+.debug-charts strong {
+  color: #edf5fa;
+  font-size: 12px;
+  font-weight: 500;
+}
+.debug-charts svg {
+  display: block;
+  width: 100%;
+  height: 36px;
+  margin: 4px 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    #ffffff08 0 1px,
+    transparent 1px 12px
+  );
+  border-bottom: 1px solid #ffffff20;
+}
+.debug-scale {
+  font-size: 9px;
+  color: #8d9fac;
+}
+.debug-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin-top: 10px;
+}
+.debug-sections section {
+  min-width: 0;
+}
+.debug-sections h2 {
+  margin: 0 0 5px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #ffffff1a;
+  font: inherit;
+  font-size: 10px;
+  color: #8fa5b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.debug-sections dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  margin: 0;
+  font-size: 10px;
+}
+.debug-sections dt {
+  color: #95a8b9;
+}
+.debug-sections dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.debug-pose {
+  margin-top: 10px;
+  padding: 7px 0;
+  border-top: 1px solid #ffffff1a;
+  border-bottom: 1px solid #ffffff1a;
+  font-size: 10px;
+}
+.debug-pose > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.debug-pose > div > span:first-child {
+  color: #95a8b9;
+}
+.debug-actors summary {
+  padding: 7px 0;
+  color: #a8d9df;
+}
+.debug-actors table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+  font-size: 10px;
+  text-align: right;
+}
+.debug-actors th {
+  color: #95a8b9;
+  font-weight: 400;
+}
+.debug-actors :is(th, td) {
+  padding: 2px 4px;
+  border-bottom: 1px solid #ffffff0b;
+}
+.debug-actors :is(th, td):nth-child(2) {
+  text-align: left;
+}
+@media (max-width: 420px) {
+  .debug-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
 input,
 select {
   font: inherit;
@@ -319,4 +469,20 @@ select {
 
 .city-minimap[hidden] {
   display: none;
+}
+
+.debug-actor-list {
+  max-height: 160px;
+  overflow: auto;
+}
+.debug-actors thead {
+  position: sticky;
+  top: 0;
+  background: #0b141e;
+}
+.game-metrics > summary {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0b141e;
 }
