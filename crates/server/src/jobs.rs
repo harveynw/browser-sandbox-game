@@ -1,6 +1,6 @@
 //! World transactions for jobs, reservations and safe garage delivery.
 use crate::{
-    admission::{MemoryProfiles, random_id},
+    admission::{Profiles, random_id},
     missions::{Mission, Objective, Phase},
     world::{Session, SessionPhase, World},
 };
@@ -322,7 +322,7 @@ impl World {
     }
     pub(crate) fn advance_missions(
         &mut self,
-        profiles: &mut MemoryProfiles,
+        profiles: &mut Profiles,
         previous: &BTreeMap<u32, VehicleMotor>,
     ) -> Result<(), String> {
         for peer in self.sessions.keys().copied().collect::<Vec<_>>() {
@@ -401,6 +401,7 @@ impl World {
                 if m.phase == Phase::RewardPending {
                     let profile = s.profile.as_ref().ok_or("mission profile missing")?;
                     if !self.repairs.contains_key(&profile.profile_id.0)
+                        && !profiles.economic_pending(&profile.profile_id.0)
                         && let Ok(committed) =
                             profiles.apply_mission_reward(&profile.profile_id.0, &m.id, m.reward)
                     {

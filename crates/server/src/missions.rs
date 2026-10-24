@@ -56,7 +56,8 @@ impl Mission {
             checkpoint_index: self.checkpoint_index,
             deadline_tick: self.deadline,
             target_entity_id: self.reserved_vehicle.map(protocol::EntityId),
-            target_position: Some(Vec3(self.target.map(Scalar))),
+            target_position: (self.phase != Phase::RewardPending)
+                .then_some(Vec3(self.target.map(Scalar))),
         }
     }
     pub fn fail(&mut self, tick: u32) {

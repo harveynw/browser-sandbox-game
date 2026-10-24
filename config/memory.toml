@@ -1,0 +1,3 @@
+# Disposable local sessions; no persistent profile state.
+[persistence]
+mode = "memory"

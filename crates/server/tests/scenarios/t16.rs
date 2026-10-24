@@ -16,7 +16,7 @@ fn car_at(w: &mut World, car: u32, pos: [f32; 3]) {
 }
 fn enter(
     w: &mut World,
-    a: &mut MemoryProfiles,
+    a: &mut Profiles,
     t: &mut FakeTransport,
     p: PeerKey,
     car: u32,
@@ -37,7 +37,7 @@ fn enter(
     step(w, a, t);
     assert_eq!(w.vehicles[&car].state.driver_id, w.sessions[&p].player);
 }
-fn ticks(w: &mut World, a: &mut MemoryProfiles, t: &mut FakeTransport, p: PeerKey, count: u32) {
+fn ticks(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey, count: u32) {
     for _ in 0..count {
         keep_alive(w, t, p);
         step(w, a, t);
@@ -259,7 +259,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
         "delivery must use a door, never a remote spawn"
     );
 }
-fn repair_setup() -> (World, MemoryProfiles, FakeTransport, PeerKey, String) {
+fn repair_setup() -> (World, Profiles, FakeTransport, PeerKey, String) {
     let (mut w, mut a, mut t) = police_setup();
     let p = peer(0);
     let cookie = join(&mut w, &mut a, &mut t, p, None);
@@ -390,7 +390,7 @@ fn delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_ca
 }
 #[test]
 fn memory_worker_reserves_refund_capacity_and_retries_without_double_debit() {
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let (profile, _) = a.session(None).unwrap();
     let id = profile.profile_id.0;
     a.apply_mission_reward(&id, "fund", 100).unwrap();

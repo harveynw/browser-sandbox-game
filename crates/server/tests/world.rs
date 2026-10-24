@@ -1,5 +1,5 @@
 use protocol::*;
-use server::{admission::MemoryProfiles, content_loader::WorldContent, transport::*, world::*};
+use server::{admission::Profiles, content_loader::WorldContent, transport::*, world::*};
 use std::{
     collections::{BTreeSet, VecDeque},
     path::Path,
@@ -35,10 +35,10 @@ fn content() -> WorldContent {
     )
     .unwrap()
 }
-fn setup() -> (World, MemoryProfiles, FakeTransport) {
+fn setup() -> (World, Profiles, FakeTransport) {
     (
         World::new(content()).unwrap(),
-        MemoryProfiles::default(),
+        Profiles::default(),
         FakeTransport::default(),
     )
 }
@@ -48,7 +48,7 @@ fn peer(id: u32) -> PeerKey {
         generation: u64::from(id) + 1,
     }
 }
-fn step(w: &mut World, a: &mut MemoryProfiles, t: &mut FakeTransport) {
+fn step(w: &mut World, a: &mut Profiles, t: &mut FakeTransport) {
     w.step(t, a, u64::from(w.tick) * 34, true).unwrap();
 }
 fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
@@ -69,7 +69,7 @@ fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
 }
 fn join(
     w: &mut World,
-    a: &mut MemoryProfiles,
+    a: &mut Profiles,
     t: &mut FakeTransport,
     p: PeerKey,
     cookie: Option<&str>,
@@ -96,7 +96,7 @@ fn join(
     step(w, a, t);
     cookie
 }
-fn ready(w: &mut World, a: &mut MemoryProfiles, t: &mut FakeTransport, p: PeerKey) {
+fn ready(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey) {
     let baseline_id = BaselineId(w.sessions[&p].baseline);
     send(
         w,
@@ -677,7 +677,7 @@ fn all_blocked_exit_candidates_preserve_occupancy_and_epoch() {
         });
     }
     let mut w = World::new(package).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     let p = peer(1);
     join(&mut w, &mut a, &mut t, p, None);
@@ -855,7 +855,7 @@ fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
 }
 #[test]
 fn memory_rewards_are_atomic_bounded_and_reject_event_conflicts() {
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let (p, _) = a.session(None).unwrap();
     let (q, _) = a.session(None).unwrap();
     assert!(
@@ -925,7 +925,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     )
     .unwrap();
     let mut w = World::new(content).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     assert_eq!(w.population.pools.len(), 4);
     assert_eq!(w.police.units.len(), 2);
@@ -956,7 +956,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
 fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
@@ -1029,7 +1029,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
 fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
@@ -1286,7 +1286,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
 fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
@@ -1409,7 +1409,7 @@ fn car_contacts_damage_both_cars_but_never_another_players_occupied_car() {
 fn moving_vehicle_damages_pedestrians_through_the_world_swept_query() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
@@ -1476,11 +1476,11 @@ fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
     assert_eq!(w.vehicles[&1].state.health.0, 100);
 }
 
-fn police_setup() -> (World, MemoryProfiles, FakeTransport) {
+fn police_setup() -> (World, Profiles, FakeTransport) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     (
         World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap(),
-        MemoryProfiles::default(),
+        Profiles::default(),
         FakeTransport::default(),
     )
 }
@@ -1770,3 +1770,6 @@ fn arrest_safely_releases_a_stationary_driver_and_rejects_old_epoch_inputs() {
 
 #[path = "scenarios/t16.rs"]
 mod t16;
+
+#[path = "scenarios/t17.rs"]
+mod t17;

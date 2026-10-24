@@ -30,7 +30,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T14 Pistol and damage | T13 | Authoritative hits, health, downing |
 | Complete | T15 Police and heat | T14 | Witnesses, pursuit, search, arrest |
 | Complete | T16 Remaining jobs and repair | T15 | Time trial/recovery/repair rules |
-| Not started | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
+| Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
 | Not started | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
 | Not started | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
 | Not started | T20 Capacity and performance | T19 | Measured 16-player budgets |

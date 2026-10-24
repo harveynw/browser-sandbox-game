@@ -109,13 +109,40 @@ export class GameSession {
     });
   }
   private async api(path: string, body: unknown = {}): Promise<unknown> {
-    const response = await fetch(path, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.any([this.abort.signal, AbortSignal.timeout(5000)]),
-    });
+    const deadline = performance.now() + 5000;
+    let response: Response;
+    do {
+      response = await fetch(path, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.any([
+          this.abort.signal,
+          AbortSignal.timeout(
+            Math.max(1, Math.ceil(deadline - performance.now())),
+          ),
+        ]),
+      });
+      if (response.status !== 202) break;
+      await response.body?.cancel();
+      if (performance.now() >= deadline)
+        throw new Error("Profile storage timed out. Retry joining.");
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(done, 100);
+        const abort = () => {
+          clearTimeout(timer);
+          reject(this.abort.signal.reason);
+        };
+        const signal = this.abort.signal;
+        function done() {
+          signal.removeEventListener("abort", abort);
+          resolve();
+        }
+        signal.addEventListener("abort", abort, { once: true });
+        if (signal.aborted) abort();
+      });
+    } while (response.status === 202);
     if (!response.ok)
       throw new Error(`Local admission failed (${response.status})`);
     return response.json();
@@ -246,7 +273,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t16-local" ||
+      info.build_id !== "t17-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )

@@ -37,6 +37,8 @@ export function courierGuidance(
     return `${kind === "courier" ? "Delivery" : title} complete! +${reward} credits · Find a terminal for another job.`;
   if (mission.phase === "failed")
     return `${title} ended — failed or cancelled.${kind === "recovery" && mission.checkpoint_index === 2 ? " Exit blocked: car held until a door clears." : " Return to a terminal to try again."}`;
+  if (!mission.target_position)
+    return `${title} reward pending · Waiting for committed credits; storage may be temporarily unavailable.`;
   const seconds = Math.max(0, Math.ceil((mission.deadline_tick - tick) / 30));
   const target = mission.target_position;
   const distance =

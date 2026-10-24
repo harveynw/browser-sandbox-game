@@ -1,6 +1,6 @@
 use protocol::DisplayName;
 use server::{
-    admission::MemoryProfiles,
+    admission::Profiles,
     content_loader::WorldContent,
     control::Control,
     scheduler::{STEP, Scheduler},
@@ -9,7 +9,7 @@ use server::{
 use std::{path::Path, time::Duration};
 #[test]
 fn tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret() {
-    let mut a = MemoryProfiles::default();
+    let mut a = Profiles::default();
     let (p, cookie) = a.session(None).unwrap();
     let cookie = cookie.unwrap();
     assert_eq!(a.session(Some(&cookie)).unwrap().0, p);

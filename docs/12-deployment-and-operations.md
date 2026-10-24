@@ -19,7 +19,7 @@ Use the real net-crate transport even on localhost. A local game must still exer
 
 Bind listeners to `127.0.0.1`, not `0.0.0.0`. Do not enable STUN/TURN or change router settings. The crate’s default host candidates are the intended loopback path; confirm through the actual two-browser spike.
 
-T07 now implements the HTTP/Vite-proxy topology above and real memory guest admission. See [21 — Authoritative localhost sessions](21-authoritative-sessions.md) for the exact available commands and explicit browser-reported readiness gate. Config files, setup/dev:all supervision, unattended probes and durable persistence below remain later work.
+T07 now implements the HTTP/Vite-proxy topology above and real memory guest admission. See [21 — Authoritative localhost sessions](21-authoritative-sessions.md) for the exact available commands and explicit browser-reported readiness gate. T17 implements persistence-only local config, SQLite profiles and bounded shutdown; setup/dev:all supervision and unattended probes remain later work.
 
 ## Required developer commands
 
@@ -41,30 +41,19 @@ The setup command checks required tools and explains missing ones; it must not s
 
 ## Local configuration
 
+The implemented `config/dev.toml` selects persistence; the existing bindings and gameplay limits remain loopback-only constants:
+
 ```toml
-[server]
-net_bind = "127.0.0.1:3000"
-http_bind = "127.0.0.1:3001"
-max_players = 16
-world_seed = 12345
-content_manifest = "content/generated/manifest.json"
-
-[auth]
-allowed_origins = ["http://localhost:5173", "http://localhost:4173"]
-secure_cookie = false
-
 [persistence]
 mode = "sqlite"
 path = "var/profiles.sqlite"
-
-[limits]
-max_input_batches_per_second = 60
-max_actions_per_second = 10
 ```
+
+Relative paths resolve from the repository root. `cargo run -p server --locked -- --config config/memory.toml` selects disposable memory storage. Unknown keys/modes and missing SQLite paths fail startup. General network/auth/gameplay configuration remains outside this milestone. See [31 — Local profiles](31-local-profiles.md).
 
 Keep browser origin consistent: use `localhost` in the page URL and the explicit numeric loopback socket endpoint supplied by `/api/join-ticket`. Using the dev proxy keeps guest cookies same-origin. Ensure Vite preview proxies the same API paths; do not serve the built page with `file://`.
 
-For the slice, use `config/slice.toml` with two players, slice map, and memory persistence. Full local alpha uses `config/dev.toml` above. Tests choose temporary data paths and available ports; they must not overwrite the developer’s local profile database.
+Full local alpha uses `config/dev.toml` above. The slice is a native regression fixture; `config/memory.toml` changes persistence only, not the city or player limit. Tests choose temporary data paths and available ports; they must not overwrite the developer’s local profile database.
 
 ## Local guest identity
 

@@ -1,9 +1,11 @@
 pub mod admission;
 pub mod combat;
+pub mod config;
 pub mod content_loader;
 pub mod control;
 pub mod jobs;
 pub mod missions;
+pub mod persistence;
 pub mod police;
 pub mod population;
 pub mod repairs;

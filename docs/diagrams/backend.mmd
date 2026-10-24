@@ -1,10 +1,13 @@
-%% Backend module system — current implementation through T16.
+%% Backend module system — current implementation through T17.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["crates/server/src/ — startup and world"]
     main["main.rs<br/>Startup and main loop"]:::app
+    config["config.rs · config/dev.toml<br/>SQLite default / explicit memory mode"]:::app
+    persistence["persistence.rs · SQLite worker thread<br/>Migrations / WAL / atomic economic ledger<br/>Repair acknowledgements and restart refunds"]:::other
+    database["var/profiles.sqlite<br/>Profiles · economic events · unresolved repairs"]:::other
     scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
     loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
@@ -18,7 +21,7 @@ flowchart TD
   end
   subgraph group_1["crates/server/src/ — networking and admission"]
     control["control.rs · HTTP thread<br/>Sessions, tickets and health"]:::net
-    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Atomic memory ledger · queued repair worker<br/>Reserved compensation capacity"]:::net
+    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Committed profile cache · bounded worker operations<br/>Memory adapter for tests"]:::net
     transport["transport.rs · network pump thread<br/>Bounded queues, codecs and channel routing"]:::net
     replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
   end
@@ -31,6 +34,10 @@ flowchart TD
     assets["Baked content package<br/>Six districts · collision / configuration<br/>Visual streaming belongs to browser"]:::content
     net["net-crate<br/>WebSocket + WebRTC server"]:::other
 
+  main -->|"validate local configuration"| config
+  config -->|"open and recover before listeners"| persistence
+  admission <-->|"bounded commands / committed results"| persistence
+  persistence <-->|"single connection · transactions"| database
   main -->|"load at startup"| loader
   assets -->|"baked package"| loader
   loader -->|"validation"| content

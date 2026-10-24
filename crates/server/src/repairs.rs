@@ -1,6 +1,6 @@
 //! Repair reservation, authoritative dwell and queued debit/refund completion.
 use crate::{
-    admission::{EconomicError, MemoryProfiles},
+    admission::{EconomicError, Profiles},
     world::{Session, SessionPhase, World},
 };
 use protocol::*;
@@ -146,7 +146,7 @@ impl World {
         self.repairs.insert(profile, pending);
         ActionCode::Ok
     }
-    pub(crate) fn advance_repairs(&mut self, profiles: &mut MemoryProfiles) -> Result<(), String> {
+    pub(crate) fn advance_repairs(&mut self, profiles: &mut Profiles) -> Result<(), String> {
         let mut results: BTreeMap<_, _> = profiles
             .poll_economic(self.tick)
             .into_iter()
@@ -191,7 +191,7 @@ impl World {
                                 let v = self.vehicles.get_mut(&r.car).expect("eligible repair car");
                                 v.state.health = VehicleHealth(v.template.health);
                                 v.idle_ticks = 0;
-                                profiles.finish_repair_debit(&r.event);
+                                profiles.finish_repair_debit(&profile, &r.event);
                                 r.phase = RepairPhase::Completed;
                                 r.code = ActionCode::Ok;
                             }

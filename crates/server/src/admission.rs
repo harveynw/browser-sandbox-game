@@ -1,4 +1,5 @@
-//! Bounded localhost memory profiles/tickets. No disk I/O in the simulation tick.
+//! Bounded localhost admission/cache with memory or single-worker SQLite storage.
+use crate::persistence::{Command, SqliteWorker, StoreError};
 use protocol::{Credits, DisplayName, OpaqueId, ProfileView};
 use std::collections::{BTreeMap, BTreeSet};
 pub fn random_id(prefix: &str, bytes: usize) -> Result<String, String> {
@@ -38,7 +39,14 @@ pub struct EconomicResult {
     pub result: Result<ProfileView, EconomicError>,
 }
 #[derive(Default)]
-pub struct MemoryProfiles {
+pub struct Profiles {
+    worker: Option<SqliteWorker>,
+    outstanding: BTreeMap<String, Command>,
+    completed: BTreeMap<String, Result<ProfileView, StoreError>>,
+    retry_after: BTreeMap<String, u32>,
+    store_tick: u32,
+    store_unavailable: bool,
+    finalizations: BTreeMap<String, String>,
     profiles: BTreeMap<String, Profile>,
     cookies: BTreeMap<String, String>,
     tickets: BTreeMap<String, Ticket>,
@@ -50,11 +58,14 @@ pub struct MemoryProfiles {
     pub repair_delay_ticks: u32,
     pub probe_until_ms: u64,
 }
-impl MemoryProfiles {
+impl Profiles {
     pub fn session(
         &mut self,
         cookie: Option<&str>,
     ) -> Result<(ProfileView, Option<String>), String> {
+        if self.worker.is_some() {
+            return Err("use asynchronous profile preparation".into());
+        }
         if let Some(profile) = self.profile(cookie) {
             return Ok((profile, None));
         }
@@ -93,6 +104,22 @@ impl MemoryProfiles {
         instance_id: &str,
         amount: u32,
     ) -> Result<ProfileView, String> {
+        if self.worker.is_some() {
+            let event = format!("mission:{instance_id}");
+            if let Some(result) = self.completed.remove(&event) {
+                return result.map_err(|_| "persistent reward temporarily unavailable".into());
+            }
+            self.queue_store(
+                &event,
+                Command::Economic {
+                    profile: profile_id.into(),
+                    event: event.clone(),
+                    delta: i64::from(amount),
+                    job: true,
+                },
+            )?;
+            return Err("reward commit pending".into());
+        }
         self.apply_economic(
             profile_id,
             &format!("mission:{instance_id}"),
@@ -152,6 +179,17 @@ impl MemoryProfiles {
         refund: bool,
         tick: u32,
     ) -> Result<(), String> {
+        if self.worker.is_some() {
+            return self.queue_store(
+                event,
+                Command::Economic {
+                    profile: profile.into(),
+                    event: event.into(),
+                    delta: if refund { 50 } else { -50 },
+                    job: false,
+                },
+            );
+        }
         if let Some(p) = self.pending_economic.get(event) {
             return if p.profile == profile && p.refund == refund {
                 Ok(())
@@ -172,10 +210,41 @@ impl MemoryProfiles {
         );
         Ok(())
     }
-    pub fn finish_repair_debit(&mut self, event: &str) {
-        self.reserved_refunds.remove(&format!("refund:{event}"));
+    pub fn finish_repair_debit(&mut self, profile: &str, event: &str) {
+        if self.worker.is_some() {
+            // Queue failure is retained for retry; crash before acknowledgement is compensated at boot.
+            self.finalizations.insert(event.into(), profile.into());
+        } else {
+            self.reserved_refunds.remove(&format!("refund:{event}"));
+        }
     }
     pub fn poll_economic(&mut self, tick: u32) -> Vec<EconomicResult> {
+        self.poll_store(tick);
+        if self.worker.is_some() {
+            let ids: Vec<_> = self
+                .completed
+                .keys()
+                .filter(|id| id.starts_with("repair:") || id.starts_with("refund:"))
+                .cloned()
+                .collect();
+            return ids
+                .into_iter()
+                .map(|event| EconomicResult {
+                    result: self
+                        .completed
+                        .remove(&event)
+                        .expect("completion")
+                        .map_err(|e| {
+                            if e == StoreError::InsufficientFunds {
+                                EconomicError::InsufficientFunds
+                            } else {
+                                EconomicError::Unavailable
+                            }
+                        }),
+                    event,
+                })
+                .collect();
+        }
         let ready: Vec<_> = self
             .pending_economic
             .iter()
@@ -248,6 +317,9 @@ impl MemoryProfiles {
         Ok(ticket)
     }
     pub fn consume(&mut self, ticket: &str, now: u64, name: DisplayName) -> Option<ProfileView> {
+        if self.worker.is_some() {
+            return None;
+        }
         let ticket = self.tickets.remove(&digest(ticket))?;
         if ticket.expires <= now {
             return None;
@@ -278,5 +350,207 @@ impl MemoryProfiles {
         }
         self.probe_until_ms = now.saturating_add(5000);
         true
+    }
+}
+
+/// Result of consuming one ticket. SQLite admission waits without allocating a game entity.
+pub enum Admission {
+    Ready(ProfileView),
+    Pending(String),
+}
+impl Profiles {
+    pub fn sqlite(path: &std::path::Path) -> Result<Self, String> {
+        Ok(Self {
+            worker: Some(SqliteWorker::open(path)?),
+            ..Self::default()
+        })
+    }
+    pub fn economic_pending(&self, profile: &str) -> bool {
+        self.finalizations.values().any(|p| p == profile)
+            || self
+                .outstanding
+                .values()
+                .any(|c| matches!(c,Command::Economic {profile:p,..} if p==profile))
+    }
+    pub fn durable(&self) -> bool {
+        self.worker.is_some()
+    }
+    pub fn healthy(&self) -> bool {
+        self.worker.as_ref().is_none_or(SqliteWorker::healthy)
+    }
+    pub fn available(&self) -> bool {
+        self.healthy() && !self.store_unavailable
+    }
+    fn queue_store(&mut self, id: &str, command: Command) -> Result<(), String> {
+        if let Some(old) = self.outstanding.get(id) {
+            return if old == &command {
+                Ok(())
+            } else {
+                Err("persistence operation conflict".into())
+            };
+        }
+        if self.outstanding.len() >= 64
+            || self
+                .retry_after
+                .get(id)
+                .is_some_and(|t| *t > self.store_tick)
+        {
+            return Err("persistence busy; retry later".into());
+        }
+        if let Command::Economic { profile, .. } = &command
+            && self
+                .outstanding
+                .values()
+                .any(|c| matches!(c, Command::Economic {profile: p,..} if p == profile))
+        {
+            return Err("profile transaction pending".into());
+        }
+        self.worker
+            .as_ref()
+            .ok_or("SQLite disabled")?
+            .submit(id.into(), command.clone())?;
+        self.retry_after.remove(id);
+        self.outstanding.insert(id.into(), command);
+        Ok(())
+    }
+    pub fn prepare_session(
+        &mut self,
+        cookie: Option<&str>,
+    ) -> Result<(Option<ProfileView>, Option<String>), String> {
+        if self.worker.is_none() {
+            return self.session(cookie).map(|(p, s)| (Some(p), s));
+        }
+        if let Some(profile) = self.profile(cookie) {
+            return Ok((Some(profile), None));
+        }
+        if self.profiles.len()
+            + self
+                .outstanding
+                .values()
+                .filter(|c| matches!(c, Command::Load { .. }))
+                .count()
+            >= 256
+        {
+            return Err("local profile cache capacity reached".into());
+        }
+        let valid = cookie.filter(|s| s.len() == 64 && s.bytes().all(|c| c.is_ascii_hexdigit()));
+        let secret = match valid {
+            Some(s) => s.to_owned(),
+            None => random_id("", 32)?,
+        };
+        let hash = digest(&secret);
+        let op = format!("load:{hash}");
+        if let Some(Err(_)) = self.completed.remove(&op) {
+            return Err("profile storage temporarily unavailable".into());
+        }
+        self.queue_store(
+            &op,
+            Command::Load {
+                hash,
+                new_id: self
+                    .outstanding
+                    .get(&op)
+                    .and_then(|c| match c {
+                        Command::Load { new_id, .. } => Some(new_id.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or(random_id("profile-", 16)?),
+            },
+        )?;
+        Ok((None, valid.is_none().then_some(secret)))
+    }
+    pub fn begin_admission(
+        &mut self,
+        ticket: &str,
+        now: u64,
+        name: DisplayName,
+    ) -> Result<Admission, protocol::RejectCode> {
+        if self.worker.is_none() {
+            return self
+                .consume(ticket, now, name)
+                .map(Admission::Ready)
+                .ok_or(protocol::RejectCode::InvalidTicket);
+        }
+        let id = format!("name:{}", digest(ticket));
+        let ticket = self
+            .tickets
+            .remove(&digest(ticket))
+            .ok_or(protocol::RejectCode::InvalidTicket)?;
+        if ticket.expires <= now {
+            return Err(protocol::RejectCode::InvalidTicket);
+        }
+        self.queue_store(
+            &id,
+            Command::Name {
+                profile: ticket.profile_id,
+                name: name.0,
+            },
+        )
+        .map_err(|_| protocol::RejectCode::Unavailable)?;
+        Ok(Admission::Pending(id))
+    }
+    pub fn admission_result(&mut self, id: &str) -> Option<Result<ProfileView, StoreError>> {
+        self.completed.remove(id)
+    }
+    pub fn poll_store(&mut self, tick: u32) {
+        self.store_tick = tick;
+        let results = self
+            .worker
+            .as_ref()
+            .map(SqliteWorker::poll)
+            .unwrap_or_default();
+        for done in results {
+            self.outstanding.remove(&done.id);
+            if done.result == Err(StoreError::Unavailable) {
+                self.store_unavailable = true;
+            } else if done.result.is_ok() {
+                self.store_unavailable = false;
+            }
+            if let Ok(view) = &done.result {
+                if let Command::Load { hash, .. } = &done.command {
+                    self.cookies.insert(hash.clone(), view.profile_id.0.clone());
+                    self.profiles.insert(
+                        view.profile_id.0.clone(),
+                        Profile {
+                            view: view.clone(),
+                            cookie_hash: hash.clone(),
+                        },
+                    );
+                } else if let Some(p) = self.profiles.get_mut(&view.profile_id.0) {
+                    p.view = view.clone();
+                }
+            }
+            if done.result == Err(StoreError::Unavailable) {
+                self.retry_after
+                    .insert(done.id.clone(), tick.saturating_add(30));
+            }
+            if let Command::FinishRepair { event } = &done.command {
+                if done.result.is_ok() {
+                    self.finalizations.remove(event);
+                }
+            } else if !matches!(done.command, Command::Load { .. }) || done.result.is_err() {
+                self.completed.insert(done.id, done.result);
+            }
+        }
+        while self.completed.len() > 128 {
+            self.completed.pop_first();
+        }
+        self.retry_after.retain(|_, end| *end > tick);
+        for (event, _) in self.finalizations.clone() {
+            let _ = self.queue_store(&format!("finish:{event}"), Command::FinishRepair { event });
+        }
+    }
+    /// Bounded shutdown drains committed worker outcomes; unresolved repair debits recover on boot.
+    pub fn shutdown(&mut self, timeout: std::time::Duration) -> bool {
+        let until = std::time::Instant::now() + timeout;
+        while (!self.outstanding.is_empty() || !self.finalizations.is_empty())
+            && std::time::Instant::now() < until
+        {
+            self.poll_store(self.store_tick.saturating_add(1));
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let drained = self.outstanding.is_empty() && self.finalizations.is_empty();
+        self.worker.take();
+        drained
     }
 }

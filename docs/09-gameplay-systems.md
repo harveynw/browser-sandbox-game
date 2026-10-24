@@ -128,7 +128,7 @@ Recovery: only the reserved vehicle satisfies delivery; use same 30-tick dwell i
 
 Terminal conditions resolve in this order: cancel/death/arrest/disconnect/vehicle destruction → timeout → success. Once RewardPending, stop timeout progression and prevent new mission acceptance; retry persistence with the same event ID. On commit publish Completed plus credits. Keep terminal mission view for 5 seconds, then clear to null.
 
-In memory-only slice the persistence adapter commits immediately with identical idempotency semantics. A committed memory reward remains through reconnect even if the client missed its success message. Process restart clears memory profiles, rewards and active/pending jobs; durable profile transactions are introduced in T17.
+In explicit memory mode the persistence adapter commits immediately with identical idempotency semantics. A committed memory reward remains through reconnect even if the client missed its success message. Process restart clears memory profiles, rewards and active/pending jobs; T17 default SQLite mode retains committed profiles/events and compensates unresolved repair debits at startup; see [31 — Local profiles](31-local-profiles.md).
 
 ## Repairs
 

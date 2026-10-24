@@ -14,6 +14,9 @@ it("guides to the private target with server-tick countdown and stopping require
   expect(courierGuidance(mission, 30, [-44, 0, 62])).toContain(
     "10 m · 179s left",
   );
+  expect(
+    courierGuidance({ ...mission, target_position: null }, 30, [0, 0, 0]),
+  ).toContain("reward pending");
   expect(courierGuidance(mission, 5500, [-44, 0, 52])).toContain("0s left");
   expect(courierGuidance(mission, 30, [-44, 0, 62])).toContain("1 second");
 });

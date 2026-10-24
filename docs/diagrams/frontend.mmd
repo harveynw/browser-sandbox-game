@@ -1,4 +1,4 @@
-%% Frontend module system — current implementation through T16.
+%% Frontend module system — current implementation through T17.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -11,7 +11,7 @@ flowchart TD
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
   end
   subgraph group_1["apps/client/src/ — networking"]
-    session["net/session.ts<br/>Session lifecycle and state coordination"]:::net
+    session["net/session.ts<br/>Bounded pending-profile HTTP admission<br/>Session lifecycle and state coordination"]:::net
     transport["net/transport.ts<br/>WebSocket + WebRTC"]:::net
     clock["net/clock.ts<br/>Server time and input lead"]:::net
     replica["world/replica.ts<br/>Player / NPC state and interpolation"]:::net

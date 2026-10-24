@@ -2,7 +2,7 @@
 
 [Index](../README.md)
 
-T07 implementation: [21 — Authoritative localhost sessions](21-authoritative-sessions.md) owns the concrete module APIs, memory-only scope and local browser-reported readiness gate. Later vehicles/NPC/economy/persistence interfaces below remain future contracts.
+T07 implementation: [21 — Authoritative localhost sessions](21-authoritative-sessions.md) owns the concrete module APIs, memory-only scope and local browser-reported readiness gate. The concrete T17 persistence adapter and restart rules are documented in [31 — Local profiles](31-local-profiles.md); conceptual interfaces below describe system boundaries.
 
 Interfaces below are implementation contracts. Helper types may be organized into smaller files, but ownership and behavior must remain explicit.
 
@@ -217,3 +217,10 @@ Shutdown: stop tickets/joins → mark not-ready → notify connected clients →
 `MemoryProfiles` queues repair economic events with a minimum one-tick completion boundary, up to 32 queued operations and four completions per tick. Tests can delay completion through `repair_delay_ticks`. `World` permits one repair reservation per profile and car and defers mission reward commits while that profile's repair is in flight. Dwell progress is observed for 60 ticks, not supplied by the client. Application rechecks the original session, player, control epoch, car ownership, zone, speed, health and pursuit state; any interruption after submission latches invalidation. Disconnect leaves the operation available for completion/refund, even if the guest rejoins with a different entity or car.
 
 A debit reserves one of the 4,096 ledger entries for its possible `refund:<repair-event>` compensation before committing. Other rewards cannot consume that slot. Successful application releases the unused reservation; compensation atomically replaces it with a refund event. Transient unavailable results retain/retry the same operation ID; committed balance is published only after completion. This remains memory-only and is replaced by durable storage in T17.
+
+
+### T17 durable adapter
+
+`admission::Profiles` now selects memory or a bounded SQLite worker. Default local configuration selects SQLite. Migration 1 adds the tables above plus `repair_pending(event_id PRIMARY KEY, profile_id UNIQUE)` as a durable debit/application acknowledgement boundary. The SHA-256 cookie hash is stored as 64 ASCII hex bytes in the BLOB column. No raw cookie is persisted. HTTP profile preparation uses 202/200; ClientHello consumes its ticket and awaits committed name/profile data before allocating a player. The world never waits on a database receive.
+
+Worker requests/results and outstanding work are capped at 64. Busy/locked SQL gets three attempts with a 50 ms busy timeout; ongoing economic outcomes retry with their original IDs after 30 ticks. Successful repair application clears its pending debit through the worker; interrupted application refunds atomically. Startup refunds unresolved debits once before listeners, so a crashed world cannot strand a repair charge. An OS ownership lock prevents a second server from running recovery against a live save. See [31 — Local profiles](31-local-profiles.md) for shutdown, tests and configuration.

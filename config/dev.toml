@@ -1,0 +1,5 @@
+# Full local city: profile balances and economic events survive server restarts.
+# Relative database paths resolve from the repository root.
+[persistence]
+mode = "sqlite"
+path = "var/profiles.sqlite"

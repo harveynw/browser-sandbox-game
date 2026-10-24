@@ -1,5 +1,5 @@
 use crate::{
-    admission::{MemoryProfiles, random_id},
+    admission::{Profiles, random_id},
     content_loader::WorldContent,
     replication::{Budget, InputRate, LIFECYCLE_RESERVE, SpatialIndex, packets},
     transport::*,
@@ -8,7 +8,7 @@ use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t16-local";
+pub const BUILD_ID: &str = "t17-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -26,6 +26,7 @@ pub struct Session {
     pub id: Option<String>,
     pub profile: Option<ProfileView>,
     pub player: Option<EntityId>,
+    pending_admission: Option<String>,
     pub phase: SessionPhase,
     pub epoch: u32,
     pub baseline: u32,
@@ -207,7 +208,7 @@ impl World {
     pub(crate) fn reliable(&mut self, peer: PeerKey, sid: Option<&str>, message: ServerMessage) {
         self.send(peer, sid, Delivery::Reliable, message);
     }
-    fn cleanup(&mut self, session: &Session, profiles: &mut MemoryProfiles) {
+    fn cleanup(&mut self, session: &Session, profiles: &mut Profiles) {
         if let Some(id) = session.player {
             self.release_disconnected_recoveries(id.0);
             for car in self
@@ -225,7 +226,7 @@ impl World {
             profiles.deactivate(&profile.profile_id.0, id);
         }
     }
-    pub fn disconnect(&mut self, peer: PeerKey, profiles: &mut MemoryProfiles) {
+    pub fn disconnect(&mut self, peer: PeerKey, profiles: &mut Profiles) {
         if let Some(session) = self.sessions.remove(&peer) {
             self.cleanup(&session, profiles);
         }
@@ -593,12 +594,100 @@ impl World {
         );
         Ok(())
     }
+    fn admit_profile(
+        &mut self,
+        peer: PeerKey,
+        s: &mut Session,
+        profile: ProfileView,
+        profiles: &mut Profiles,
+        now: u64,
+    ) -> Result<(), &'static str> {
+        // Replace a previous session only after the new one proved its one-use ticket.
+        let old = self
+            .sessions
+            .iter()
+            .find(|(_, old)| {
+                old.profile
+                    .as_ref()
+                    .is_some_and(|p| p.profile_id == profile.profile_id)
+            })
+            .map(|(peer, _)| *peer);
+        if let Some(old) = old {
+            let old_session_id = self.sessions.get(&old).and_then(|s| s.id.clone());
+            self.disconnect(old, profiles);
+            self.output.push_back((
+                old,
+                Delivery::Reliable,
+                ServerEnvelope {
+                    v: ProtocolVersion(2),
+                    world_id: Some(OpaqueId(self.id.clone())),
+                    session_id: old_session_id.map(OpaqueId),
+                    message: ServerMessage::Disconnect(Disconnect {
+                        code: TemplateId("replaced".into()),
+                        detail: DetailText("guest joined again".into()),
+                    }),
+                },
+            ));
+        }
+        if self.players.len() >= MAX_PLAYERS {
+            self.reliable(
+                peer,
+                None,
+                ServerMessage::Reject(Reject {
+                    code: RejectCode::ServerFull,
+                    detail: DetailText("shard full".into()),
+                }),
+            );
+            return Err("shard full");
+        }
+        let slot = (0..MAX_PLAYERS)
+            .find(|slot| self.players.values().all(|p| p.slot != *slot))
+            .ok_or("spawn slots full")?;
+        let id = EntityId(self.next_entity);
+        self.next_entity = self
+            .next_entity
+            .checked_add(1)
+            .ok_or("entity IDs exhausted")?;
+        let position = spawn_position(&self.content, slot).map_err(|_| "spawn unavailable")?;
+        let motor = sim_core::spawn_character(position, self.content.manifest.spawns[0].yaw as f32)
+            .map_err(|_| "spawn unavailable")?;
+        self.players.insert(
+            id.0,
+            Player {
+                id,
+                display_name: profile.display_name.clone(),
+                slot,
+                state: CharacterState {
+                    motor,
+                    health: CharacterHealth(100),
+                    mode: CharacterMode::OnFoot,
+                    vehicle_id: None,
+                },
+            },
+        );
+        s.player = Some(id);
+        s.profile = Some(profile.clone());
+        s.id = Some(random_id("session-", 16).map_err(|_| "randomness failed")?);
+        self.reliable(
+            peer,
+            s.id.as_deref(),
+            ServerMessage::Welcome(Welcome {
+                player_id: id,
+                server_tick: self.tick,
+                input_lead_ticks: InputLead(3),
+                profile,
+            }),
+        );
+        self.baseline(peer, s, now)
+            .map_err(|_| "baseline unavailable")?;
+        Ok(())
+    }
     fn message(
         &mut self,
         peer: PeerKey,
         s: &mut Session,
         message: ClientEnvelope,
-        profiles: &mut MemoryProfiles,
+        profiles: &mut Profiles,
         now: u64,
         allow_joins: bool,
     ) -> Result<(), &'static str> {
@@ -617,7 +706,9 @@ impl World {
         self.metrics.ingress_bytes += bytes as u64;
         s.last_heard = now;
         match message.message {
-            ClientMessage::ClientHello(hello) if s.phase == SessionPhase::AwaitHello => {
+            ClientMessage::ClientHello(hello)
+                if s.phase == SessionPhase::AwaitHello && s.pending_admission.is_none() =>
+            {
                 let build = self.build();
                 let reject = if hello.build_id != build.build_id {
                     Some(RejectCode::VersionMismatch)
@@ -641,98 +732,29 @@ impl World {
                     );
                     return Err("join rejected");
                 }
-                let Some(profile) = profiles.consume(&hello.join_ticket.0, now, hello.display_name)
-                else {
-                    self.reliable(
-                        peer,
-                        None,
-                        ServerMessage::Reject(Reject {
-                            code: RejectCode::InvalidTicket,
-                            detail: DetailText("ticket invalid, expired or consumed".into()),
-                        }),
-                    );
-                    return Err("invalid ticket");
-                };
-                // Replace a previous session only after the new one proved its one-use ticket.
-                let old = self
-                    .sessions
-                    .iter()
-                    .find(|(_, old)| {
-                        old.profile
-                            .as_ref()
-                            .is_some_and(|p| p.profile_id == profile.profile_id)
-                    })
-                    .map(|(peer, _)| *peer);
-                if let Some(old) = old {
-                    let old_session_id = self.sessions.get(&old).and_then(|s| s.id.clone());
-                    self.disconnect(old, profiles);
-                    self.output.push_back((
-                        old,
-                        Delivery::Reliable,
-                        ServerEnvelope {
-                            v: ProtocolVersion(2),
-                            world_id: Some(OpaqueId(self.id.clone())),
-                            session_id: old_session_id.map(OpaqueId),
-                            message: ServerMessage::Disconnect(Disconnect {
-                                code: TemplateId("replaced".into()),
-                                detail: DetailText("guest joined again".into()),
-                            }),
-                        },
-                    ));
+                let admission =
+                    match profiles.begin_admission(&hello.join_ticket.0, now, hello.display_name) {
+                        Ok(admission) => admission,
+                        Err(code) => {
+                            self.reliable(
+                                peer,
+                                None,
+                                ServerMessage::Reject(Reject {
+                                    code,
+                                    detail: DetailText(
+                                        "ticket invalid or profile storage unavailable".into(),
+                                    ),
+                                }),
+                            );
+                            return Err("ticket or profile unavailable");
+                        }
+                    };
+                match admission {
+                    crate::admission::Admission::Ready(profile) => {
+                        self.admit_profile(peer, s, profile, profiles, now)?
+                    }
+                    crate::admission::Admission::Pending(id) => s.pending_admission = Some(id),
                 }
-                if self.players.len() >= MAX_PLAYERS {
-                    self.reliable(
-                        peer,
-                        None,
-                        ServerMessage::Reject(Reject {
-                            code: RejectCode::ServerFull,
-                            detail: DetailText("shard full".into()),
-                        }),
-                    );
-                    return Err("shard full");
-                }
-                let slot = (0..MAX_PLAYERS)
-                    .find(|slot| self.players.values().all(|p| p.slot != *slot))
-                    .ok_or("spawn slots full")?;
-                let id = EntityId(self.next_entity);
-                self.next_entity = self
-                    .next_entity
-                    .checked_add(1)
-                    .ok_or("entity IDs exhausted")?;
-                let position =
-                    spawn_position(&self.content, slot).map_err(|_| "spawn unavailable")?;
-                let motor =
-                    sim_core::spawn_character(position, self.content.manifest.spawns[0].yaw as f32)
-                        .map_err(|_| "spawn unavailable")?;
-                self.players.insert(
-                    id.0,
-                    Player {
-                        id,
-                        display_name: profile.display_name.clone(),
-                        slot,
-                        state: CharacterState {
-                            motor,
-                            health: CharacterHealth(100),
-                            mode: CharacterMode::OnFoot,
-                            vehicle_id: None,
-                        },
-                    },
-                );
-                s.player = Some(id);
-                s.profile = Some(profile.clone());
-                s.id = Some(random_id("session-", 16).map_err(|_| "randomness failed")?);
-                self.reliable(
-                    peer,
-                    s.id.as_deref(),
-                    ServerMessage::Welcome(Welcome {
-                        player_id: id,
-                        server_tick: self.tick,
-                        input_lead_ticks: InputLead(3),
-                        profile,
-                    }),
-                );
-                self.baseline(peer, s, now)
-                    .map_err(|_| "baseline unavailable")?;
             }
             ClientMessage::ClientReady(ready) if s.phase == SessionPhase::Loading => {
                 if ready.baseline_id.0 != s.baseline {
@@ -843,7 +865,15 @@ impl World {
                     } else if request.request_id.0 <= s.last_request {
                         ActionCode::StaleRequest
                     } else {
-                        self.action(peer, s, &request.action, request.request_id.0)
+                        if matches!(request.action, Action::AcceptMission(_) | Action::Repair(_))
+                            && s.profile
+                                .as_ref()
+                                .is_some_and(|p| profiles.economic_pending(&p.profile_id.0))
+                        {
+                            ActionCode::Unavailable
+                        } else {
+                            self.action(peer, s, &request.action, request.request_id.0)
+                        }
                     };
                     let result = ActionResult {
                         request_id: request.request_id,
@@ -939,16 +969,30 @@ impl World {
         }
         Ok(())
     }
+    /// Stop gameplay and compensate interrupted repairs within the shutdown budget.
+    pub fn shutdown(&mut self, profiles: &mut Profiles) -> bool {
+        for peer in self.sessions.keys().copied().collect::<Vec<_>>() {
+            self.disconnect(peer, profiles);
+        }
+        let until = std::time::Instant::now() + std::time::Duration::from_millis(3500);
+        while !self.repairs.is_empty() && std::time::Instant::now() < until {
+            self.tick = self.tick.saturating_add(1);
+            let _ = self.advance_repairs(profiles);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        profiles.shutdown(std::time::Duration::from_secs(1)) && self.repairs.is_empty()
+    }
     pub fn step<T: GameTransport>(
         &mut self,
         transport: &mut T,
-        profiles: &mut MemoryProfiles,
+        profiles: &mut Profiles,
         now: u64,
         allow_joins: bool,
     ) -> Result<(), String> {
         if self.tick >= u32::MAX - 1 {
             return Err("world tick exhausted; restart required".into());
         }
+        profiles.poll_store(self.tick);
         let events = transport.drain(128);
         let closed: BTreeSet<_> = events
             .iter()
@@ -995,6 +1039,7 @@ impl World {
                             id: None,
                             profile: None,
                             player: None,
+                            pending_admission: None,
                             phase: SessionPhase::AwaitHello,
                             epoch: 1,
                             baseline: 0,
@@ -1043,6 +1088,46 @@ impl World {
                     self.closing.insert(peer, reason);
                 }
             }
+        }
+        // Profile/name persistence completes before any player allocation or Welcome.
+        for peer in self.sessions.keys().copied().collect::<Vec<_>>() {
+            let Some(mut s) = self.sessions.remove(&peer) else {
+                continue;
+            };
+            let result = s
+                .pending_admission
+                .as_deref()
+                .and_then(|id| profiles.admission_result(id));
+            if let Some(result) = result {
+                s.pending_admission = None;
+                if !allow_joins || result.as_ref().is_err() {
+                    self.reliable(
+                        peer,
+                        None,
+                        ServerMessage::Reject(Reject {
+                            code: RejectCode::Unavailable,
+                            detail: DetailText("profile storage unavailable".into()),
+                        }),
+                    );
+                    self.closing.insert(peer, "profile storage unavailable");
+                    continue;
+                }
+                if self
+                    .admit_profile(
+                        peer,
+                        &mut s,
+                        result.expect("successful admission"),
+                        profiles,
+                        now,
+                    )
+                    .is_err()
+                {
+                    self.cleanup(&s, profiles);
+                    self.closing.insert(peer, "profile admission failed");
+                    continue;
+                }
+            }
+            self.sessions.insert(peer, s);
         }
         // Replaced guests have already been removed. Kill the old transport as well.
         for (peer, _, message) in &self.output {

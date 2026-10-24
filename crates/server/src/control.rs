@@ -1,5 +1,5 @@
 //! Explicit localhost development issuer; not a public authentication service.
-use crate::{admission::MemoryProfiles, world::World};
+use crate::{admission::Profiles, world::World};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -24,7 +24,7 @@ pub struct Status {
     pub transport_healthy: bool,
 }
 pub struct Control {
-    pub profiles: MemoryProfiles,
+    pub profiles: Profiles,
     pub status: Status,
     pub build: Value,
 }
@@ -57,7 +57,7 @@ impl Control {
     pub fn new(world: &World) -> Self {
         let hello = world.build();
         Self {
-            profiles: MemoryProfiles::default(),
+            profiles: Profiles::default(),
             status: Status::default(),
             build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
         }
@@ -102,8 +102,10 @@ impl Control {
                     let alive = self.status.tick > 0
                         && now.saturating_sub(self.status.last_tick_ms) < 1000
                         && self.status.transport_healthy;
-                    let ready =
-                        alive && !self.status.overloaded && self.profiles.probe_until_ms > now;
+                    let ready = alive
+                        && !self.status.overloaded
+                        && self.profiles.available()
+                        && self.profiles.probe_until_ms > now;
                     Reply::new(
                         if if path.ends_with("ready") {
                             ready
@@ -141,14 +143,22 @@ impl Control {
                 if serde_json::from_slice::<protocol::Empty>(body).is_err() {
                     return Reply::error(400, "expected empty JSON object");
                 }
-                match self.profiles.session(cookie) {
+                match self.profiles.prepare_session(cookie) {
                     Ok((profile, secret)) => Reply {
-                        code: 200,
-                        body: json!({"profile":profile}),
-                        cookie: secret
-                            .map(|s| format!("{COOKIE}={s}; HttpOnly; SameSite=Strict; Path=/api")),
+                        code: if profile.is_some() { 200 } else { 202 },
+                        body: json!({"profile":profile,"pending":profile.is_none()}),
+                        cookie: secret.map(|s| {
+                            format!(
+                                "{COOKIE}={s}; HttpOnly; SameSite=Strict; Path=/api{}",
+                                if self.profiles.durable() {
+                                    "; Max-Age=31536000"
+                                } else {
+                                    ""
+                                }
+                            )
+                        }),
                     },
-                    Err(_) => Reply::error(503, "memory profile capacity unavailable"),
+                    Err(_) => Reply::error(503, "profile storage temporarily unavailable"),
                 }
             }
             "/api/join-ticket" => {
