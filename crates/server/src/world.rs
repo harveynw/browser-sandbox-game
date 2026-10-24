@@ -8,7 +8,7 @@ use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-pub const BUILD_ID: &str = "t19-local";
+pub const BUILD_ID: &str = "protocol-simple-local";
 pub const MAX_PLAYERS: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SessionPhase {
@@ -179,7 +179,7 @@ impl World {
     }
     pub fn build(&self) -> ServerHello {
         ServerHello {
-            protocol_version: ProtocolVersion(2),
+            protocol_version: ProtocolVersion(3),
             build_id: BuildId(BUILD_ID.into()),
             content_hash: ContentHash(self.content.manifest.content_hash.clone()),
             sim_config_hash: ContentHash(self.content.manifest.sim_config_hash.clone()),
@@ -198,7 +198,7 @@ impl World {
             peer,
             delivery,
             ServerEnvelope {
-                v: ProtocolVersion(2),
+                v: ProtocolVersion(3),
                 world_id: Some(OpaqueId(self.id.clone())),
                 session_id: sid.map(|s| OpaqueId(s.into())),
                 message,
@@ -619,7 +619,7 @@ impl World {
                 old,
                 Delivery::Reliable,
                 ServerEnvelope {
-                    v: ProtocolVersion(2),
+                    v: ProtocolVersion(3),
                     world_id: Some(OpaqueId(self.id.clone())),
                     session_id: old_session_id.map(OpaqueId),
                     message: ServerMessage::Disconnect(Disconnect {
@@ -1408,7 +1408,7 @@ impl World {
                         peer,
                         Delivery::Reliable,
                         ServerEnvelope {
-                            v: ProtocolVersion(2),
+                            v: ProtocolVersion(3),
                             world_id: Some(OpaqueId(self.id.clone())),
                             session_id: session.id.clone().map(OpaqueId),
                             message: ServerMessage::PlayerStatus(Self::status(self.tick, session)?),
@@ -1502,7 +1502,7 @@ pub(crate) fn test_envelope(
     kind: &str,
     data: serde_json::Value,
 ) -> ServerEnvelope {
-    serde_json::from_value(serde_json::json!({"v":2,"world_id":world,"session_id":sid,"message":{"kind":kind,"data":data}})).unwrap()
+    serde_json::from_value(serde_json::json!({"v":3,"world_id":world,"session_id":sid,"message":{"kind":kind,"data":data}})).unwrap()
 }
 
 fn entity_position(state: &EntityState) -> [f32; 3] {

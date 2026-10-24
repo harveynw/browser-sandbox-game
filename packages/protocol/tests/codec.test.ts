@@ -8,15 +8,10 @@ import {
   decodeServer,
   encodeClient,
   encodeServer,
-  validateClient,
-  validateClientContext,
-  validateServer,
   ProtocolError,
+  protocolLimits as limits,
 } from "../src/index";
-import type { ClientContext, Delivery } from "../src/index";
-import { scan } from "../src/scan";
-import limits from "../src/generated/limits.json";
-
+import type { ClientEnvelope, ServerEnvelope, Delivery } from "../src/index";
 interface Fixture {
   name: string;
   direction: "client" | "server";
@@ -37,16 +32,14 @@ const manifest = JSON.parse(
     "utf8",
   ),
 ) as { fixtures: Fixture[] };
-const positive = manifest.fixtures.filter((f) => f.valid);
-const negative = manifest.fixtures.filter((f) => !f.valid);
+const positive = manifest.fixtures.filter((f) => f.valid),
+  negative = manifest.fixtures.filter((f) => !f.valid);
 function fixture(name: string): Fixture {
-  const result = manifest.fixtures.find((f) => f.name === name);
-  if (!result) throw new Error("Missing fixture " + name);
-  return result;
+  const found = manifest.fixtures.find((f) => f.name === name);
+  if (!found) throw new Error(`Missing fixture ${name}`);
+  return found;
 }
-function bytes(hex: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(hex, "hex"));
-}
+const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
 function decodeFixture(f: Fixture): unknown {
   return f.direction === "client"
     ? decodeClient(bytes(f.hex))
@@ -54,207 +47,159 @@ function decodeFixture(f: Fixture): unknown {
 }
 function closeValues(actual: unknown, expected: unknown): void {
   if (typeof actual === "number" && typeof expected === "number") {
-    if (Number.isSafeInteger(actual) && Number.isSafeInteger(expected)) {
+    if (Number.isSafeInteger(actual) && Number.isSafeInteger(expected))
       expect(actual).toBe(expected);
-      return;
-    }
-    expect(Math.abs(actual - expected)).toBeLessThanOrEqual(
-      Math.max(1, Math.abs(expected)) * 1e-6,
-    );
+    else
+      expect(Math.abs(actual - expected)).toBeLessThanOrEqual(
+        Math.max(1, Math.abs(expected)) * 1e-6,
+      );
   } else if (Array.isArray(actual) && Array.isArray(expected)) {
-    expect(actual.length).toBe(expected.length);
+    expect(actual).toHaveLength(expected.length);
     actual.forEach((v: unknown, i: number) => closeValues(v, expected[i]));
   } else if (
-    actual !== null &&
-    expected !== null &&
+    actual &&
+    expected &&
     typeof actual === "object" &&
     typeof expected === "object"
   ) {
-    const a = actual as Record<string, unknown>;
-    const e = expected as Record<string, unknown>;
+    const a = actual as Record<string, unknown>,
+      e = expected as Record<string, unknown>;
     expect(Object.keys(a).sort()).toEqual(Object.keys(e).sort());
-    for (const key of Object.keys(e)) closeValues(a[key], e[key]);
+    for (const k of Object.keys(e)) closeValues(a[k], e[k]);
   } else expect(actual).toEqual(expected);
 }
-
-describe("Rust encoded reference fixtures", () => {
-  test.each(positive)("$name decodes with its real wire shape", (f) =>
+describe("small Rust reference corpus", () => {
+  test.each(positive)("$name interoperates", (f) =>
     closeValues(decodeFixture(f), f.value),
   );
-  test.each(negative)("$name is rejected", (f) =>
+  test.each(negative)("$name fails decoding", (f) =>
     expect(() => decodeFixture(f)).toThrow(ProtocolError),
   );
 });
-
-test("TS encodes every variant; Rust decodes and validates them plus the negative corpus", () => {
-  const encoded = positive.map((f) => {
-    const packed =
-      f.direction === "client"
-        ? encodeClient(validateClient(f.value))
-        : encodeServer(validateServer(f.value, f.delivery), f.delivery);
-    return { ...f, hex: Buffer.from(packed).toString("hex") };
-  });
-  const floatIntegers = {
-    ...fixture("ping"),
-    name: "ts_float_encoded_integers",
+function rustVerify(all: Fixture[]): Verification[] {
+  return JSON.parse(
+    execFileSync(
+      "cargo",
+      [
+        "run",
+        "--quiet",
+        "-p",
+        "xtask",
+        "--locked",
+        "--offline",
+        "--",
+        "verify-wire",
+      ],
+      {
+        cwd: root,
+        input: JSON.stringify(all),
+        encoding: "utf8",
+        timeout: 120000,
+        maxBuffer: 1024 * 1024,
+      },
+    ),
+  ) as Verification[];
+}
+test("Rust decodes TypeScript's ordinary MessagePack encoding in both directions", () => {
+  const encoded = positive.map((f) => ({
+    ...f,
     hex: Buffer.from(
-      encode(fixture("ping").value, { forceIntegerToFloat: true }),
+      f.direction === "client"
+        ? encodeClient(f.value as ClientEnvelope)
+        : encodeServer(f.value as ServerEnvelope, f.delivery),
     ).toString("hex"),
-  };
-  closeValues(decodeClient(bytes(floatIntegers.hex)), floatIntegers.value);
-  const all = [...encoded, floatIntegers, ...negative];
-  const output = execFileSync(
-    "cargo",
-    [
-      "run",
-      "--quiet",
-      "-p",
-      "xtask",
-      "--locked",
-      "--offline",
-      "--",
-      "verify-wire",
-    ],
-    {
-      cwd: root,
-      input: JSON.stringify(all),
-      encoding: "utf8",
-      timeout: 120000,
-      maxBuffer: 8 * 1024 * 1024,
-    },
-  );
-  const results = JSON.parse(output) as Verification[];
+  }));
+  const all = [...encoded, ...negative],
+    results = rustVerify(all);
   expect(results).toHaveLength(all.length);
-  results.forEach((result, i) => {
-    const input = all[i];
-    if (!input) throw new Error("Missing case");
-    expect(result.name).toBe(input.name);
-    expect(result.ok, input.name).toBe(input.valid);
-    if (input.valid) closeValues(result.value, input.value);
+  results.forEach((r, i) => {
+    const f = all[i];
+    if (!f) throw new Error("missing fixture");
+    expect(r.name).toBe(f.name);
+    expect(r.ok, f.name).toBe(f.valid);
+    if (f.valid) closeValues(r.value, f.value);
   });
-});
-
-test("maximum-size realtime envelopes fit even when JS emits float64", () => {
+}, 120_000);
+test("the authoritative Rust decoder rejects invalid client values sent by JavaScript", () => {
+  const base = fixture("input_batch");
+  const invalid: Fixture[] = [];
+  for (const bad of [NaN, Infinity, 20]) {
+    const value = structuredClone(base.value) as ClientEnvelope;
+    if (value.message.kind !== "input_batch") throw new Error("fixture");
+    const first = value.message.data.frames[0];
+    if (!first) throw new Error("frame");
+    first.look_pitch = bad;
+    invalid.push({
+      ...base,
+      name: `bad_pitch_${bad}`,
+      valid: false,
+      hex: Buffer.from(encodeClient(value)).toString("hex"),
+    });
+  }
+  const value = structuredClone(base.value) as ClientEnvelope;
+  if (value.message.kind !== "input_batch") throw new Error("fixture");
+  value.message.data.frames = [];
+  invalid.push({
+    ...base,
+    name: "empty_input_batch",
+    valid: false,
+    hex: Buffer.from(encodeClient(value)).toString("hex"),
+  });
+  expect(rustVerify(invalid).every((r) => !r.ok)).toBe(true);
+}, 120_000);
+test("maximum realtime messages fit the 1100-byte packet budget", () => {
   for (const name of ["max_input_batch", "max_owner_state"]) {
     const f = fixture(name);
     const packed =
       f.direction === "client"
-        ? encodeClient(validateClient(f.value))
-        : encodeServer(validateServer(f.value, f.delivery), f.delivery);
+        ? encodeClient(f.value as ClientEnvelope)
+        : encodeServer(f.value as ServerEnvelope, f.delivery);
     expect(packed.length).toBeLessThanOrEqual(limits.unreliable_bytes);
   }
 });
-
-test("sender cannot silently omit/coerce JS-only values or execute getters", () => {
-  const base = fixture("action_exit_vehicle").value;
-  const invalid: unknown[] = [
-    undefined,
-    NaN,
-    Infinity,
-    1n,
-    new Date(),
-    new Map(),
-    new Set(),
-    new Uint8Array(),
-    () => 0,
-    Symbol("x"),
-    "\ud800",
-  ];
-  for (const item of invalid) {
-    const value = structuredClone(base) as Record<string, unknown>;
-    value["unexpected"] = item;
-    expect(() => validateClient(value)).toThrow(ProtocolError);
-  }
-  const cyclic: Record<string, unknown> = {};
-  cyclic["self"] = cyclic;
-  expect(() => validateClient(cyclic)).toThrow(ProtocolError);
-  expect(() =>
-    validateClient({
-      get message() {
-        throw new Error("getter executed");
-      },
-    }),
-  ).toThrow(ProtocolError);
-  expect(() => validateClient(Array<unknown>(1))).toThrow(ProtocolError);
+test("browser decoding trusts server relationships and leaves them to the owning systems", () => {
+  const value = structuredClone(
+    fixture("owner_driving").value,
+  ) as ServerEnvelope;
+  if (
+    value.message.kind !== "owner_state" ||
+    value.message.data.state.kind !== "vehicle"
+  )
+    throw new Error("fixture");
+  value.message.data.state.data.driver_id = 3;
+  expect(decodeServer(encodeServer(value))).toEqual(value);
 });
-
-test("unknown fields, missing required nulls, wrong empty payloads and positional structs fail", () => {
-  const value = structuredClone(fixture("action_exit_vehicle").value) as Record<
-    string,
-    unknown
-  >;
-  delete value["session_id"];
-  expect(() => decodeClient(encode(value))).toThrow(ProtocolError);
+test("frame limits and the library's declared collection/string limits remain", () => {
+  expect(() => decodeServer(new Uint8Array(limits.reliable_bytes + 1))).toThrow(
+    ProtocolError,
+  );
+  expect(() =>
+    decodeServer(new Uint8Array(limits.unreliable_bytes + 1), "unreliable"),
+  ).toThrow(ProtocolError);
+  expect(() =>
+    decodeClient(Uint8Array.from([0xdd, 255, 255, 255, 255])),
+  ).toThrow(ProtocolError);
   expect(() =>
     decodeClient(
-      encode([1, "world-0001", "session-0001", { kind: "leave", data: {} }]),
+      encode({ v: 3, data: "x".repeat(limits.max_string_bytes + 1) }),
     ),
   ).toThrow(ProtocolError);
+  const f = fixture("input_batch");
+  const value = f.value as ClientEnvelope;
   expect(() =>
-    validateClient({ ...(fixture("leave").value as object), extra: 1 }),
+    encodeClient({
+      ...value,
+      message: {
+        kind: "input_batch",
+        data: {
+          control_epoch: 1,
+          frames: Array.from({ length: 100 }, () =>
+            value.message.kind === "input_batch"
+              ? value.message.data.frames[0]
+              : undefined,
+          ),
+        },
+      },
+    } as ClientEnvelope),
   ).toThrow(ProtocolError);
-});
-
-test("phase, scope, epoch, baseline and tick window admission", () => {
-  const input = validateClient(fixture("input_batch").value);
-  const context: ClientContext = {
-    world_id: "world-0001",
-    session_id: "session-0001",
-    phase: "playing",
-    control_epoch: 1,
-    next_tick: 31,
-    baseline_id: 1,
-  };
-  expect(() => validateClientContext(input, context)).not.toThrow();
-  for (const change of [
-    { phase: "loading" as const },
-    { session_id: "stale" },
-    { world_id: "old" },
-    { control_epoch: 2 },
-    { next_tick: 32 },
-    { next_tick: 1 },
-  ]) {
-    expect(() =>
-      validateClientContext(input, { ...context, ...change }),
-    ).toThrow(ProtocolError);
-  }
-  const ready = validateClient(fixture("client_ready").value);
-  expect(() =>
-    validateClientContext(ready, { ...context, phase: "loading" }),
-  ).not.toThrow();
-  expect(() =>
-    validateClientContext(ready, {
-      ...context,
-      phase: "loading",
-      baseline_id: 2,
-    }),
-  ).toThrow(ProtocolError);
-});
-
-test("unreliable ownership changes are rejected", () => {
-  expect(() =>
-    decodeServer(bytes(fixture("control_changed").hex), "unreliable"),
-  ).toThrow(ProtocolError);
-});
-
-test("preflight limits declared lengths, total nodes and UTF-8 byte lengths", () => {
-  const nodes = [0xdc, 0, 128];
-  for (let i = 0; i < 128; i++)
-    nodes.push(0x9f, ...Array<number>(15).fill(0xc0));
-  expect(() => scan(Uint8Array.from(nodes), limits.reliable_bytes)).toThrow(
-    ProtocolError,
-  );
-  const text = [0xda, 2, 1, ...Array<number>(513).fill(97)];
-  expect(() => scan(Uint8Array.from(text), limits.reliable_bytes)).toThrow(
-    ProtocolError,
-  );
-  expect(() =>
-    scan(
-      Uint8Array.from([0xdc, 0, 128, ...Array<number>(128).fill(0xc0)]),
-      limits.reliable_bytes,
-    ),
-  ).not.toThrow();
-  const input = bytes(fixture("input_batch").hex);
-  for (let i = 0; i < input.length; i++)
-    expect(() => decodeClient(input.subarray(0, i))).toThrow(ProtocolError);
 });

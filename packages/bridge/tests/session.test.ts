@@ -86,7 +86,7 @@ function receive(
     channel,
     encodeServer(
       {
-        v: 2,
+        v: 3,
         world_id: world,
         session_id: message.kind === "server_hello" ? null : session,
         message,
@@ -114,8 +114,8 @@ async function connect() {
     {
       kind: "server_hello",
       data: {
-        protocol_version: 2,
-        build_id: "t19-local",
+        protocol_version: 3,
+        build_id: "protocol-simple-local",
         content_hash: hash,
         sim_config_hash: hash,
         tick_rate: 30,
@@ -243,7 +243,7 @@ it("accepts ordered baseline once, discards early snapshots and ignores old scop
     "unreliable",
     encodeServer(
       {
-        v: 2,
+        v: 3,
         world_id: "world",
         session_id: "old-session",
         message: { kind: "owner_state", data: owner(101) },
@@ -379,7 +379,7 @@ it("cancels asynchronous asset work before opening transport and ignores capture
     "reliable",
     encodeServer(
       {
-        v: 2,
+        v: 3,
         world_id: "world",
         session_id: "session",
         message: {

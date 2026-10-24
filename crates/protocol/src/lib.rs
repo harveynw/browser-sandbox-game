@@ -1,5 +1,5 @@
-//! Version 2 shared wire contract. Decoding validates shape and stateless rules;
-//! callers must also validate session context before applying client intent.
+//! Version 3 wire types and a small Serde/MessagePack codec.
+//! The server owns session admission and authoritative gameplay checks.
 
 #[cfg(feature = "codec")]
 pub mod codec;
@@ -8,14 +8,12 @@ pub mod contract;
 #[cfg(feature = "codec")]
 pub mod fixtures;
 pub mod limits;
-pub mod scan;
 pub mod types;
 pub mod validate;
 
 #[cfg(feature = "codec")]
 pub use codec::{decode_client, decode_server, encode_client, encode_server};
 pub use types::*;
-pub use validate::{ClientContext, Phase, validate_client_context};
 
 /// A bounded, non-sensitive error. Raw payloads are never included.
 #[derive(Debug, Clone, PartialEq, Eq)]

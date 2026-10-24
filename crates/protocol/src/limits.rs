@@ -3,7 +3,6 @@ pub const CLIENT_BYTES: usize = 4096;
 pub const RELIABLE_BYTES: usize = 16384;
 pub const UNRELIABLE_BYTES: usize = 1100;
 pub const MAX_DEPTH: usize = 16;
-pub const MAX_NODES: usize = 2048;
 pub const MAX_STRING_BYTES: usize = 512;
 pub const MAX_MAP_FIELDS: usize = 32;
 pub const MAX_ARRAY_ITEMS: usize = 128;

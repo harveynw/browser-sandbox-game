@@ -60,7 +60,7 @@ fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
     t.events.push_back(TransportEvent::Message {
         peer: p,
         message: ClientEnvelope {
-            v: ProtocolVersion(2),
+            v: ProtocolVersion(3),
             world_id: Some(OpaqueId(w.id.clone())),
             session_id: sid,
             message,
@@ -85,7 +85,7 @@ fn join(
         t,
         p,
         ClientMessage::ClientHello(ClientHello {
-            protocol_version: ProtocolVersion(2),
+            protocol_version: ProtocolVersion(3),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,
@@ -376,7 +376,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
         &mut t,
         p,
         ClientMessage::ClientHello(ClientHello {
-            protocol_version: ProtocolVersion(2),
+            protocol_version: ProtocolVersion(3),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,
@@ -393,7 +393,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
     t.events.push_back(TransportEvent::Message {
         peer: p,
         message: ClientEnvelope {
-            v: ProtocolVersion(2),
+            v: ProtocolVersion(3),
             world_id: Some(OpaqueId("wrong-boot".into())),
             session_id: w.sessions[&p].id.clone().map(OpaqueId),
             message: ClientMessage::Leave(Empty {}),

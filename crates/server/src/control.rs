@@ -46,6 +46,11 @@ impl Reply {
         Self::new(code, json!({"error":message}))
     }
 }
+// HTTP control requests keep their own JSON body contract.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EmptyBody {}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Probe {
@@ -140,7 +145,7 @@ impl Control {
         }
         match path {
             "/api/session" => {
-                if serde_json::from_slice::<protocol::Empty>(body).is_err() {
+                if serde_json::from_slice::<EmptyBody>(body).is_err() {
                     return Reply::error(400, "expected empty JSON object");
                 }
                 match self.profiles.prepare_session(cookie) {
@@ -162,7 +167,7 @@ impl Control {
                 }
             }
             "/api/join-ticket" => {
-                if serde_json::from_slice::<protocol::Empty>(body).is_err() {
+                if serde_json::from_slice::<EmptyBody>(body).is_err() {
                     return Reply::error(400, "expected empty JSON object");
                 }
                 if self.status.overloaded {

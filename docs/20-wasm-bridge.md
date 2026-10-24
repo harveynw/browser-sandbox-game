@@ -38,7 +38,7 @@ All local control DTOs have `version: 1`. `PredictedFrame` contains `{version, t
 
 This is a deliberate narrow refinement of document 08's proposed `state: EntityState`: T06 supports a character motor only. There is no invented vehicle or character gameplay state. Convert validated authoritative character owner state into the local bridge DTO when implementing T07–T09. The wire protocol and its version are unchanged.
 
-MessagePack uses named maps and numeric arrays. Control buffers are capped at **16 KiB**, each collision/config buffer at **2 MiB**; decoding has a depth cap of 32 and rejects empty, malformed, trailing bytes, unknown/duplicate struct fields and typed range violations. The shared motor validates finite values, settings, geometry, input and overlaps. These are local byte messages, not accepted network envelopes. Call `loadCollision` with content already verified by the T04 loader; the bridge checks simulation safety but does not independently authenticate content hashes.
+MessagePack uses named maps and numeric arrays. Control buffers are capped at **16 KiB**, each collision/config buffer at **2 MiB**; decoding has a depth cap of 32 and rejects empty, malformed, trailing bytes, typed range violations. Bridge-owned request structs retain their field policy; shared protocol DTOs now follow ordinary Serde defaults after the approved protocol simplification (document 34). The shared motor validates finite values, settings, geometry, input and overlaps. These are local byte messages, not accepted network envelopes. Call `loadCollision` with content already verified by the T04 loader; the bridge checks simulation safety but does not independently authenticate content hashes.
 
 ## TypeScript boundary and contracts
 

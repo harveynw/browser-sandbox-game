@@ -25,9 +25,9 @@ Unit tests use injected clocks and seeded RNG. Avoid sleeps except where testing
 
 ## Protocol suite
 
-- Every enum variant, empty action payload, tuple, nullable field, maximum collection, and numerical bound.
-- Reject wrong versions, missing/unknown fields, duplicate map keys, incorrect envelope IDs, invalid UTF-8, extensions, trailing values, huge declared lengths, depth overflow, NaN/infinity.
-- Rust map serialization matches generated TS shape; ensure accidental `rmp_serde::to_vec` does not silently change structs to arrays.
+- Representative nested messages, empty actions, nullable fields, fixed tuples, numeric boundaries and maximum realtime packet sizes.
+- Rust rejects wrong versions/types, malformed/trailing/deep/oversized frames, invalid scalar inputs and malformed input batches. Server tests enforce scope/phase/epochs and authority. Unknown fields and omitted Option fields follow Serde defaults; browser server payloads are trusted as documented in the v3 simplification.
+- Rust named-map output matches generated TS; use `to_vec_named`. Library-supported alternate input representations are no longer rejected by a custom scanner.
 - Generation is deterministic; CI compares generated output from a temporary directory with tracked artifacts.
 - Maximum legal input batch and owner state fit the RTC application limit.
 - Decoding arbitrary fuzzed bytes never panics, allocates outside configured caps, or partially mutates world state.

@@ -70,7 +70,6 @@
           "minimum": 0
         }
       },
-      "additionalProperties": false,
       "required": [
         "tick",
         "move_x",

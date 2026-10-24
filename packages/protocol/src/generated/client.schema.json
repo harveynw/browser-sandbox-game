@@ -1,7 +1,6 @@
 {
   "$defs": {
     "AcceptMission": {
-      "additionalProperties": false,
       "properties": {
         "template_id": {
           "$ref": "#/$defs/TemplateId"
@@ -15,7 +14,6 @@
     "Action": {
       "oneOf": [
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/EnterVehicle"
@@ -26,13 +24,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Empty"
@@ -43,13 +40,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Fire"
@@ -60,13 +56,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Empty"
@@ -77,13 +72,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/AcceptMission"
@@ -94,13 +88,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Empty"
@@ -111,13 +104,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Repair"
@@ -128,15 +120,14 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         }
       ]
     },
     "ActionRequest": {
-      "additionalProperties": false,
       "properties": {
         "action": {
           "$ref": "#/$defs/Action"
@@ -149,9 +140,9 @@
         }
       },
       "required": [
-        "action",
+        "request_id",
         "control_epoch",
-        "request_id"
+        "action"
       ],
       "type": "object"
     },
@@ -172,7 +163,6 @@
       "type": "integer"
     },
     "ClientHello": {
-      "additionalProperties": false,
       "properties": {
         "build_id": {
           "$ref": "#/$defs/BuildId"
@@ -194,19 +184,18 @@
         }
       },
       "required": [
+        "protocol_version",
         "build_id",
         "content_hash",
-        "display_name",
+        "sim_config_hash",
         "join_ticket",
-        "protocol_version",
-        "sim_config_hash"
+        "display_name"
       ],
       "type": "object"
     },
     "ClientMessage": {
       "oneOf": [
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ClientHello"
@@ -217,13 +206,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ClientReady"
@@ -234,13 +222,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/InputBatch"
@@ -251,13 +238,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ActionRequest"
@@ -268,13 +254,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Ping"
@@ -285,13 +270,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ResyncRequest"
@@ -302,13 +286,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Empty"
@@ -319,15 +302,14 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         }
       ]
     },
     "ClientReady": {
-      "additionalProperties": false,
       "properties": {
         "baseline_id": {
           "$ref": "#/$defs/BaselineId"
@@ -356,11 +338,9 @@
       "type": "string"
     },
     "Empty": {
-      "additionalProperties": false,
       "type": "object"
     },
     "EnterVehicle": {
-      "additionalProperties": false,
       "properties": {
         "vehicle_id": {
           "$ref": "#/$defs/EntityId"
@@ -377,7 +357,6 @@
       "type": "integer"
     },
     "Fire": {
-      "additionalProperties": false,
       "properties": {
         "aim_pitch": {
           "$ref": "#/$defs/Pitch"
@@ -387,8 +366,8 @@
         }
       },
       "required": [
-        "aim_pitch",
-        "aim_yaw"
+        "aim_yaw",
+        "aim_pitch"
       ],
       "type": "object"
     },
@@ -398,7 +377,6 @@
       "type": "integer"
     },
     "InputBatch": {
-      "additionalProperties": false,
       "properties": {
         "control_epoch": {
           "$ref": "#/$defs/ControlEpoch"
@@ -419,7 +397,6 @@
       "type": "object"
     },
     "InputFrame": {
-      "additionalProperties": false,
       "properties": {
         "buttons": {
           "$ref": "#/$defs/Buttons"
@@ -443,12 +420,12 @@
         }
       },
       "required": [
-        "buttons",
-        "look_pitch",
-        "look_yaw",
+        "tick",
         "move_x",
         "move_z",
-        "tick"
+        "look_yaw",
+        "look_pitch",
+        "buttons"
       ],
       "type": "object"
     },
@@ -464,7 +441,6 @@
       "type": "string"
     },
     "Ping": {
-      "additionalProperties": false,
       "properties": {
         "client_time_ms": {
           "$ref": "#/$defs/Milliseconds"
@@ -476,8 +452,8 @@
         }
       },
       "required": [
-        "client_time_ms",
-        "nonce"
+        "nonce",
+        "client_time_ms"
       ],
       "type": "object"
     },
@@ -487,12 +463,11 @@
       "type": "number"
     },
     "ProtocolVersion": {
-      "maximum": 2,
-      "minimum": 2,
+      "maximum": 3,
+      "minimum": 3,
       "type": "integer"
     },
     "Repair": {
-      "additionalProperties": false,
       "properties": {
         "zone_id": {
           "$ref": "#/$defs/TemplateId"
@@ -517,7 +492,6 @@
       "type": "string"
     },
     "ResyncRequest": {
-      "additionalProperties": false,
       "properties": {
         "reason": {
           "$ref": "#/$defs/ResyncReason"
@@ -541,7 +515,6 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
   "properties": {
     "message": {
       "$ref": "#/$defs/ClientMessage"
@@ -571,10 +544,8 @@
     }
   },
   "required": [
-    "message",
-    "session_id",
     "v",
-    "world_id"
+    "message"
   ],
   "title": "ClientEnvelope",
   "type": "object"

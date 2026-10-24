@@ -10,7 +10,7 @@
 | D02 | 16-player single authoritative Rust shard | Small, testable multiplayer model | Measured demand requires more |
 | D03 | Keep net-crate, pin source revision | User’s networking crate is a requirement | A tracked bug fix requires a newer/fork revision |
 | D04 | TypeScript + Three.js browser presentation | Direct browser integration with a small rendering layer | The user selects a different frontend |
-| D05 | Rust DTOs → generated TS/Schema | One source of contract shape with runtime checking | Codegen compatibility fails the early fixture spike |
+| D05 | Rust DTOs → generated TS/Schema | One source of DTO shape; schemas are metadata for game packets | Codegen compatibility fails the early fixture spike |
 | D06 | MessagePack named maps | Explicit readable fields and straightforward cross-language compatibility | Actual bandwidth profiling justifies a versioned packed format |
 | D07 | Shared native/WASM movement | Avoid duplicate Rust/TS movement implementations | Measured WASM overhead remains unacceptable after boundary tuning |
 | D08 | Arcade kinematic cars, flat roads | Tractable prediction, collision, and implementation scope | A later milestone explicitly needs full vehicle dynamics |
@@ -20,6 +20,7 @@
 | D12 | Complete static collision, streamed visuals | Prediction never depends on an unloaded visual chunk | Collision package exceeds measured memory/load budgets |
 | D13 | SQLite guest profiles; no world persistence | Useful local progress with a small transactional boundary | Requirements add durable world state |
 | D14 | Public-hosting notes remain optional | Preserve transport research without blocking localhost | Public deployment enters scope |
+| D15 | Direct Serde/MessagePack game codec; browser trusts server DTOs | User approved simpler protocol after T19; retain frame/input bounds and authority | Concrete failures justify another boundary check |
 
 ## Early experiments and exit criteria
 

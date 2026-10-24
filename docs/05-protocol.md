@@ -2,24 +2,23 @@
 
 [Index](../README.md) · Timing: [Simulation and netcode](06-simulation-and-netcode.md)
 
-This is the normative v2 wire contract. Implement the types in `crates/protocol`; generate TypeScript and validation schemas. Names in the TypeScript-shaped reference below are exact wire names. All structures use snake_case.
+This is the normative v3 wire contract. Implement the types in `crates/protocol`; generate TypeScript and schema metadata. Names in the TypeScript-shaped reference below are exact wire names. All structures use snake_case.
 
 ## Encoding and compatibility
 
 - One binary transport message contains exactly one MessagePack value. No length prefix, compression, batching of unrelated envelopes, or stream decoder.
-- Encode Rust structs as named maps using the same serializer mode as `rmp_serde::to_vec_named`. The implementation uses a bounded writer with `Serializer::with_struct_map` to cap allocation. Decode with a bounded decoder and reject trailing bytes.
+- Encode Rust structs as named maps with `rmp_serde::to_vec_named`. Check encoded packet size. Decode directly into Serde DTOs with frame/depth limits and reject trailing bytes. No JSON conversion, runtime schema validation or encode/decode self-check is used.
 - Browser uses `@msgpack/msgpack` `encode`/`decode`. Do not use extension types, Date, BigInt, undefined, Map, Set, or class instances.
-- Integers are bounded Rust `u8/u16/u32/i16` as appropriate. Floats are finite `f32` in simulation, wire float32 or float64 accepted if representable; semantic comparisons in tests allow float rounding. Reject NaN/infinity.
-- Optional fields are explicit `null` (`Option<T>`), never silently omitted. Arrays are arrays; tuples have exact lengths.
+- Integers use ordinary MessagePack integer encoding and bounded Rust `u8/u16/u32/i16` types. Rust scalar deserializers reject nonfinite/out-of-range inputs. Float32 or representable float64 values are accepted for floating fields; tests allow f32 roundoff. The browser trusts server numeric values.
+- Encoders serialize absent optional fields as `null`. Standard Serde decoding also accepts omitted `Option<T>` fields as None. Fixed-size vectors retain their Rust tuple lengths.
 - Enums are adjacently tagged: `#[serde(tag = "kind", content = "data", rename_all = "snake_case")]`. Unit variants are represented by dedicated empty payload structs where needed, so all variants still have `data`.
-- Every envelope has `v: 2`. Exact version match is required. Any wire-shape or interpretation change increments the version; alpha has no rolling compatibility.
-- Reject unknown message kinds. Use strict known fields for v2; do not rely on Serde’s permissive default.
+- Every envelope has `v: 3`. Exact version match is required. Any wire-shape or interpretation change increments the version; alpha has no rolling compatibility.
+- Rust rejects unknown enum variants and follows normal Serde defaults for fields: ignore unknown fields, accept omitted optional fields and library-supported positional struct representations. Canonical encoders always write named maps. The browser trusts the typed server payload after frame/library limits and a version check.
 
 Prototype example:
 
 ```rust
 #[derive(serde::Serialize, serde::Deserialize, ts_rs::TS, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
 pub struct InputFrame {
     pub tick: u32,
     pub move_x: i16,
@@ -28,17 +27,16 @@ pub struct InputFrame {
     pub look_pitch: f32,
     pub buttons: u8,
 }
-// Every enum's individual payload struct also denies unknown fields.
 // InputFrame has no client position and no variable dt.
 ```
 
-Derive TS and JSON Schema from the same Rust types. `ts-rs` declarations alone are not runtime validation. Generate Schemars JSON Schema 2020-12 explicitly and validate decoded browser values using Ajv’s 2020 entry point. Add Rust semantic validation for ranges, phase, ownership, and time. Do not hand-maintain a second independent TypeScript DTO definition.
+Derive TS and schema metadata from the same Rust types. Generated TS is compile-time documentation; browser game packets are not runtime schema-validated. Content loading and the local WASM bridge retain their independently owned schema checks. The server owns phase, scope, epochs, ownership and gameplay validation. Do not maintain a second handwritten TS DTO definition.
 
 ## Envelope and primitives
 
 ```ts
 type Envelope<T> = {
-  v: 2;
+  v: 3;
   world_id: string | null;
   session_id: string | null;
   message: T;
@@ -54,7 +52,7 @@ The initial `ServerHello` envelope has `world_id` set and `session_id = null`. `
 
 Before any decode: cap C→S binary messages at 4 KiB; S→C reliable at 16 KiB; S→C unreliable at 1,100 bytes. C→S `InputBatch` also must fit 1,100 bytes. RTC sizing is a conservative application policy, not a claim about exact path MTU.
 
-Bound decode depth to 16 and total nodes to 2,048; strings ≤ 512 UTF-8 bytes by default; maps ≤ 32 fields; arrays ≤ 128 entries unless a tighter bound below applies. Before typed deserialization, scan MessagePack structure with a bounded parser to reject oversized declared lengths, extensions, duplicate map keys, trailing data, and excessive nesting. A small encoded buffer can still declare malicious collection lengths. Apply semantic numeric bounds after decode.
+The Rust MessagePack decoder has a depth limit of 16 and rejects trailing data; Serde supplies type/tuple parsing and scalar bounds. The browser uses library limits of 512-byte strings, 32 map fields and 128 array items, with binary/extensions disabled. Input batches retain a 1–3 ascending unique tick check. There is no custom MessagePack scanner, total-node budget, special-key policy or separate allocation guarantee beyond the library behavior and frame/depth limits.
 
 ## Client → server messages
 
@@ -282,17 +280,15 @@ Resync stops local controls, increments the control epoch, neutralizes the actor
 
 ## Contract acceptance
 
-Generate at least one positive fixture for every message/action/state/event variant and negative fixtures for bounds, missing/unknown fields, duplicate keys, nulls, overflow, extension values, and malformed frames. Rust encodes → TS validates/decodes; TS encodes → Rust validates/decodes. Compare semantic values, not encoder byte identity. Commit generated files and fixture manifest; CI fails on drift.
+Maintain a compact representative interoperability corpus and focused malformed/version cases. Rust encodes → TS decodes; TS encodes → Rust deserializes. Compare semantic values, not encoder byte identity. Keep authority/lifecycle/gameplay invariants tested in their owning modules. Commit generated artifacts and fail CI on drift.
 
 Test the initial full OwnerState and maximum-sized InputBatch against 1,100 bytes. If they exceed it, adjust the schema/version deliberately before shipping; do not rely on transport fragmentation.
 
-## T02 implementation notes
+## Current codec policy
 
-The complete v2 contract is now implemented in `crates/protocol` and exported through `packages/protocol`. The generated schemas are also used by the native decoder, after bounded MessagePack preflight and before DTO construction. Native schema validation has remote HTTP/file resolution disabled. The default `codec` Cargo feature includes it; native/WASM consumers needing only shared types can use `default-features = false`.
+The original T02/v2 implementation used custom preflight scanners, JSON intermediates, runtime schema validation, required-null/unknown-field enforcement and outgoing round-trip checks. The user explicitly approved replacing those layers on 24 October 2026. [Protocol simplification](34-protocol-simplification.md) records the v3 policy and verification. The default `codec` feature exposes direct MessagePack helpers; `default-features = false` remains available to shared simulation consumers. No jsonschema runtime dependency remains.
 
-Schemars normally makes Option fields optional. Generation retains their null union and explicitly requires every declared object property. Serde nullable fields have a required-field deserializer. Both paths therefore reject omission while accepting an explicit null. MessagePack arrays are never substitutes for named struct objects.
-
-Scalar bounds retained in the v2 implementation:
+Scalar deserialization bounds retained on the Rust side:
 
 | Field/category | Bound |
 |---|---|
@@ -303,18 +299,18 @@ Scalar bounds retained in the v2 implementation:
 | Credits | 0–1,000,000,000 |
 | Character / vehicle health | 0–100 / 0–160 |
 | Heat / magazine / input lead | 0–3 / 0–12 / 2–6 |
-| Baseline count / snapshot records / input frames | 0–96 / 1–96 / 1–3 |
+| Baseline count / input frames | 0–96 / 1–3; snapshot population is bounded by server replication |
 | Character jump cooldown / checkpoint index | u16 |
 | Yaw, pitch, steering | ±f32(pi), ±f32(1.2), ±f32(0.55) |
 | Impact severity | Normalized 0–1 |
 | Millisecond clocks | Finite, nonnegative f64 up to JavaScript's maximum safe integer |
 | Other scalar motor/vector values | Finite f32 range; world-specific checks remain authoritative |
 
-Display names require 3–20 Unicode scalar values, no control characters, and canonical Unicode whitespace trimming. Detail text has at most 512 UTF-8 bytes and no control characters. Other string/collection limits continue to apply from the preflight scanner. Binary values and reserved prototype-related map keys are rejected because v2 defines no such fields.
+Display names require 3–20 Unicode scalar values, no control characters, and canonical Unicode whitespace trimming. Detail text has at most 512 UTF-8 bytes and no control characters. These scalar constraints are enforced by Rust deserialization. There is no protocol-specific scanner for duplicate/reserved keys; standard decoder behavior applies.
 
-Integer fields use mathematical integer semantics across languages: float markers containing an exact safe whole number are accepted; fractional values fail. Float endpoints use their f32-rounded constants so Rust-encoded boundary values remain valid. Cross-language tests compare IDs/ticks exactly and allow float roundoff.
+Use integer markers for integer fields, as the ordinary JS and Rust encoders do. The old JSON whole-float normalization is removed; Serde decides which representations each Rust field accepts. Float endpoints use f32-rounded constants. Cross-language tests compare IDs/ticks exactly and allow float roundoff.
 
-World ID must be present and non-null for every game envelope. Hello/Reject use null session IDs; Leave/Disconnect may use null before authentication. Other messages require a session. Stateful identity/phase validation still needs the actual session; stateless decoding alone does not authenticate it.
+World ID must be present and non-null for every game envelope. Hello/Reject use null session IDs; Leave/Disconnect may use null before authentication. Other messages require a session. The authoritative server session enforces these scope/phase rules at application time; the protocol codec does not authenticate identity.
 
 See the [package API guide](../packages/protocol/README.md) and [implementation log](implementation-log.md) for commands and measured fixture sizes. The initial v1 contract shipped with T02; T16 advances the wire to v2 for explicit repair status.
 

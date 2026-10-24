@@ -1,6 +1,6 @@
 # 33 — Impairment and lifecycle regression
 
-T19 completes local regression coverage on 24 October 2026. Browser/server build IDs are `t19-local`. Network version 2, content, WASM bridge and SQLite schema remain unchanged. This milestone adds failure tests and session hardening; T20 owns the 16-peer populated capacity and soak measurements.
+T19 originally recorded completion on 24 October 2026. **Reopened:** the later [protocol simplification](34-protocol-simplification.md) reproduced a loss-progress failure with both old and new codecs; that investigation remains incomplete. The results below describe the original run. Browser/server build IDs are `t19-local`. Network version 2, content, WASM bridge and SQLite schema remain unchanged. This milestone adds failure tests and session hardening; T20 owns the 16-peer populated capacity and soak measurements.
 
 ## Running the suites
 

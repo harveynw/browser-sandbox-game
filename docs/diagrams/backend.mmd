@@ -28,7 +28,7 @@ flowchart TD
   subgraph group_2["Shared Rust crates"]
     sim["crates/sim-core/<br/>Character / vehicle motors<br/>Static collision and car proxies"]:::sim
     content["crates/content/<br/>Content types and validation"]:::content
-    protocol["crates/protocol/<br/>Messages, codecs and limits"]:::net
+    protocol["crates/protocol/<br/>Serde DTOs · direct MessagePack codec<br/>Scalar / input-batch limits"]:::net
   end
     browser["Browser frontend"]:::other
     assets["Baked content package<br/>Six districts · collision / configuration<br/>Visual streaming belongs to browser"]:::content

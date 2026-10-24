@@ -481,7 +481,7 @@ mod tests {
     #[test]
     fn stalled_ingress_is_bounded_and_stale_sends_cannot_reach_reconnect() {
         let (mut transport, key) = boundary();
-        let bytes = protocol::encode_client(&serde_json::from_value(serde_json::json!({"v":2,"world_id":"diagnostic","session_id":"session","message":{"kind":"ping","data":{"nonce":1,"client_time_ms":0}}})).unwrap()).unwrap();
+        let bytes = protocol::encode_client(&serde_json::from_value(serde_json::json!({"v":3,"world_id":"diagnostic","session_id":"session","message":{"kind":"ping","data":{"nonce":1,"client_time_ms":0}}})).unwrap()).unwrap();
         {
             let mut q = transport.queues.lock().unwrap();
             for _ in 0..=CONTROLS {

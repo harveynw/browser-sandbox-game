@@ -51,7 +51,7 @@ fn persistent_join(
         t,
         p,
         ClientMessage::ClientHello(ClientHello {
-            protocol_version: ProtocolVersion(2),
+            protocol_version: ProtocolVersion(3),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,

@@ -30,7 +30,7 @@ flowchart TD
   end
   subgraph group_4["Shared frontend packages"]
     content["packages/content/<br/>Full collision / config preload<br/>Hashed visual ChunkStream · 192 / 256 m"]:::content
-    protocol["packages/protocol/<br/>Message encoding and validation"]:::net
+    protocol["packages/protocol/<br/>Thin MessagePack codec · trusted server DTOs"]:::net
     wasm["packages/sim-wasm/<br/>Shared Rust simulation in WASM"]:::sim
   end
     backend["Backend<br/>HTTP :3001 · WS / WebRTC :3000"]:::other

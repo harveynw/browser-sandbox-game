@@ -1,41 +1,35 @@
 # Shared protocol package
 
-Rust in [crates/protocol](../../crates/protocol) owns all wire fields, tagged variants, scalar bounds, and schemas. This package exports generated TypeScript declarations and browser-safe codecs. It starts no network connections.
+Rust in [crates/protocol](../../crates/protocol) owns the wire types. This package exports generated TypeScript declarations and a thin `@msgpack/msgpack` codec. It starts no connections.
 
-## Public API
+```ts
+import { encodeClient, decodeServer } from "@port-meridian/protocol";
+import type { ClientEnvelope } from "@port-meridian/protocol";
+```
 
-    import {
-      encodeClient, decodeServer, validateClientContext,
-      protocolLimits, ProtocolError,
-    } from "@port-meridian/protocol";
-    import type { ClientEnvelope, ClientContext } from "@port-meridian/protocol";
+`encodeClient` writes one MessagePack `Uint8Array`; `decodeServer(bytes, delivery)` decodes a server envelope. `decodeClient` and `encodeServer` support tests/tools. Encoders check the resulting packet size, without decoding their output again. Trusted callers construct typed plain data; no recursive JavaScript object sanitizer runs.
 
-Use encodeClient for client intent; it returns one MessagePack Uint8Array. Use decodeServer(bytes, "reliable" | "unreliable") for received binary frames; it returns a validated ServerEnvelope or throws ProtocolError. Both APIs are synchronous and do not partially update application state. decodeClient and encodeServer are also available for tests and local tools.
+## Trust boundary
 
-Transport text signalling does not belong in this codec. Validate envelope world/session IDs against the actual session before applying messages. validateClientContext checks phase, epoch, baseline, and scheduled input window using the generated ClientContext type; it cannot authenticate a ticket or inspect gameplay ownership, distance, cooldowns, and money.
+- Rust decodes directly into Serde DTOs using rmp-serde, with frame/depth limits and a trailing-data check. Scalar deserializers retain finite/range checks; input batches contain 1–3 unique ascending ticks.
+- Browser decoding checks frame size, library string/array/map limits and `v: 3`, then trusts the server payload as its generated TypeScript type. This is intentionally a type assertion, not runtime schema validation.
+- Server session/world code owns tickets, scope, phase, epochs, ownership, input windows, rates, cooldowns, missions and money. Client session/replica code still owns baseline and visibility ordering. Parsing does not authorize an action.
+- Server-message gameplay relationships are tested in their owning systems, rather than rechecked inside both codecs. There is no protocol-level duplicate/special-key scanner or exhaustive semantic validator.
+- Senders use named maps and serialize absent `Option` values as null. Serde defaults accept omitted optional fields and ignore unknown fields. Unknown Rust enum variants still fail. Integer fields use ordinary MessagePack integer encoding; no JSON numeric-normalization stage remains.
 
-On the Rust server, decode_client(bytes) validates structure and stateless coherence. Then call validate_client_context with the current session at application time. Build outgoing DTOs and call encode_server with an explicit Delivery. A protocol success is not authorization to execute an action.
+Protocol v3 explicitly marks this acceptance-policy change; old v2 clients must reload. Canonical message field names/tagged shapes are unchanged. The independent local WASM/content versions remain 1; their schema validation still exists where owned by those boundaries.
 
 ## Generation and verification
 
-    npm run protocol:generate
-    npm run protocol:check
-    npm run test:unit
-    cargo test -p protocol -p xtask --locked
+```sh
+npm run protocol:generate
+npm run protocol:check
+npm run test:unit
+cargo test -p protocol --locked
+```
 
-Generation writes types, client/server JSON Schemas, and limits under src/generated plus the shared fixture manifest under tests/fixtures/protocol. Do not edit those files. check-generated regenerates in a temporary directory, compares the complete file set and bytes, and leaves existing files unchanged on drift. The root check command includes it; the root build command regenerates.
+Generation writes TS declarations, schema metadata and limits under `src/generated`, plus a compact shared fixture manifest. Schemas describe data for tooling/documentation; they are not loaded by the game packet codecs. Do not edit generated files. The root build/check commands verify drift.
 
-Vitest decodes Rust-written fixtures and sends TypeScript-encoded cases to the real Rust codec via xtask verify-wire. Float32 roundoff is tolerated for floats; safe integer IDs/ticks are compared exactly. Rust tests cover context admission, scanner limits, randomized bounded bytes/truncations, and schema enum coverage. No network mock is used or needed for this serialization milestone.
+Fourteen representative positive fixtures cover handshake, batched inputs, nested actions, characters/vehicles, snapshots/status and maximum realtime packets. Four malformed/version examples cover shared decoder failures. Vitest sends TS-encoded examples to the actual Rust codec via `xtask verify-wire`; safe integer IDs/ticks compare exactly and floats allow f32 roundoff. Rust tests cover client types/ranges, malformed/truncated/deep/oversized frames, small ordered batches and intended Serde defaults. The full server, WASM prediction and transport suites exercise gameplay and lifecycle behavior.
 
-## Validation details
-
-- Both decoders preflight byte size, depth, node count, collection lengths, UTF-8, integer safety, duplicate/reserved map keys, extensions/binary values, nonfinite floats, and trailing values before decoding.
-- Generated Schema 2020-12 requires named objects, every declared property including nullable fields, exact tuples, known fields/variants, and numeric/string bounds.
-- Additional checks reject unsorted inputs, conflicting owner/driver state, descriptor/state mismatch, duplicate snapshot IDs, invalid status/result coherence, and unreliable control changes.
-- Integers with mathematically integral float markers are accepted consistently. Rust normalizes safe whole numbers before typed deserialization; fractional integer fields fail.
-- Outbound JS values must be plain, acyclic, dense wire data; undefined, accessors, classes, BigInt, binary buffers, symbols, and nonfinite numbers are rejected.
-- Rust encoding uses the same named-map serializer mode as rmp-serde to_vec_named with a bounded writer, then validates its output. Error strings omit packet contents.
-
-The Rust crate defaults to its native codec feature, including a cached schema validator with remote HTTP/file resolution disabled. Shared simulation/WASM consumers should select default-features = false for DTOs and pure validation without the native validator dependency. That mode has been compiled for wasm32-unknown-unknown.
-
-Full wire semantics are in [document 05](../../docs/05-protocol.md). Rate limiting, action-result caching, relevance, gameplay authority, networking, and session storage belong to T03/T07 and later tasks.
+See [the current protocol contract](../../docs/05-protocol.md) and [the simplification record](../../docs/34-protocol-simplification.md).

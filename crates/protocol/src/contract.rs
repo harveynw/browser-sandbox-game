@@ -8,28 +8,7 @@ pub fn schema<T: JsonSchema>() -> Value {
     let root = SchemaSettings::draft2020_12()
         .into_generator()
         .into_root_schema_for::<T>();
-    let mut value = serde_json::to_value(root).expect("schema serialization");
-    require_all_properties(&mut value);
-    value
-}
-
-// Serde's custom deserializers require nullable fields to be present. Schemars
-// normally regards Option<T> as optional. Keep its null union and require every
-// declared property, rather than using schemars(required), which removes null.
-fn require_all_properties(value: &mut Value) {
-    match value {
-        Value::Object(object) => {
-            if let Some(Value::Object(properties)) = object.get("properties") {
-                let required: Vec<_> = properties.keys().cloned().collect();
-                object.insert("required".into(), json!(required));
-            }
-            for child in object.values_mut() {
-                require_all_properties(child);
-            }
-        }
-        Value::Array(values) => values.iter_mut().for_each(require_all_properties),
-        _ => {}
-    }
+    serde_json::to_value(root).expect("schema serialization")
 }
 
 pub fn typescript() -> String {
@@ -127,8 +106,6 @@ pub fn typescript() -> String {
         Impact,
         Pong,
         Disconnect,
-        crate::validate::Phase,
-        crate::validate::ClientContext<'static>,
     );
     output.push_str(&format!(
         "export type Tick = {};\n",
@@ -142,7 +119,7 @@ pub fn limits() -> Value {
     json!({
         "client_bytes": CLIENT_BYTES, "reliable_bytes": RELIABLE_BYTES,
         "unreliable_bytes": UNRELIABLE_BYTES, "max_depth": MAX_DEPTH,
-        "max_nodes": MAX_NODES, "max_string_bytes": MAX_STRING_BYTES,
+        "max_string_bytes": MAX_STRING_BYTES,
         "max_map_fields": MAX_MAP_FIELDS, "max_array_items": MAX_ARRAY_ITEMS,
         "max_input_frames": MAX_INPUT_FRAMES, "max_visible_entities": MAX_VISIBLE_ENTITIES,
         "max_safe_integer": MAX_SAFE_INTEGER, "max_float": f64::from(f32::MAX)

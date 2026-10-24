@@ -49,7 +49,7 @@ it.each(profiles)(
       net.send(
         {
           bytes: encodeServer(
-            { v: 2, world_id: "world", session_id: "session", message },
+            { v: 3, world_id: "world", session_id: "session", message },
             reliable ? "reliable" : "unreliable",
           ),
           reliable,

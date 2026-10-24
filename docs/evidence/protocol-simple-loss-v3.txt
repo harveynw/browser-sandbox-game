@@ -1,0 +1,20 @@
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.12s
+     Running tests/actual_transport.rs (target/debug/deps/actual_transport-72135ec97d0bddd3)
+
+running 1 test
+T19 loss progress receipts=2
+
+thread 'real_rtc_datagram_loss_recovery_and_rapid_kill_reconnect' (1999481) panicked at crates/server/tests/actual_transport.rs:177:13:
+RTC made no progress under packet loss
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test real_rtc_datagram_loss_recovery_and_rapid_kill_reconnect ... FAILED
+
+failures:
+
+failures:
+    real_rtc_datagram_loss_recovery_and_rapid_kill_reconnect
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.82s
+
+error: test failed, to rerun pass `-p server --test actual_transport`

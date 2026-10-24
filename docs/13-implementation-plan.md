@@ -32,7 +32,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T16 Remaining jobs and repair | T15 | Time trial/recovery/repair rules |
 | Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
 | Complete | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
-| Complete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
+| Incomplete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
 | Not started | T20 Capacity and performance | T19 | Measured 16-player budgets |
 | Not started | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
 | Not started | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
@@ -51,13 +51,13 @@ Verify native compilation, TS checking, and test harness launch. Record tested t
 
 ## T02 — Protocol, validation, generation, fixtures
 
-Read 05 completely. Own `crates/protocol`, protocol exports in `xtask`, `packages/protocol`, and protocol fixtures. Implement every documented DTO variant even if its feature handler comes later. Use strict serde payload structs, tagged enums, finite/range validation, and bounded MessagePack structure scan.
+Read 05 completely. Own `crates/protocol`, protocol exports in `xtask`, `packages/protocol`, and protocol fixtures. Implement every documented DTO variant even if its feature handler comes later. Use Serde DTOs, tagged enums, scalar finite/range validation and decoder frame/depth limits. The approved post-T19 simplification in document 34 supersedes the original custom scanner/schema guards.
 
-Generate TypeScript and JSON Schema 2020-12. Implement browser codec/validation, positive and negative fixtures, both language directions, and `check-generated`.
+Generate TypeScript and JSON Schema 2020-12. Implement a thin browser codec, representative positive and malformed/version fixtures, both language directions, and `check-generated`.
 
 Replace the T01 `xtask` failure stubs/tests with real generation checks, wire generation/drift verification into the root build/check commands, and remove Vitest's temporary `--passWithNoTests` allowance once the protocol suite exists.
 
-**Done:** G0 protocol portion passes; all variants round-trip; sizes are measured; an intentionally edited generated file fails drift check. Report encoded maximum InputBatch/OwnerState sizes.
+**Done:** G0 protocol portion passes; representative Rust/TS messages round-trip; sizes are measured; an intentionally edited generated file fails drift check. Report encoded maximum InputBatch/OwnerState sizes.
 
 Do not implement gameplay or use handwritten duplicate TS types.
 
@@ -195,7 +195,7 @@ G3 local functional acceptance passed on 24 October 2026: native gameplay checks
 
 Implement the full matrix in 11 using seeded packet scheduler plus real local transport tests. Cover pre-open data, baseline ordering, same-tick packet splits, epochs, stale sessions, backgrounding, queue saturation, resync, and ID reuse.
 
-**Done:** every documented regression has a reproducible test or clearly recorded manual evidence where automation is infeasible. Fix failures without weakening authority or bypassing real RTC. Completed 24 October 2026; [coverage and limits](33-impairment-and-lifecycle.md) distinguish all six seeded application profiles from the actual UDP loss/backpressure and kill/reconnect run. Dependency-internal queue/ID limitations remain explicit.
+**Done:** every documented regression has a reproducible test or clearly recorded manual evidence where automation is infeasible. Fix failures without weakening authority or bypassing real RTC. Originally completed 24 October 2026; reopened after the protocol simplification reproduced an RTC-loss progress failure with both old and new codecs. See [the follow-up](34-protocol-simplification.md). The historical [coverage and limits](33-impairment-and-lifecycle.md) distinguish all six seeded application profiles from the actual UDP loss/backpressure and kill/reconnect run. Dependency-internal queue/ID limitations remain explicit.
 
 ## T20 — Capacity and performance
 

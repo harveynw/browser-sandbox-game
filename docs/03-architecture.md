@@ -13,7 +13,7 @@ The [current module diagrams](diagrams/README.md) map the implemented frontend a
 | Authoritative game | Rust stable, fixed-step single simulation thread | State, validation, gameplay, NPCs, rewards |
 | Transport | Pinned `net` Git dependency | WebSocket signalling/reliable binary and WebRTC unordered binary |
 | Wire format | Serde + `rmp-serde`; `@msgpack/msgpack` | MessagePack map encoding |
-| Contract generation | `ts-rs` + `schemars`; Ajv 2020 in browser | TS declarations and runtime structural validation |
+| Contract generation | `ts-rs` + `schemars` | Generated TS and schema metadata; game codecs trust Serde/MessagePack |
 | Collision | `rapier3d` behind our `CollisionWorld` | Static shape casts/raycasts and shared collision queries |
 | HTTP control plane | Axum on a separate async runtime/thread | Health, guest session, join tickets, build metadata |
 | Persistence | SQLite, one persistence worker | Guest profiles and idempotent economic transactions |
@@ -85,7 +85,7 @@ apps/
     src/{net,simulation,world,render,input,ui,audio,content}/
 packages/
   protocol/src/generated/        committed generated TS + JSON Schemas
-  protocol/src/{codec,validate}.ts
+  protocol/src/codec.ts
   sim-wasm/                      generated wasm-pack package; build artifact
 content/
   source/                        authored world/gameplay JSON
@@ -106,7 +106,7 @@ Directories above are proposed; do not claim they exist until implemented. Keep 
 ## Dependency rules
 
 ```text
-protocol -> serde, rmp-serde, ts-rs, schemars; optional native jsonschema codec
+protocol -> serde, rmp-serde, ts-rs, schemars; direct typed MessagePack codec
 content -> protocol's primitive types only (or its own content DTOs)
 sim-core -> protocol's control/state DTOs, content, rapier3d
 sim-wasm -> sim-core, protocol, wasm-bindgen

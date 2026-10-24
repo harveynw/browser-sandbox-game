@@ -38,7 +38,7 @@ macro_rules! integer {
     };
 }
 
-integer!(ProtocolVersion, u16, 2, 2, "2");
+integer!(ProtocolVersion, u16, 3, 3, "3");
 integer!(TickRate, u8, 30, 30, "30");
 integer!(SnapshotRate, u8, 10, 10, "10");
 integer!(EntityId, u32, 1, u32::MAX, "number");
@@ -153,23 +153,16 @@ pub type Tick = u32;
 #[serde(transparent)]
 pub struct Vec3(pub [Scalar; 3]);
 
-fn required_nullable<'de, D: Deserializer<'de>, T: Deserialize<'de>>(
-    de: D,
-) -> std::result::Result<Option<T>, D::Error> {
-    Option::deserialize(de)
-}
-
 macro_rules! wire_struct {
     ($name:ident { $($(#[$attr:meta])* $field:ident : $ty:ty),* $(,)? }) => {
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
-        #[serde(deny_unknown_fields)]
         pub struct $name { $($(#[$attr])* pub $field: $ty),* }
     };
 }
 macro_rules! wire_enum {
     ($name:ident { $($variant:ident($ty:ty)),* $(,)? }) => {
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS, JsonSchema)]
-        #[serde(tag = "kind", content = "data", rename_all = "snake_case", deny_unknown_fields)]
+        #[serde(tag = "kind", content = "data", rename_all = "snake_case")]
         pub enum $name { $($variant($ty)),* }
     };
 }
@@ -184,17 +177,13 @@ macro_rules! string_enum {
 wire_struct!(Empty {});
 wire_struct!(ClientEnvelope {
     v: ProtocolVersion,
-    #[serde(deserialize_with = "required_nullable")]
     world_id: Option<OpaqueId>,
-    #[serde(deserialize_with = "required_nullable")]
     session_id: Option<OpaqueId>,
     message: ClientMessage,
 });
 wire_struct!(ServerEnvelope {
     v: ProtocolVersion,
-    #[serde(deserialize_with = "required_nullable")]
     world_id: Option<OpaqueId>,
-    #[serde(deserialize_with = "required_nullable")]
     session_id: Option<OpaqueId>,
     message: ServerMessage,
 });
@@ -309,7 +298,6 @@ wire_struct!(BaselineBegin {
     server_tick: Tick
 });
 wire_struct!(EntityShow {
-    #[serde(deserialize_with = "required_nullable")]
     baseline_id: Option<BaselineId>,
     visibility_id: VisibilityId, descriptor: EntityDescriptor, state: EntityState,
     state_tick: Tick,
@@ -340,7 +328,6 @@ wire_struct!(Snapshot {
 });
 wire_struct!(EntityDescriptor {
     id: EntityId, entity_kind: EntityKind, template_id: TemplateId,
-    #[serde(deserialize_with = "required_nullable")]
     display_name: Option<DisplayName>,
 });
 string_enum!(EntityKind {
@@ -365,12 +352,10 @@ wire_struct!(VehicleMotor {
 });
 wire_struct!(CharacterState {
     motor: CharacterMotor, health: CharacterHealth, mode: CharacterMode,
-    #[serde(deserialize_with = "required_nullable")]
     vehicle_id: Option<EntityId>,
 });
 wire_struct!(VehicleState {
     motor: VehicleMotor, health: VehicleHealth,
-    #[serde(deserialize_with = "required_nullable")]
     driver_id: Option<EntityId>,
     disabled: bool,
 });
@@ -397,7 +382,6 @@ wire_struct!(OwnerState {
 });
 wire_struct!(ActionResult {
     request_id: RequestId, applied_tick: Tick, ok: bool, code: ActionCode,
-    #[serde(deserialize_with = "required_nullable")]
     affected_entity_id: Option<EntityId>,
 });
 string_enum!(ActionCode {
@@ -422,9 +406,7 @@ string_enum!(ActionCode {
 wire_struct!(MissionView {
     instance_id: OpaqueId, template_id: TemplateId, phase: MissionPhase,
     checkpoint_index: u16, deadline_tick: Tick,
-    #[serde(deserialize_with = "required_nullable")]
     target_entity_id: Option<EntityId>,
-    #[serde(deserialize_with = "required_nullable")]
     target_position: Option<Vec3>,
 });
 string_enum!(MissionPhase {
@@ -435,15 +417,10 @@ string_enum!(MissionPhase {
 wire_struct!(PlayerStatus {
     revision: Revision, server_tick: Tick, credits: Credits, completed_jobs: u32,
     heat: Heat, pursuit: Pursuit, magazine: Magazine,
-    #[serde(deserialize_with = "required_nullable")]
     repair: Option<RepairView>,
-    #[serde(deserialize_with = "required_nullable")]
     reload_end_tick: Option<Tick>,
-    #[serde(deserialize_with = "required_nullable")]
     mission: Option<MissionView>,
-    #[serde(deserialize_with = "required_nullable")]
     respawn_tick: Option<Tick>,
-    #[serde(deserialize_with = "required_nullable")]
     protected_until_tick: Option<Tick>,
 });
 string_enum!(RepairPhase {
@@ -472,7 +449,6 @@ string_enum!(Pursuit {
 wire_enum!(WorldEvent { Shot(Shot), Impact(Impact) });
 wire_struct!(Shot {
     event_id: EventId, server_tick: Tick, shooter_id: EntityId, origin: Vec3, end: Vec3,
-    #[serde(deserialize_with = "required_nullable")]
     hit_entity_id: Option<EntityId>,
 });
 wire_struct!(Impact {

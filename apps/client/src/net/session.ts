@@ -252,7 +252,7 @@ export class GameSession {
   }
   private send(message: ClientMessage, channel: Channel = "reliable"): boolean {
     const bytes = encodeClient({
-      v: 2,
+      v: 3,
       world_id: this.world,
       session_id: this.session,
       message,
@@ -275,7 +275,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t19-local" ||
+      info.build_id !== "protocol-simple-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -285,7 +285,7 @@ export class GameSession {
     this.send({
       kind: "client_hello",
       data: {
-        protocol_version: 2,
+        protocol_version: 3,
         build_id: info.build_id,
         content_hash: info.content_hash,
         sim_config_hash: info.sim_config_hash,

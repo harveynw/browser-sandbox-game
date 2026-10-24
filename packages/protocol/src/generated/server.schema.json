@@ -23,7 +23,6 @@
       "type": "string"
     },
     "ActionResult": {
-      "additionalProperties": false,
       "properties": {
         "affected_entity_id": {
           "anyOf": [
@@ -51,16 +50,14 @@
         }
       },
       "required": [
-        "affected_entity_id",
+        "request_id",
         "applied_tick",
-        "code",
         "ok",
-        "request_id"
+        "code"
       ],
       "type": "object"
     },
     "BaselineBegin": {
-      "additionalProperties": false,
       "properties": {
         "baseline_id": {
           "$ref": "#/$defs/BaselineId"
@@ -78,7 +75,6 @@
       "type": "object"
     },
     "BaselineEnd": {
-      "additionalProperties": false,
       "properties": {
         "baseline_id": {
           "$ref": "#/$defs/BaselineId"
@@ -119,7 +115,6 @@
       "type": "string"
     },
     "CharacterMotor": {
-      "additionalProperties": false,
       "properties": {
         "grounded": {
           "type": "boolean"
@@ -151,16 +146,15 @@
         }
       },
       "required": [
-        "grounded",
-        "jump_cooldown_ticks",
         "position",
         "velocity",
-        "yaw"
+        "yaw",
+        "grounded",
+        "jump_cooldown_ticks"
       ],
       "type": "object"
     },
     "CharacterState": {
-      "additionalProperties": false,
       "properties": {
         "health": {
           "$ref": "#/$defs/CharacterHealth"
@@ -183,10 +177,9 @@
         }
       },
       "required": [
-        "health",
-        "mode",
         "motor",
-        "vehicle_id"
+        "health",
+        "mode"
       ],
       "type": "object"
     },
@@ -213,7 +206,6 @@
       "type": "string"
     },
     "Disconnect": {
-      "additionalProperties": false,
       "properties": {
         "code": {
           "$ref": "#/$defs/TemplateId"
@@ -240,7 +232,6 @@
       "type": "integer"
     },
     "EntityDescriptor": {
-      "additionalProperties": false,
       "properties": {
         "display_name": {
           "anyOf": [
@@ -263,15 +254,13 @@
         }
       },
       "required": [
-        "display_name",
-        "entity_kind",
         "id",
+        "entity_kind",
         "template_id"
       ],
       "type": "object"
     },
     "EntityHide": {
-      "additionalProperties": false,
       "properties": {
         "entity_id": {
           "$ref": "#/$defs/EntityId"
@@ -290,9 +279,9 @@
       },
       "required": [
         "entity_id",
-        "reason",
+        "visibility_id",
         "server_tick",
-        "visibility_id"
+        "reason"
       ],
       "type": "object"
     },
@@ -311,7 +300,6 @@
       "type": "string"
     },
     "EntityShow": {
-      "additionalProperties": false,
       "properties": {
         "baseline_id": {
           "anyOf": [
@@ -339,18 +327,16 @@
         }
       },
       "required": [
-        "baseline_id",
+        "visibility_id",
         "descriptor",
         "state",
-        "state_tick",
-        "visibility_id"
+        "state_tick"
       ],
       "type": "object"
     },
     "EntityState": {
       "oneOf": [
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/CharacterState"
@@ -361,13 +347,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/VehicleState"
@@ -378,8 +363,8 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         }
@@ -404,7 +389,6 @@
       "type": "string"
     },
     "Impact": {
-      "additionalProperties": false,
       "properties": {
         "entity_id": {
           "$ref": "#/$defs/EntityId"
@@ -430,10 +414,10 @@
         }
       },
       "required": [
-        "entity_id",
         "event_id",
-        "position",
         "server_tick",
+        "entity_id",
+        "position",
         "severity"
       ],
       "type": "object"
@@ -462,7 +446,6 @@
       "type": "string"
     },
     "MissionView": {
-      "additionalProperties": false,
       "properties": {
         "checkpoint_index": {
           "format": "uint16",
@@ -507,13 +490,11 @@
         }
       },
       "required": [
-        "checkpoint_index",
-        "deadline_tick",
         "instance_id",
+        "template_id",
         "phase",
-        "target_entity_id",
-        "target_position",
-        "template_id"
+        "checkpoint_index",
+        "deadline_tick"
       ],
       "type": "object"
     },
@@ -524,7 +505,6 @@
       "type": "string"
     },
     "OwnerState": {
-      "additionalProperties": false,
       "properties": {
         "consumed_through_tick": {
           "format": "uint32",
@@ -553,18 +533,17 @@
         }
       },
       "required": [
+        "server_tick",
         "consumed_through_tick",
         "control_epoch",
-        "controlled_entity_id",
         "player_id",
-        "player_state",
-        "server_tick",
-        "state"
+        "controlled_entity_id",
+        "state",
+        "player_state"
       ],
       "type": "object"
     },
     "PlayerStatus": {
-      "additionalProperties": false,
       "properties": {
         "completed_jobs": {
           "format": "uint32",
@@ -637,23 +616,17 @@
         }
       },
       "required": [
-        "completed_jobs",
-        "credits",
-        "heat",
-        "magazine",
-        "mission",
-        "protected_until_tick",
-        "pursuit",
-        "reload_end_tick",
-        "repair",
-        "respawn_tick",
         "revision",
-        "server_tick"
+        "server_tick",
+        "credits",
+        "completed_jobs",
+        "heat",
+        "pursuit",
+        "magazine"
       ],
       "type": "object"
     },
     "Pong": {
-      "additionalProperties": false,
       "properties": {
         "client_time_ms": {
           "$ref": "#/$defs/Milliseconds"
@@ -673,15 +646,14 @@
         }
       },
       "required": [
-        "client_time_ms",
         "nonce",
+        "client_time_ms",
         "server_tick",
         "server_time_ms"
       ],
       "type": "object"
     },
     "ProfileView": {
-      "additionalProperties": false,
       "properties": {
         "completed_jobs": {
           "format": "uint32",
@@ -699,16 +671,16 @@
         }
       },
       "required": [
-        "completed_jobs",
-        "credits",
+        "profile_id",
         "display_name",
-        "profile_id"
+        "credits",
+        "completed_jobs"
       ],
       "type": "object"
     },
     "ProtocolVersion": {
-      "maximum": 2,
-      "minimum": 2,
+      "maximum": 3,
+      "minimum": 3,
       "type": "integer"
     },
     "Pursuit": {
@@ -721,7 +693,6 @@
       "type": "string"
     },
     "Reject": {
-      "additionalProperties": false,
       "properties": {
         "code": {
           "$ref": "#/$defs/RejectCode"
@@ -759,7 +730,6 @@
       "type": "string"
     },
     "RepairView": {
-      "additionalProperties": false,
       "properties": {
         "code": {
           "$ref": "#/$defs/ActionCode"
@@ -784,12 +754,12 @@
         }
       },
       "required": [
-        "code",
-        "dwell_ticks",
+        "vehicle_id",
+        "zone_id",
         "phase",
         "price",
-        "vehicle_id",
-        "zone_id"
+        "dwell_ticks",
+        "code"
       ],
       "type": "object"
     },
@@ -809,7 +779,6 @@
       "type": "number"
     },
     "ServerHello": {
-      "additionalProperties": false,
       "properties": {
         "build_id": {
           "$ref": "#/$defs/BuildId"
@@ -831,19 +800,18 @@
         }
       },
       "required": [
+        "protocol_version",
         "build_id",
         "content_hash",
-        "protocol_version",
         "sim_config_hash",
-        "snapshot_rate",
-        "tick_rate"
+        "tick_rate",
+        "snapshot_rate"
       ],
       "type": "object"
     },
     "ServerMessage": {
       "oneOf": [
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ServerHello"
@@ -854,13 +822,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Reject"
@@ -871,13 +838,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Welcome"
@@ -888,13 +854,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/BaselineBegin"
@@ -905,13 +870,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/EntityShow"
@@ -922,13 +886,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/BaselineEnd"
@@ -939,13 +902,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/StartPlay"
@@ -956,13 +918,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/EntityHide"
@@ -973,13 +934,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Snapshot"
@@ -990,13 +950,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/OwnerState"
@@ -1007,13 +966,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/OwnerState"
@@ -1024,13 +982,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/ActionResult"
@@ -1041,13 +998,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/PlayerStatus"
@@ -1058,13 +1014,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/WorldEvent"
@@ -1075,13 +1030,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Pong"
@@ -1092,13 +1046,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Disconnect"
@@ -1109,8 +1062,8 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         }
@@ -1122,7 +1075,6 @@
       "type": "number"
     },
     "Shot": {
-      "additionalProperties": false,
       "properties": {
         "end": {
           "items": {
@@ -1163,17 +1115,15 @@
         }
       },
       "required": [
-        "end",
         "event_id",
-        "hit_entity_id",
-        "origin",
         "server_tick",
-        "shooter_id"
+        "shooter_id",
+        "origin",
+        "end"
       ],
       "type": "object"
     },
     "Snapshot": {
-      "additionalProperties": false,
       "properties": {
         "records": {
           "items": {
@@ -1190,8 +1140,8 @@
         }
       },
       "required": [
-        "records",
-        "server_tick"
+        "server_tick",
+        "records"
       ],
       "type": "object"
     },
@@ -1201,7 +1151,6 @@
       "type": "integer"
     },
     "StartPlay": {
-      "additionalProperties": false,
       "properties": {
         "baseline_id": {
           "$ref": "#/$defs/BaselineId"
@@ -1217,7 +1166,6 @@
       "type": "object"
     },
     "StateRecord": {
-      "additionalProperties": false,
       "properties": {
         "entity_id": {
           "$ref": "#/$defs/EntityId"
@@ -1231,8 +1179,8 @@
       },
       "required": [
         "entity_id",
-        "state",
-        "visibility_id"
+        "visibility_id",
+        "state"
       ],
       "type": "object"
     },
@@ -1258,7 +1206,6 @@
       "type": "integer"
     },
     "VehicleMotor": {
-      "additionalProperties": false,
       "properties": {
         "position": {
           "items": {
@@ -1288,15 +1235,14 @@
       },
       "required": [
         "position",
+        "yaw",
         "speed",
         "steering",
-        "velocity",
-        "yaw"
+        "velocity"
       ],
       "type": "object"
     },
     "VehicleState": {
-      "additionalProperties": false,
       "properties": {
         "disabled": {
           "type": "boolean"
@@ -1319,10 +1265,9 @@
         }
       },
       "required": [
-        "disabled",
-        "driver_id",
+        "motor",
         "health",
-        "motor"
+        "disabled"
       ],
       "type": "object"
     },
@@ -1332,7 +1277,6 @@
       "type": "integer"
     },
     "Welcome": {
-      "additionalProperties": false,
       "properties": {
         "input_lead_ticks": {
           "$ref": "#/$defs/InputLead"
@@ -1350,17 +1294,16 @@
         }
       },
       "required": [
-        "input_lead_ticks",
         "player_id",
-        "profile",
-        "server_tick"
+        "server_tick",
+        "input_lead_ticks",
+        "profile"
       ],
       "type": "object"
     },
     "WorldEvent": {
       "oneOf": [
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Shot"
@@ -1371,13 +1314,12 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         },
         {
-          "additionalProperties": false,
           "properties": {
             "data": {
               "$ref": "#/$defs/Impact"
@@ -1388,8 +1330,8 @@
             }
           },
           "required": [
-            "data",
-            "kind"
+            "kind",
+            "data"
           ],
           "type": "object"
         }
@@ -1402,7 +1344,6 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": false,
   "properties": {
     "message": {
       "$ref": "#/$defs/ServerMessage"
@@ -1432,10 +1373,8 @@
     }
   },
   "required": [
-    "message",
-    "session_id",
     "v",
-    "world_id"
+    "message"
   ],
   "title": "ServerEnvelope",
   "type": "object"
