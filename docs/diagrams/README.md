@@ -3,7 +3,7 @@
 - [Frontend](frontend.mmd): browser modules, shared packages, graphics, prediction and networking.
 - [Backend](backend.mmd): server modules, threads, admission, authoritative simulation and replication.
 
-These Mermaid sources describe the implemented architecture through **T10**, rather than the proposed full game. Open them in a Mermaid-compatible viewer to render them.
+These Mermaid sources describe the implemented architecture through **T18**, rather than the proposed full game. Open them in a Mermaid-compatible viewer to render them.
 
 Both diagrams use the same colour groups: purple for orchestration/input, blue for networking/sessions/replication, green for simulation/collision, orange for graphics/camera, yellow for content, and grey for diagnostics/external systems. Arrows show the main calls and data flows; dashed arrows show secondary relationships, including diagnostic tooling and queries. Groups identify source locations; they do not imply extra runtime threads. Backend thread ownership is labelled explicitly.
 

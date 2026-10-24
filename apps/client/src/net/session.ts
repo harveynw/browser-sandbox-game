@@ -88,6 +88,7 @@ export class GameSession {
     private readonly log: (text: string) => void,
     private readonly status: (text: string) => void,
     private readonly events: SessionEvents = {},
+    private readonly displayName = "Local Player",
   ) {
     this.transport.onBytes((channel, bytes) => this.receive(channel, bytes));
     this.transport.onClose((reason) => {
@@ -273,7 +274,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t17-local" ||
+      info.build_id !== "t18-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -288,7 +289,7 @@ export class GameSession {
         content_hash: info.content_hash,
         sim_config_hash: info.sim_config_hash,
         join_ticket: this.ticket,
-        display_name: "Local Player",
+        display_name: this.displayName,
       },
     });
     this.ticket = undefined;

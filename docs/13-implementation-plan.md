@@ -31,7 +31,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T15 Police and heat | T14 | Witnesses, pursuit, search, arrest |
 | Complete | T16 Remaining jobs and repair | T15 | Time trial/recovery/repair rules |
 | Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
-| Not started | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
+| Complete | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
 | Not started | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
 | Not started | T20 Capacity and performance | T19 | Measured 16-player budgets |
 | Not started | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
@@ -187,9 +187,9 @@ Implement schema/migrations, cookie-secret hashing, profile load/update, worker 
 
 Finish assets, palettes, character clips, car wheels/lean, camera aiming/driving transitions, audio pools, minimap/full map, contextual tutorial, controls remapping, quality presets, reduced motion, and readable HUD/error screens.
 
-**Done:** first-time user completes a job from in-game prompts; no missing asset license; audio requires gesture and mutes correctly; low-quality/resized play works. Detailed remote aiming remains excluded by v1 protocol.
+**Done:** first-time user completes a job from in-game prompts; no missing asset license; audio requires gesture and mutes correctly; low-quality/resized play works. Detailed remote aiming remains excluded by the current entity contract (network version 2).
 
-G3 passes after all gameplay and UX checks.
+G3 local functional acceptance passed on 24 October 2026: native gameplay checks plus live first-job, driving, map, remapping, audio lifecycle and resized/Low presentation evidence. See [T18 verification and limits](32-presentation-and-ux.md). Real-RTC impairment, capacity and soak measurements remain T19/T20.
 
 ## T19 — Impairment and lifecycle regression
 

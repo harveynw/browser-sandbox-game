@@ -1,3 +1,8 @@
+import { GameAudio } from "../audio/sound";
+import { CityMap } from "../ui/city-map";
+import { GameHud, Tutorial, friendlyProblem } from "../ui/hud";
+import { SettingsPanel } from "../ui/settings-panel";
+import { readSettings, saveSettings, controlText } from "./settings";
 import { Diagnostics } from "./diagnostics";
 import { simulationMemoryBytes } from "../simulation/bridge";
 import { courierGuidance, repairGuidance } from "./courier";
@@ -46,7 +51,27 @@ export class GameApp {
   private protectedUntil: number | null = null;
   private hitUntil = 0;
   private readonly cross = document.createElement("div");
-  private readonly hud = document.createElement("div");
+  private readonly hud = new GameHud();
+  private readonly audio = new GameAudio();
+  private readonly tutorial = new Tutorial();
+  private cityMap: CityMap | undefined;
+  private readonly mapButton = document.createElement("button");
+  private readonly instructions = document.createElement("p");
+  private readonly note = document.createElement("p");
+  private readonly menuSummary = document.createElement("p");
+  private readonly settings = (() => {
+    try {
+      return readSettings(
+        localStorage,
+        matchMedia("(prefers-reduced-motion: reduce)").matches,
+      );
+    } catch {
+      return readSettings();
+    }
+  })();
+  private readonly preferences: SettingsPanel;
+  private completedJobs = 0;
+  private lastMissionSound = "";
   private readonly minimap = document.createElement("canvas");
   private readonly debug = new Diagnostics();
   private renderer: GameRenderer | undefined;
@@ -87,10 +112,10 @@ export class GameApp {
     kicker.className = "stage";
     kicker.textContent = "Port Meridian / Six districts";
     this.status.setAttribute("role", "status");
-    const instructions = document.createElement("p");
+    const instructions = this.instructions;
     instructions.textContent =
       "WASD or arrows to move · Shift to sprint · Space to jump · Mouse to look · Esc to pause. The online world continues while paused.";
-    const note = document.createElement("p");
+    const note = this.note;
     note.className = "game-note";
     note.textContent =
       "E enters/exits a parked car. At a cyan terminal, F opens jobs: Quay courier / recovery, or the north ring time trial while driving. Follow the gold marker. In the green Ironworks repair zone, stop and press F to repair for 50 credits.";
@@ -118,66 +143,15 @@ export class GameApp {
       this.cancelCourier,
       this.reload,
     );
-    const settings = document.createElement("details");
-    const summary = document.createElement("summary");
-    summary.textContent = "Settings";
-    settings.append(summary);
-    const label = (
-      text: string,
-      input: HTMLInputElement | HTMLSelectElement,
-    ) => {
-      const row = document.createElement("label");
-      row.append(text, input);
-      settings.append(row);
-    };
-    const sensitivity = document.createElement("input");
-    sensitivity.type = "range";
-    sensitivity.min = "0.0005";
-    sensitivity.max = "0.006";
-    sensitivity.step = "0.0001";
-    sensitivity.value = "0.002";
-    sensitivity.addEventListener(
-      "input",
-      () => {
-        this.input.sensitivity = Number(sensitivity.value);
-      },
-      { signal: this.abort.signal },
+    this.preferences = new SettingsPanel(this.settings, () =>
+      this.applySettings(),
     );
-    label("Mouse sensitivity", sensitivity);
-    const check = (
-      text: string,
-      initial: boolean,
-      apply: (v: boolean) => void,
-    ) => {
-      const el = document.createElement("input");
-      el.type = "checkbox";
-      el.checked = initial;
-      el.addEventListener("change", () => apply(el.checked), {
-        signal: this.abort.signal,
-      });
-      label(text, el);
-    };
-    check("Invert mouse Y", false, (v) => {
-      this.input.invert = v;
-    });
-    check("Reduced motion", this.reduced, (v) => {
-      this.reduced = v;
-    });
-    const quality = document.createElement("select");
-    for (const name of ["Medium", "Low"]) {
-      const opt = document.createElement("option");
-      opt.textContent = name;
-      quality.append(opt);
-    }
-    quality.addEventListener(
-      "change",
-      () => {
-        this.low = quality.value === "Low";
-        this.renderer?.quality(this.low);
-      },
-      { signal: this.abort.signal },
-    );
-    label("Graphics quality", quality);
+    const settings = this.preferences.element;
+    this.mapButton.textContent = "City map · M";
+    this.mapButton.hidden = true;
+    this.mapButton.onclick = () => this.openMap();
+    actions.append(this.mapButton);
+    this.applySettings();
     const links = document.createElement("p");
     links.className = "game-links";
     for (const [href, text] of [
@@ -194,6 +168,8 @@ export class GameApp {
       kicker,
       title,
       this.status,
+      this.menuSummary,
+      this.preferences.name,
       instructions,
       this.courierInfo,
       this.jobChoices,
@@ -202,7 +178,6 @@ export class GameApp {
       note,
       links,
     );
-    this.hud.className = "game-hud";
     const debugPanel = document.createElement("details");
     debugPanel.className = "game-metrics";
     const debugSummary = document.createElement("summary");
@@ -226,7 +201,7 @@ export class GameApp {
       this.canvas,
       this.minimap,
       this.cross,
-      this.hud,
+      this.hud.element,
       debugPanel,
       this.overlay,
     );
@@ -252,7 +227,9 @@ export class GameApp {
       options,
     );
     this.unbind = bindInput(this.canvas, this.input, () => {
-      this.overlay.hidden = false;
+      this.audio.pause(true);
+      this.overlay.hidden = !!this.cityMap?.open;
+      this.root.dataset.paused = "true";
       if (this.phase === "playing")
         this.status.textContent = "Paused — the online world continues.";
     });
@@ -275,7 +252,26 @@ export class GameApp {
       },
       options,
     );
-    window.addEventListener("resize", () => this.renderer?.resize(), options);
+    window.addEventListener(
+      "resize",
+      () => {
+        this.renderer?.resize();
+      },
+      options,
+    );
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          this.cityMap?.open &&
+          (event.code === "Escape" || event.code === this.settings.bindings.map)
+        ) {
+          event.preventDefault();
+          this.closeMap();
+        }
+      },
+      options,
+    );
     window.addEventListener("pagehide", () => this.dispose(), options);
     this.canvas.addEventListener(
       "webglcontextlost",
@@ -325,8 +321,55 @@ export class GameApp {
     );
     this.frame = requestAnimationFrame((now) => this.animate(now));
   }
+  private applySettings(): void {
+    this.input.bindings = { ...this.settings.bindings };
+    this.input.sensitivity = this.settings.sensitivity;
+    this.input.invert = this.settings.invert;
+    this.reduced = this.settings.reduced;
+    this.low = this.settings.quality === "low";
+    this.renderer?.quality(this.low);
+    this.root.dataset.reduced = String(this.reduced);
+    this.root.dataset.quality = this.settings.quality;
+    this.audio.configure(
+      this.settings.master,
+      this.settings.effects,
+      this.settings.muted,
+    );
+    this.instructions.textContent = controlText(
+      "WASD / arrows move · Shift sprint · Space jump · Mouse look · Esc menu",
+      this.settings.bindings,
+    );
+    this.note.textContent = controlText(
+      "Cyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.",
+      this.settings.bindings,
+    );
+    this.mapButton.textContent = controlText(
+      "City map · M",
+      this.settings.bindings,
+    );
+    saveSettings(this.settings);
+  }
+  private openMap(): void {
+    this.preferences.cancelRemap();
+    if (this.phase !== "playing" || !this.cityMap) return;
+    this.cityMap.show();
+    this.input.clear();
+    this.audio.pause(true);
+    this.overlay.hidden = true;
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+  }
+  private closeMap(): void {
+    this.cityMap?.hide();
+    this.overlay.hidden = false;
+    this.resume.focus();
+  }
   private setPhase(phase: AppPhase, message?: string): void {
     this.phase = phase;
+    this.mapButton.hidden = phase !== "playing";
+    if (phase !== "playing") {
+      this.audio.pause(true);
+      this.cityMap?.hide();
+    }
     this.root.dataset.phase = phase;
     if (message) this.status.textContent = message;
     const playing = phase === "playing";
@@ -335,6 +378,8 @@ export class GameApp {
     this.play.disabled = !["menu", "disconnected", "fatal"].includes(phase);
     this.play.textContent = phase === "menu" ? "Play" : "Retry";
     this.leave.hidden = ["menu", "disconnected", "fatal"].includes(phase);
+    this.preferences.name.hidden = playing;
+    this.root.dataset.paused = String(!this.input.active);
     if (!playing) {
       this.input.clear();
       if (document.pointerLockElement === this.canvas)
@@ -357,6 +402,11 @@ export class GameApp {
     return "This game requires WebGL2. Enable hardware acceleration or use a supported desktop browser.";
   }
   private join(): void {
+    this.preferences.cancelRemap();
+    if (!this.preferences.nameInput.reportValidity()) return;
+    this.settings.name = this.preferences.nameInput.value;
+    saveSettings(this.settings);
+    void this.audio.unlock();
     this.session?.close("Rejoining");
     this.cleanupScene();
     const unsupported = this.supportReason();
@@ -371,7 +421,7 @@ export class GameApp {
         if (this.disposed || this.session !== session) return;
         this.connection = text;
         if (text.startsWith("Closed:"))
-          this.setPhase("disconnected", text.slice(8));
+          this.setPhase("disconnected", friendlyProblem(text.slice(8)));
         else if (text.startsWith("Connecting"))
           this.setPhase("connecting", "Connecting to the local game server…");
         else if (text.startsWith("Authenticating"))
@@ -384,6 +434,8 @@ export class GameApp {
           this.queries = queries;
           this.renderer = new GameRenderer(this.canvas, assets);
           this.renderer.quality(this.low);
+          this.cityMap = new CityMap(assets, () => this.closeMap());
+          this.root.append(this.cityMap.element);
         },
         phase: (phase) => {
           if (this.session !== session) return;
@@ -415,18 +467,48 @@ export class GameApp {
           this.ownerTick = owner.server_tick;
           this.motor = owner.player_state.motor;
           this.health = owner.player_state.health;
+          if (
+            (this.mode === "driving") !==
+            (owner.player_state.mode === "driving")
+          )
+            this.audio.cue("door");
           this.mode = owner.player_state.mode;
           this.carHealth =
             owner.state.kind === "vehicle" ? owner.state.data.health : null;
         },
         worldEvent: (event, own) => {
-          this.renderer?.effect(event);
+          this.renderer?.effect(event, own);
+          this.audio.cue(
+            event.kind === "shot" ? "shot" : "impact",
+            event.kind === "shot" ? event.data.origin : event.data.position,
+            own ? 3 : 1,
+          );
           if (own && event.kind === "shot" && event.data.hit_entity_id !== null)
             this.hitUntil = performance.now() + 300;
         },
         playerStatus: (status) => {
           if (this.session === session) {
             this.credits = status.credits;
+            this.completedJobs = status.completed_jobs;
+            if (
+              status.reload_end_tick !== null &&
+              status.reload_end_tick !== this.reloadEnd
+            )
+              this.audio.cue("reload");
+            const missionSound = status.mission
+              ? `${status.mission.instance_id}:${status.mission.phase}`
+              : "";
+            if (
+              missionSound !== this.lastMissionSound &&
+              status.mission?.phase === "completed"
+            )
+              this.audio.cue("success");
+            if (
+              missionSound !== this.lastMissionSound &&
+              status.mission?.phase === "failed"
+            )
+              this.audio.cue("failure");
+            this.lastMissionSound = missionSound;
             this.magazine = status.magazine;
             this.heat = status.heat;
             if (status.pursuit === "arresting" && this.pursuit !== "arresting")
@@ -439,13 +521,18 @@ export class GameApp {
           }
         },
       },
+      this.settings.name,
     );
     this.session = session;
     void session.connect();
   }
   private async capture(): Promise<void> {
-    if (this.phase !== "playing" || this.contextLost) return;
+    this.preferences.cancelRemap();
+    if (this.phase !== "playing" || this.contextLost || this.cityMap?.open)
+      return;
     if (this.input.active) return;
+    this.audio.pause(false);
+    void this.audio.unlock();
     if (!this.dragLook) {
       try {
         await this.canvas.requestPointerLock();
@@ -472,6 +559,7 @@ export class GameApp {
     this.previous = now;
     try {
       if (!this.contextLost && this.phase === "playing") {
+        if (this.input.consumeMap()) this.openMap();
         if (this.input.consumeInteract()) this.session?.interact();
         if (this.input.consumeJob()) {
           if (
@@ -501,13 +589,27 @@ export class GameApp {
               },
         );
       }
+      this.audio.pause(
+        !this.input.active || this.phase !== "playing" || document.hidden,
+      );
       const localMotor = this.session?.presentation(now) ?? this.motor;
       const remotes = this.session?.remoteSamples(now) ?? [];
       if (!this.contextLost && this.renderer && this.queries && localMotor) {
+        const aiming =
+          this.input.active &&
+          this.input.aiming &&
+          this.health > 0 &&
+          this.mode === "on_foot";
         this.renderer.pose(
           localMotor,
           this.session?.isDriving,
           this.session?.controlledVehicleTemplate,
+          dt,
+          this.reduced,
+          aiming,
+          this.reloadEnd !== null,
+          this.health <= 0 || this.mode === "arrested",
+          this.input.down("jump"),
         );
         this.renderer.remotes(remotes);
         const mission = this.session?.currentMission;
@@ -519,11 +621,6 @@ export class GameApp {
           objective?.kind === "courier",
           objective?.kind === "time_trial" ? objective.data.gate_radius : 5,
         );
-        const aiming =
-          this.input.active &&
-          this.input.aiming &&
-          this.health > 0 &&
-          this.mode === "on_foot";
         const distance = this.camera.update(
           this.renderer.camera,
           localMotor.position,
@@ -538,6 +635,41 @@ export class GameApp {
         );
         this.cameraDistance = distance;
         this.renderer.render(distance, aiming);
+        const siren =
+          this.heat > 0
+            ? remotes
+                .filter(
+                  (a) =>
+                    a.descriptor.entity_kind === "police" &&
+                    !a.stale &&
+                    Math.hypot(
+                      a.motor.position[0] - localMotor.position[0],
+                      a.motor.position[2] - localMotor.position[2],
+                    ) < 60,
+                )
+                .sort(
+                  (a, b) =>
+                    Math.hypot(
+                      a.motor.position[0] - localMotor.position[0],
+                      a.motor.position[2] - localMotor.position[2],
+                    ) -
+                    Math.hypot(
+                      b.motor.position[0] - localMotor.position[0],
+                      b.motor.position[2] - localMotor.position[2],
+                    ),
+                )[0]?.motor.position
+            : undefined;
+        this.audio.update(
+          localMotor.position,
+          localMotor.yaw,
+          Math.hypot(localMotor.velocity[0], localMotor.velocity[2]),
+          localMotor.grounded,
+          this.session?.isDriving ?? false,
+          this.input.down("jump"),
+          siren,
+          dt,
+          this.session?.controlledVehicleTemplate?.top_speed,
+        );
       }
       if (now - this.lastHud > 100) {
         this.lastHud = now;
@@ -546,20 +678,65 @@ export class GameApp {
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
         this.minimap.hidden = this.phase !== "playing";
-        if (localMotor) this.renderer?.drawMinimap(this.minimap, localMotor);
+
         const streaming = this.renderer?.streamingMetrics;
         const mission = this.session?.currentMission ?? null;
-        const guidance = courierGuidance(
-          mission,
-          this.session?.estimatedTick(now) ?? 0,
-          localMotor?.position,
-          this.assets?.manifest.zones.find((z) => z.kind === "terminal")
-            ?.center,
-          this.assets?.manifest.mission_templates.find(
-            (t) => t.id === mission?.template_id,
+        const terminal = this.assets?.manifest.zones
+          .filter((z) => z.kind === "terminal")
+          .sort(
+            (a, b) =>
+              Math.hypot(
+                (localMotor?.position[0] ?? 0) - a.center[0],
+                (localMotor?.position[2] ?? 0) - a.center[2],
+              ) -
+              Math.hypot(
+                (localMotor?.position[0] ?? 0) - b.center[0],
+                (localMotor?.position[2] ?? 0) - b.center[2],
+              ),
+          )[0];
+        const choices = terminal?.allowed_templates
+          .map(
+            (id) =>
+              this.assets?.manifest.mission_templates.find((t) => t.id === id)
+                ?.objective.kind,
+          )
+          .map((k) =>
+            k === "time_trial"
+              ? "time trial (driving)"
+              : k === "recovery"
+                ? "recovery"
+                : "courier",
+          )
+          .join(" / ");
+        const guidance = controlText(
+          courierGuidance(
+            mission,
+            this.session?.estimatedTick(now) ?? 0,
+            localMotor?.position,
+            terminal?.center,
+            this.assets?.manifest.mission_templates.find(
+              (t) => t.id === mission?.template_id,
+            ),
+            this.input.active,
+            terminal?.id === "terminal_trial"
+              ? "North ring"
+              : terminal?.id === "terminal_civic"
+                ? "Civic"
+                : "Quay",
+            choices,
           ),
-          this.input.active,
+          this.settings.bindings,
         );
+        if (localMotor)
+          this.cityMap?.update(
+            localMotor,
+            remotes,
+            mission?.phase === "active" ? mission.target_position : null,
+            this.assets?.manifest.mission_templates.find(
+              (t) => t.id === mission?.template_id,
+            )?.objective.kind === "courier",
+            this.minimap,
+          );
         const jobs = this.session?.nearbyJobs(now) ?? [];
         const key = jobs.map((t) => t.id).join(",");
         if (key !== this.jobChoiceKey) {
@@ -583,9 +760,11 @@ export class GameApp {
         this.jobChoices.className = "game-job-choices";
         this.courierInfo.textContent = this.phase === "playing" ? guidance : "";
         this.cancelCourier.hidden =
-          this.phase !== "playing" || mission?.phase !== "active";
+          this.phase !== "playing" ||
+          mission?.phase !== "active" ||
+          mission.target_position === null;
         const drivingStatus = this.session?.isDriving
-          ? ` · ${(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h · Car health ${this.carHealth}${this.input.active && this.input.keys.has("Space") ? " · Handbrake" : ""}`
+          ? ` · ${(Math.hypot(...(localMotor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h · Car health ${this.carHealth}${this.input.active && this.input.down("jump") ? " · Handbrake" : ""}`
           : "";
         this.debug.update({
           now,
@@ -606,11 +785,66 @@ export class GameApp {
             ? `Arrested · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
             : this.health <= 0
               ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
-              : `${this.magazine}/12${this.session?.isDriving ? " · Weapon holstered" : this.reloadEnd !== null ? " · Reloading" : " · RMB / Q aim · click fire · R reload"}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Spawn protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
-        this.hud.textContent =
+              : `AMMO ${this.magazine} / 12${this.reloadEnd !== null ? " · Reloading" : ""}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
+        const prompt = this.session?.interactionPrompt(now) ?? "";
+        const repair = this.session?.currentRepair;
+        this.hud.element.hidden =
+          this.phase !== "playing" || !this.input.active;
+        this.minimap.hidden = this.phase !== "playing" || !this.input.active;
+        this.root.dataset.paused = String(!this.input.active);
+        this.menuSummary.textContent =
           this.phase === "playing"
-            ? `Health ${this.health} · ${combat} · Heat ${"●".repeat(this.heat)}${"○".repeat(3 - this.heat)} · ${this.pursuit === "arresting" ? `Arrest ${Math.min(100, Math.max(0, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100)))}% · move to escape` : this.pursuit === "searching" ? "Searching · stay out of sight" : this.pursuit === "pursuing" ? "Police pursuit · break line of sight" : "Clear"} · Credits ${this.credits} · Players ${remotes.filter((a) => a.descriptor.entity_kind === "player").length + 1}${drivingStatus}${net?.stale ? " · Connection delayed" : ""} · ${this.input.active ? `${this.session?.interactionPrompt(now) ?? ""} · Esc menu` : "Paused · world continues"}${this.session?.actionMessage ? ` · ${this.session.actionMessage}` : ""}\n${guidance}${this.session?.currentRepair ? `\n${repairGuidance(this.session.currentRepair)}` : ""}`
-            : "Port Meridian · Walking and driving";
+            ? `${this.credits.toLocaleString()} credits · ${this.completedJobs} completed ${this.completedJobs === 1 ? "job" : "jobs"} · Heat ${this.heat}/3`
+            : "";
+        this.menuSummary.className = "game-profile";
+        this.preferences.soundStatus.textContent = this.audio.status;
+        const district = this.assets?.manifest.districts.find(
+          (d) =>
+            localMotor &&
+            localMotor.position[0] >= d.rect.min[0] &&
+            localMotor.position[0] < d.rect.max[0] &&
+            localMotor.position[2] >= d.rect.min[1] &&
+            localMotor.position[2] < d.rect.max[1],
+        );
+        this.hud.update({
+          guidance: repair ? repairGuidance(repair) : guidance,
+          credits: this.credits,
+          health: this.health,
+          heat: this.heat,
+          pursuit:
+            this.pursuit === "clear"
+              ? "Clear"
+              : this.pursuit === "arresting"
+                ? `Arrest ${Math.min(100, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100))}% · move`
+                : this.pursuit === "searching"
+                  ? "Searching · stay hidden"
+                  : "Pursuit · break sight",
+          ammo: controlText(combat, this.settings.bindings),
+          vehicle: drivingStatus.replace(/^ · /, ""),
+          prompt: controlText(
+            `${prompt} · M map · Esc menu`,
+            this.settings.bindings,
+          ),
+          tutorial:
+            localMotor && this.completedJobs === 0
+              ? controlText(
+                  this.tutorial.update(
+                    localMotor.position,
+                    this.session?.isDriving ?? false,
+                    !!mission,
+                    prompt.includes("Car health"),
+                  ),
+                  this.settings.bindings,
+                )
+              : "",
+          warning: net?.stale
+            ? "Connection delayed — waiting for the server"
+            : (this.session?.actionMessage ?? ""),
+        });
+        this.root.setAttribute(
+          "aria-label",
+          `Port Meridian — ${district?.name ?? "city"}`,
+        );
       }
     } catch (error) {
       this.session?.close(
@@ -623,6 +857,9 @@ export class GameApp {
   }
   private cleanupScene(): void {
     this.input.clear();
+    this.audio.pause(true);
+    this.cityMap?.dispose();
+    this.cityMap = undefined;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     this.renderer?.dispose();
     this.renderer = undefined;
@@ -636,6 +873,8 @@ export class GameApp {
     if (this.disposed) return;
     this.disposed = true;
     this.abort.abort();
+    this.preferences.dispose();
+    this.audio.dispose();
     this.unbind.dispose();
     cancelAnimationFrame(this.frame);
     this.session?.close("Page closed");

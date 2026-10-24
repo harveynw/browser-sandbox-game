@@ -107,3 +107,14 @@ it("aligns aim view with the authoritative chest-origin ray", () => {
   expect(direction.y).toBeCloseTo(Math.sin(pitch));
   expect(direction.z).toBeCloseTo(-Math.cos(yaw) * Math.cos(pitch));
 });
+
+it("eases field of view between walking/driving/aim and snaps presentation when reduced motion is selected", () => {
+  const camera = new PerspectiveCamera(65),
+    follow = new FollowCamera(),
+    world = { spherecastStatic: () => ({ version: 1 as const, hit: null }) };
+  follow.update(camera, [0, 0, 0], 0, 0, 0.016, world, false, true);
+  expect(camera.fov).toBeGreaterThan(65);
+  expect(camera.fov).toBeLessThan(70);
+  follow.update(camera, [0, 0, 0], 0, 0, 0.016, world, true, false, 1.4, true);
+  expect(camera.fov).toBe(54);
+});

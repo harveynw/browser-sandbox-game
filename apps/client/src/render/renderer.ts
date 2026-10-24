@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { CharacterRig, DynamicBatch, carLean } from "./character";
+import { facadeDetails } from "./facades";
 import {
   findRoute,
   ChunkStream,
@@ -14,6 +16,31 @@ export class GameRenderer {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.PerspectiveCamera(65, 1, 0.05, 650);
   readonly actor = new THREE.Group();
+  private readonly dynamic = new DynamicBatch(this.scene);
+  private readonly lods = new Map<number, THREE.Mesh>();
+  private readonly rigs = new Map<number, CharacterRig>();
+  private localRig: CharacterRig;
+  private readonly textures = new Set<THREE.Texture>();
+  private readonly signs: THREE.Sprite[] = [];
+  private readonly wheelGeometry = new THREE.CylinderGeometry(
+    0.34,
+    0.34,
+    0.22,
+    10,
+  );
+  private readonly wheelData = new Map<
+    number,
+    {
+      wheels: THREE.Group[];
+      body: THREE.Group;
+      previous: THREE.Vector3;
+      roll: number;
+    }
+  >();
+  private readonly sun = new THREE.DirectionalLight("#ffe0b5", 2.5);
+  private reduced = false;
+  private localFired = false;
+  private frameDt = 0.016;
   private readonly geometry = new Set<THREE.BufferGeometry>();
   private readonly materials = new Set<THREE.Material>();
   private readonly characterMaterial = new THREE.MeshStandardMaterial({
@@ -24,11 +51,23 @@ export class GameRenderer {
   private readonly effectSlots: {
     line: THREE.Line;
     marker: THREE.Mesh;
+    flash: THREE.Mesh;
     until: number;
   }[] = [];
   private effectCursor = 0;
+  private dustClock = 0;
+  private dustCursor = 0;
+  private readonly dust: {
+    mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
+    until: number;
+  }[] = [];
   private readonly pistol = new THREE.Group();
-  effect(event: WorldEvent): void {
+  effect(event: WorldEvent, own = false): void {
+    if (event.kind === "shot") {
+      const rig = this.rigs.get(event.data.shooter_id);
+      if (rig) rig.fire();
+      else if (own) this.localFired = true;
+    }
     let slot = this.effectSlots[this.effectCursor++ % 32];
     if (!slot) {
       const geometry = new THREE.BufferGeometry();
@@ -43,8 +82,11 @@ export class GameRenderer {
       this.geometry.add(geometry);
       this.materials.add(material);
       this.materials.add(markerMaterial);
-      this.scene.add(line, marker);
-      slot = { line, marker, until: 0 };
+      const flash = new THREE.Mesh(this.cube, markerMaterial);
+      flash.scale.set(0.16, 0.16, 0.2);
+      flash.visible = false;
+      this.scene.add(line, marker, flash);
+      slot = { line, marker, flash, until: 0 };
       this.effectSlots.push(slot);
     }
     const end = event.kind === "shot" ? event.data.end : event.data.position;
@@ -55,6 +97,8 @@ export class GameRenderer {
       positions.needsUpdate = true;
       slot.line.geometry.computeBoundingSphere();
     }
+    slot.flash.visible = event.kind === "shot" && !this.reduced;
+    if (event.kind === "shot") slot.flash.position.set(...event.data.origin);
     slot.line.visible = event.kind === "shot";
     slot.marker.position.set(...end);
     slot.marker.scale.setScalar(
@@ -68,9 +112,7 @@ export class GameRenderer {
   private readonly chunks = new Map<string, THREE.Group>();
   private readonly fallback = new Map<string, THREE.Group>();
   private readonly stream: ChunkStream;
-  private readonly minimap = document.createElement("canvas");
   private readonly missionMarker = new THREE.Group();
-  private missionTarget: readonly number[] | null | undefined;
   private readonly courierRoute = new THREE.Group();
   private readonly carMaterials = new Map<string, THREE.MeshStandardMaterial>();
   private readonly remoteActors = new Map<number, THREE.Group>();
@@ -87,14 +129,12 @@ export class GameRenderer {
     roughness: 0.8,
   });
   private capsule: THREE.CapsuleGeometry;
-  private faceMaterial: THREE.MeshStandardMaterial;
   private cube: THREE.BoxGeometry;
   setMissionTarget(
     position: readonly number[] | null | undefined,
     courier = true,
     radius = 5,
   ): void {
-    this.missionTarget = position;
     this.missionMarker.visible = !!position;
     this.courierRoute.visible = !!position && courier;
     this.missionMarker.children[0]?.scale.setScalar(radius);
@@ -107,12 +147,36 @@ export class GameRenderer {
   ) {
     this.graphics = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.graphics.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene.background = new THREE.Color("#b3ced1");
+    const sky = document.createElement("canvas");
+    sky.width = 2;
+    sky.height = 256;
+    const skyContext = sky.getContext("2d");
+    if (skyContext) {
+      const gradient = skyContext.createLinearGradient(0, 0, 0, 256);
+      gradient.addColorStop(0, "#83b7ca");
+      gradient.addColorStop(1, "#f2dfbc");
+      skyContext.fillStyle = gradient;
+      skyContext.fillRect(0, 0, 2, 256);
+      const texture = new THREE.CanvasTexture(sky);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      this.textures.add(texture);
+      this.scene.background = texture;
+    } else this.scene.background = new THREE.Color("#b3ced1");
     this.scene.fog = new THREE.Fog("#b3ced1", 130, 450);
     this.scene.add(new THREE.HemisphereLight("#eff8ff", "#6a6351", 2.3));
-    const sun = new THREE.DirectionalLight("#ffdfb0", 2.8);
-    sun.position.set(-80, 130, 60);
-    this.scene.add(sun);
+    this.sun.position.set(-30, 60, 30);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.camera.left = -16;
+    this.sun.shadow.camera.right = 16;
+    this.sun.shadow.camera.top = 16;
+    this.sun.shadow.camera.bottom = -16;
+    this.sun.shadow.camera.far = 150;
+    this.sun.shadow.bias = -0.0003;
+    this.graphics.shadowMap.enabled = true;
+    this.graphics.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.scene.add(this.sun, this.sun.target);
+    this.geometry.add(this.wheelGeometry);
     const cube = new THREE.BoxGeometry(1, 1, 1);
     this.geometry.add(cube);
     this.cube = cube;
@@ -178,7 +242,6 @@ export class GameRenderer {
       (chunk) => this.showChunk(chunk),
       (id) => this.hideChunk(id),
     );
-    this.bakeMinimap();
     const ringGeometry = new THREE.RingGeometry(0.85, 1, 48);
     const terminalMaterial = new THREE.MeshBasicMaterial({
       color: "#56e5e1",
@@ -215,6 +278,53 @@ export class GameRenderer {
       pole.position.set(zone.center[0], 1.5, zone.center[2]);
       pole.scale.set(0.3, 3, 0.3);
       this.scene.add(pole);
+      const label = document.createElement("canvas");
+      label.width = 256;
+      label.height = 96;
+      const context = label.getContext("2d");
+      if (context) {
+        context.fillStyle = "#142c37";
+        context.fillRect(0, 0, 256, 96);
+        context.strokeStyle =
+          zone.kind === "terminal"
+            ? "#66dfcb"
+            : zone.kind === "repair"
+              ? "#b8ee88"
+              : "#a9c9ff";
+        context.lineWidth = 8;
+        context.strokeRect(4, 4, 248, 88);
+        context.fillStyle = "#fff4df";
+        context.font = "bold 27px system-ui";
+        context.textAlign = "center";
+        context.fillText(
+          zone.kind === "terminal"
+            ? "JOBS"
+            : zone.kind === "repair"
+              ? "REPAIR · 50"
+              : "GARAGE",
+          128,
+          38,
+        );
+        context.font = "20px system-ui";
+        context.fillText(
+          zone.id
+            .replace(/^(terminal|garage|repair)_/, "")
+            .replaceAll("_", " ")
+            .toUpperCase(),
+          128,
+          70,
+        );
+        const texture = new THREE.CanvasTexture(label);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.textures.add(texture);
+        const material = new THREE.SpriteMaterial({ map: texture });
+        this.materials.add(material);
+        const sign = new THREE.Sprite(material);
+        sign.position.set(zone.center[0], 4.2, zone.center[2]);
+        sign.scale.set(4.5, 1.7, 1);
+        this.signs.push(sign);
+        this.scene.add(sign);
+      }
     }
     const targetRing = new THREE.Mesh(ringGeometry, targetMaterial);
     targetRing.rotation.x = -Math.PI / 2;
@@ -251,19 +361,26 @@ export class GameRenderer {
     this.materials.add(this.pedestrianMaterial);
     this.materials.add(this.staleMaterial);
     this.materials.add(this.characterMaterial);
-    const body = new THREE.Mesh(capsule, this.characterMaterial);
-    body.position.y = 0.87;
-    this.actor.add(body);
-    const faceMaterial = new THREE.MeshStandardMaterial({
-      color: "#263e45",
-      transparent: true,
+    const localMaterials = new Map<string, THREE.MeshStandardMaterial>();
+    this.localRig = new CharacterRig(cube, (color) => {
+      let m = localMaterials.get(color);
+      if (!m) {
+        m = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.85,
+          transparent: true,
+        });
+        localMaterials.set(color, m);
+        this.materials.add(m);
+      }
+      return m;
     });
+    this.actor.add(this.localRig.root);
+    this.actor.traverse((o) => {
+      if (o instanceof THREE.Mesh) o.castShadow = true;
+    });
+    const faceMaterial = new THREE.MeshStandardMaterial({ color: "#263e45" });
     this.materials.add(faceMaterial);
-    this.faceMaterial = faceMaterial;
-    const face = new THREE.Mesh(cube, faceMaterial);
-    face.position.set(0, 1.48, -0.29);
-    face.scale.set(0.34, 0.12, 0.12);
-    this.actor.add(face);
     this.scene.add(this.actor);
     this.resize();
   }
@@ -299,6 +416,7 @@ export class GameRenderer {
     const dummy = new THREE.Object3D();
     for (const [material, values] of buckets) {
       const mesh = new THREE.InstancedMesh(this.cube, material, values.length);
+      mesh.receiveShadow = true;
       values.forEach((p, i) => {
         dummy.position.set(...p.center);
         dummy.scale.set(
@@ -317,6 +435,10 @@ export class GameRenderer {
   private showChunk(chunk: VisualChunk): void {
     this.hideChunk(chunk.id);
     const group = this.batch(chunk.primitives);
+    const facade = this.batch(facadeDetails(chunk.primitives));
+    facade.name = "facades";
+    facade.visible = !this.low;
+    group.add(facade);
     this.chunks.set(chunk.id, group);
     this.scene.add(group);
     const fallback = this.fallback.get(chunk.id);
@@ -334,84 +456,6 @@ export class GameRenderer {
     const fallback = this.fallback.get(id);
     if (fallback) fallback.visible = true;
   }
-  private bakeMinimap(): void {
-    this.minimap.width = 384;
-    this.minimap.height = 384;
-    const ctx = this.minimap.getContext("2d");
-    if (!ctx) return;
-    const bounds = this.assets.manifest.bounds;
-    const width = bounds.max[0] - bounds.min[0];
-    const point = (x: number, z: number) => [
-      ((x - bounds.min[0]) / width) * 384,
-      ((z - bounds.min[2]) / width) * 384,
-    ];
-    for (const p of this.assets.minimap.primitives) {
-      const [x, z] = point(
-        p.center[0] - p.half_extents[0],
-        p.center[2] - p.half_extents[2],
-      );
-      ctx.fillStyle = p.color;
-      ctx.fillRect(
-        x ?? 0,
-        z ?? 0,
-        ((p.half_extents[0] * 2) / width) * 384,
-        ((p.half_extents[2] * 2) / width) * 384,
-      );
-    }
-    ctx.font = "11px sans-serif";
-    ctx.textAlign = "center";
-    for (const d of this.assets.manifest.districts) {
-      const [x, z] = point(
-        (d.rect.min[0] + d.rect.max[0]) / 2,
-        (d.rect.min[1] + d.rect.max[1]) / 2,
-      );
-      ctx.fillStyle = "#0b2534";
-      ctx.fillText(d.name, x ?? 0, z ?? 0);
-    }
-  }
-  drawMinimap(canvas: HTMLCanvasElement, motor: CharacterMotor): void {
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(this.minimap, 0, 0, canvas.width, canvas.height);
-    const b = this.assets.manifest.bounds;
-    const scale = canvas.width / (b.max[0] - b.min[0]);
-    const x = (motor.position[0] - b.min[0]) * scale,
-      z = (motor.position[2] - b.min[2]) * scale;
-    if (this.missionTarget) {
-      ctx.fillStyle = "#ffcf4a";
-      ctx.beginPath();
-      ctx.arc(
-        ((this.missionTarget[0] ?? 0) - b.min[0]) * scale,
-        ((this.missionTarget[2] ?? 0) - b.min[2]) * scale,
-        4,
-        0,
-        Math.PI * 2,
-      );
-      ctx.fill();
-    }
-    ctx.save();
-    ctx.translate(x, z);
-    ctx.rotate(-motor.yaw);
-    ctx.fillStyle = "#ffed67";
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.lineTo(-4, 4);
-    ctx.lineTo(4, 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-    const district = this.assets.manifest.districts.find(
-      (d) =>
-        motor.position[0] >= d.rect.min[0] &&
-        motor.position[0] < d.rect.max[0] &&
-        motor.position[2] >= d.rect.min[1] &&
-        motor.position[2] < d.rect.max[1],
-    );
-    canvas.setAttribute(
-      "aria-label",
-      `City minimap — ${district?.name ?? "Harbour"}`,
-    );
-  }
   get streamingMetrics() {
     let matrices = 0;
     for (const group of [...this.chunks.values(), ...this.fallback.values()])
@@ -420,14 +464,28 @@ export class GameRenderer {
       });
     return {
       ...this.stream.metrics,
-      matrixBytes: matrices,
+      matrixBytes: matrices + this.dynamic.matrixBytes,
       drawCalls: this.graphics.info.render.calls,
       geometries: this.graphics.info.memory.geometries,
       triangles: this.graphics.info.render.triangles,
     };
   }
   quality(low: boolean): void {
+    const changed = this.low !== low;
     this.low = low;
+    this.graphics.shadowMap.enabled = !low;
+    this.sun.castShadow = !low;
+    if (changed) {
+      for (const material of this.materials) material.needsUpdate = true;
+    }
+    if (low && this.sun.shadow.map) {
+      this.sun.shadow.map.dispose();
+      this.sun.shadow.map = null;
+    }
+    for (const group of this.chunks.values()) {
+      const facade = group.getObjectByName("facades");
+      if (facade) facade.visible = !low;
+    }
     this.resize();
   }
   resize(): void {
@@ -441,11 +499,71 @@ export class GameRenderer {
     motor: CharacterMotor,
     driving = false,
     template?: VehicleTemplate,
+    dt = 0.016,
+    reduced = false,
+    aiming = false,
+    reloading = false,
+    disabled = false,
+    skidding = false,
   ): void {
+    this.dustClock += dt;
+    if (
+      driving &&
+      skidding &&
+      !this.low &&
+      Math.hypot(motor.velocity[0], motor.velocity[2]) > 4 &&
+      this.dustClock > 0.12
+    ) {
+      this.dustClock = 0;
+      const index = this.dustCursor++ % 12;
+      let dust = this.dust[index];
+      if (!dust) {
+        const material = new THREE.MeshBasicMaterial({
+          color: "#d6c3a4",
+          transparent: true,
+          depthWrite: false,
+        });
+        this.materials.add(material);
+        const mesh = new THREE.Mesh(this.cube, material);
+        this.scene.add(mesh);
+        dust = { mesh, until: 0 };
+        this.dust[index] = dust;
+      }
+      dust.mesh.position.set(
+        motor.position[0] + Math.sin(motor.yaw) * 2,
+        0.3,
+        motor.position[2] + Math.cos(motor.yaw) * 2,
+      );
+      dust.mesh.scale.setScalar(0.3);
+      dust.mesh.material.opacity = 0.35;
+      dust.mesh.visible = true;
+      dust.until = performance.now() + 450;
+    }
+    this.frameDt = dt;
+    this.reduced = reduced;
+    this.localRig.pose(
+      {
+        motor,
+        driving,
+        aiming,
+        reloading,
+        incapacitated: disabled,
+        fired: this.localFired,
+      },
+      dt,
+      performance.now() / 1000,
+      reduced,
+    );
+    this.localFired = false;
+    for (const sign of this.signs)
+      sign.visible =
+        sign.position.distanceTo(new THREE.Vector3(...motor.position)) < 90;
+    this.sun.position.set(motor.position[0] - 30, 60, motor.position[2] + 30);
+    this.sun.target.position.set(motor.position[0], 0, motor.position[2]);
     this.stream.update(motor.position);
     this.actor.position.set(...motor.position);
     this.actor.rotation.y = motor.yaw;
-    this.actor.scale.setScalar(driving ? 0.55 : 1);
+    this.actor.scale.setScalar(driving ? 0.6 : 1);
     if (driving) {
       const offset = template?.seat_offset ?? [0, 0.8, -0.25];
       this.actor.position.y += offset[1] ?? 0.8;
@@ -457,12 +575,24 @@ export class GameRenderer {
         Math.cos(motor.yaw) * (offset[2] ?? -0.25);
     }
   }
+  private visualMaterial(color: string): THREE.MeshStandardMaterial {
+    let m = this.carMaterials.get(color);
+    if (!m) {
+      m = new THREE.MeshStandardMaterial({ color, roughness: 0.82 });
+      this.carMaterials.set(color, m);
+      this.materials.add(m);
+    }
+    return m;
+  }
   remotes(actors: readonly RenderActor[]): void {
+    this.dynamic.begin();
     const present = new Set(actors.map((a) => a.id));
-    for (const [id, group] of this.remoteActors)
+    for (const [id] of this.remoteActors)
       if (!present.has(id)) {
-        this.scene.remove(group);
         this.remoteActors.delete(id);
+        this.rigs.delete(id);
+        this.lods.delete(id);
+        this.wheelData.delete(id);
       }
     for (const actor of actors) {
       let group = this.remoteActors.get(actor.id);
@@ -475,84 +605,192 @@ export class GameRenderer {
           const visual = this.assets.vehicleVisuals.find(
             (v) => v.id === template?.visual_asset_id,
           );
+          const body = new THREE.Group();
+          group.add(body);
           for (const p of visual?.primitives ?? []) {
-            let material = this.carMaterials.get(p.color);
-            if (!material) {
-              material = new THREE.MeshStandardMaterial({
-                color: p.color,
-                roughness: 0.8,
-              });
-              this.carMaterials.set(p.color, material);
-              this.materials.add(material);
-            }
-            const mesh = new THREE.Mesh(this.cube, material);
+            const mesh = new THREE.Mesh(
+              this.cube,
+              this.visualMaterial(p.color),
+            );
             mesh.position.set(...p.center);
             mesh.scale.set(
               p.half_extents[0] * 2,
               p.half_extents[1] * 2,
               p.half_extents[2] * 2,
             );
-            group.add(mesh);
-          }
-          if (actor.descriptor.entity_kind === "police") {
-            let material = this.carMaterials.get("police-beacon");
-            if (!material) {
-              material = new THREE.MeshStandardMaterial({
-                color: "#307bff",
-                emissive: "#103a90",
-              });
-              this.carMaterials.set("police-beacon", material);
-              this.materials.add(material);
+            if (p.id === "body" && template?.dimensions[1] !== 2.2) {
+              mesh.scale.y *= 0.65;
+              mesh.position.y *= 0.75;
             }
-            const beacon = new THREE.Mesh(this.cube, material);
-            beacon.position.set(0, 1.65, 0);
-            beacon.scale.set(1.1, 0.18, 0.35);
-            group.add(beacon);
+            body.add(mesh);
           }
+          const [width, , length] = template?.dimensions ?? [1.8, 1.4, 4.2],
+            wheelbase = template?.wheelbase ?? 2.6;
+          const wheels: THREE.Group[] = [];
+          for (const x of [-1, 1])
+            for (const z of [-1, 1]) {
+              const pivot = new THREE.Group();
+              pivot.position.set(
+                x * (width / 2 - 0.02),
+                0.35,
+                (z * wheelbase) / 2,
+              );
+              const roller = new THREE.Group();
+              const rubber = new THREE.Mesh(
+                this.wheelGeometry,
+                this.visualMaterial("#28343a"),
+              );
+              rubber.rotation.z = Math.PI / 2;
+              roller.add(rubber);
+              const rim = new THREE.Mesh(
+                this.wheelGeometry,
+                this.visualMaterial("#b8c2bc"),
+              );
+              rim.rotation.z = Math.PI / 2;
+              rim.scale.set(0.55, 1.04, 0.55);
+              roller.add(rim);
+              const spoke = new THREE.Mesh(
+                this.cube,
+                this.visualMaterial("#b8c2bc"),
+              );
+              spoke.scale.set(0.24, 0.46, 0.055);
+              roller.add(spoke);
+              pivot.add(roller);
+              group.add(pivot);
+              wheels.push(pivot);
+            }
+          for (const front of [-1, 1])
+            for (const side of [-1, 1]) {
+              const lamp = new THREE.Mesh(
+                this.cube,
+                this.visualMaterial(front === -1 ? "#ffe4a4" : "#d3735a"),
+              );
+              lamp.position.set(
+                side * width * 0.32,
+                0.62,
+                front * (length / 2 + 0.015),
+              );
+              lamp.scale.set(0.3, 0.14, 0.04);
+              body.add(lamp);
+            }
+          if (actor.descriptor.entity_kind === "police")
+            for (const side of [-1, 1]) {
+              const lamp = new THREE.Mesh(
+                this.cube,
+                this.visualMaterial(side === -1 ? "#e47b6a" : "#699bea"),
+              );
+              lamp.position.set(
+                side * 0.3,
+                (template?.dimensions[1] ?? 1.4) + 0.1,
+                0,
+              );
+              lamp.scale.set(0.5, 0.18, 0.28);
+              body.add(lamp);
+            }
+          const smoke = new THREE.Mesh(this.cube, this.staleMaterial);
+          smoke.name = "disabled-smoke";
+          smoke.position.y = 2.1;
+          smoke.scale.set(0.65, 1, 0.65);
+          group.add(smoke);
+          this.wheelData.set(actor.id, {
+            body,
+            wheels,
+            roll: 0,
+            previous: new THREE.Vector3(...actor.motor.position),
+          });
         } else {
-          const body = new THREE.Mesh(this.capsule, this.remoteMaterial);
-          body.position.y = 0.87;
-          group.add(body);
-          const face = new THREE.Mesh(this.cube, this.faceMaterial);
-          face.position.set(0, 1.48, -0.29);
-          face.scale.set(0.34, 0.12, 0.12);
-          group.add(face);
+          const rig = new CharacterRig(
+            this.cube,
+            (c) => this.visualMaterial(c),
+            actor.id % 4,
+          );
+          this.rigs.set(actor.id, rig);
+          group.add(rig.root);
         }
         this.remoteActors.set(actor.id, group);
-        this.scene.add(group);
       }
-      const body = group.children[0];
-      if (body instanceof THREE.Mesh && actor.state.kind !== "vehicle")
-        body.material = actor.stale
-          ? this.staleMaterial
-          : actor.descriptor.entity_kind === "pedestrian"
-            ? this.pedestrianMaterial
-            : this.remoteMaterial;
-      group.scale.setScalar(
-        actor.state.kind === "character" && actor.state.data.mode === "driving"
-          ? 0.55
-          : 1,
-      );
       group.position.set(...actor.motor.position);
       group.rotation.y = actor.motor.yaw;
-      group.rotation.z =
-        actor.state.kind === "character" && actor.state.data.health === 0
-          ? Math.PI / 2
-          : 0;
-      if (actor.state.kind === "character" && actor.state.data.health === 0)
-        group.position.y += 0.3;
+      group.scale.setScalar(
+        actor.state.kind === "character" && actor.state.data.mode === "driving"
+          ? 0.6
+          : 1,
+      );
       if (actor.state.kind === "vehicle") {
-        let smoke = group.getObjectByName("disabled-smoke");
-        if (!smoke && actor.state.data.disabled) {
-          smoke = new THREE.Mesh(this.cube, this.staleMaterial);
-          smoke.name = "disabled-smoke";
-          smoke.position.y = 2.5;
-          smoke.scale.set(0.8, 1.4, 0.8);
-          group.add(smoke);
+        const data = this.wheelData.get(actor.id);
+        if (!data) continue;
+        const delta = data.previous.distanceTo(group.position);
+        data.previous.copy(group.position);
+        if (delta < 5)
+          data.roll += (delta * Math.sign(actor.state.data.motor.speed)) / 0.34;
+        data.body.rotation.z = carLean(
+          actor.state.data.motor.speed,
+          actor.state.data.motor.steering,
+          this.reduced,
+        );
+        data.wheels.forEach((wheel, i) => {
+          wheel.rotation.y =
+            i % 2 === 0
+              ? actor.state.kind === "vehicle"
+                ? actor.state.data.motor.steering
+                : 0
+              : 0;
+          const roller = wheel.children[0];
+          if (roller) roller.rotation.x = data.roll;
+        });
+        const smoke = group.getObjectByName("disabled-smoke");
+        if (smoke) {
+          smoke.visible = actor.state.data.disabled;
+          smoke.rotation.y = this.reduced ? 0 : performance.now() / 1500;
         }
-        if (smoke) smoke.visible = actor.state.data.disabled;
+      } else {
+        const rig = this.rigs.get(actor.id);
+        if (!rig) continue;
+        rig.pose(
+          {
+            motor: actor.motor,
+            driving:
+              actor.state.kind === "character" &&
+              actor.state.data.mode === "driving",
+            incapacitated: actor.state.data.health === 0,
+          },
+          this.frameDt,
+          performance.now() / 1000,
+          this.reduced,
+        );
+        if (actor.state.data.health === 0) group.position.y += 0.4;
       }
+      group.updateMatrixWorld(true);
+      const distant =
+        actor.state.kind !== "vehicle" &&
+        (this.low || group.position.distanceTo(this.actor.position) > 55);
+      if (distant) {
+        let simple = this.lods.get(actor.id);
+        if (!simple) {
+          simple = new THREE.Mesh(this.capsule, this.staleMaterial);
+          this.lods.set(actor.id, simple);
+        }
+        simple.material = actor.stale
+          ? this.staleMaterial
+          : this.visualMaterial(
+              actor.descriptor.entity_kind === "pedestrian"
+                ? "#b16f5b"
+                : "#4a9d9a",
+            );
+        simple.rotation.z = actor.state.data.health === 0 ? Math.PI / 2 : 0;
+        simple.position.set(0, 0.87, 0);
+        simple.updateMatrix();
+        simple.matrixWorld.multiplyMatrices(group.matrixWorld, simple.matrix);
+        this.dynamic.add(simple);
+      } else
+        group.traverse((o) => {
+          if (o instanceof THREE.Mesh && o.visible) {
+            const parentVisible = o.parent?.visible ?? true;
+            if (parentVisible) this.dynamic.add(o);
+          }
+        });
     }
+    this.dynamic.end();
   }
   render(distance: number, aiming = false): void {
     this.pistol.visible = aiming;
@@ -565,8 +803,19 @@ export class GameRenderer {
       if (performance.now() >= slot.until) {
         slot.line.visible = false;
         slot.marker.visible = false;
+        slot.flash.visible = false;
+      } else if (performance.now() > slot.until - 145)
+        slot.flash.visible = false;
+    for (const d of this.dust) {
+      const left = (d.until - performance.now()) / 450;
+      d.mesh.visible = left > 0 && !this.low;
+      if (d.mesh.visible) {
+        d.mesh.material.opacity = Math.max(0, left) * 0.35;
+        d.mesh.scale.setScalar(0.3 + (1 - left) * 0.5);
+        d.mesh.position.y += this.frameDt * 0.25;
       }
-    this.actor.visible = distance > 0.15;
+    }
+    this.actor.visible = distance > 0.15 && !aiming;
     this.actor.traverse((object) => {
       if (object instanceof THREE.Mesh)
         object.material.opacity =
@@ -576,6 +825,10 @@ export class GameRenderer {
   }
   dispose(): void {
     this.stream.dispose();
+    this.dynamic.dispose();
+    for (const texture of this.textures) texture.dispose();
+    this.textures.clear();
+    this.sun.shadow.map?.dispose();
     for (const group of this.fallback.values())
       group.traverse((o) => {
         if (o instanceof THREE.InstancedMesh) o.dispose();
@@ -585,6 +838,9 @@ export class GameRenderer {
     for (const g of this.geometry) g.dispose();
     for (const m of this.materials) m.dispose();
     this.remoteActors.clear();
+    this.rigs.clear();
+    this.lods.clear();
+    this.wheelData.clear();
     this.scene.clear();
     this.graphics.dispose();
   }

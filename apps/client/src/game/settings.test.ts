@@ -1,0 +1,41 @@
+import { expect, it } from "vitest";
+import { defaults, readSettings, rebind, controlText } from "./settings";
+import { InputState } from "../input/input";
+it("loads bounded settings and rejects corrupt or conflicting bindings", () => {
+  expect(readSettings({ getItem: () => "{" }, true).reduced).toBe(true);
+  const v = readSettings({
+    getItem: () =>
+      JSON.stringify({
+        version: 1,
+        master: 4,
+        sensitivity: 1,
+        bindings: { ...defaults, job: "KeyE" },
+      }),
+  });
+  expect(v.master).toBe(1);
+  expect(v.sensitivity).toBe(0.006);
+  expect(v.bindings.job).toBe("KeyF");
+});
+it("swaps bindings atomically, updates prompts and never leaves old movement or edges held", () => {
+  const input = new InputState();
+  input.bindings = rebind({ ...defaults }, "forward", "KeyF");
+  input.active = true;
+  input.press("KeyW");
+  expect(input.sample().move_z).toBe(0);
+  expect(input.consumeJob()).toBe(true);
+  input.release("KeyW");
+  input.press("KeyF");
+  expect(input.sample().move_z).toBe(32767);
+  expect(input.consumeJob()).toBe(false);
+  input.press("KeyW");
+  expect(input.consumeJob()).toBe(true);
+  input.clear();
+  input.active = true;
+  input.press("KeyM");
+  expect(input.consumeMap()).toBe(true);
+  expect(input.consumeMap()).toBe(false);
+  expect(controlText("F jobs · E enter", input.bindings)).toBe(
+    "W jobs · E enter",
+  );
+  expect(rebind(input.bindings, "job", "Escape")).toBe(input.bindings);
+});

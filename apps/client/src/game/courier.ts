@@ -7,6 +7,8 @@ export function courierGuidance(
   terminalPosition?: readonly number[],
   template?: MissionTemplate,
   inputActive = true,
+  terminalName = "Quay",
+  choices = "courier / recovery",
 ): string {
   if (!mission) {
     const metres =
@@ -20,10 +22,10 @@ export function courierGuidance(
     const action =
       metres !== undefined && metres <= 3
         ? inputActive
-          ? "F choose courier / recovery"
-          : "Choose courier / recovery from this menu"
-        : "Approach within 3 m to choose courier / recovery";
-    return `Jobs: cyan Quay terminal${distance} · ${action} · Trial start: north city ring [0, -256] · Repairs: Ironworks [220, -180]`;
+          ? `F choose ${choices}`
+          : `Choose ${choices} from this menu`
+        : `Approach within 3 m to choose ${choices}`;
+    return `Jobs: cyan ${terminalName} terminal${distance} · ${action} · M city map`;
   }
   const kind = template?.objective.kind ?? "courier";
   const title =

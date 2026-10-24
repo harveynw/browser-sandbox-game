@@ -575,3 +575,24 @@ Verification:
 Limitations: SQLite is a local single-worker save, not public identity or a multi-shard database. The profile cache remains bounded at 256 guests per process; world state restarts from content. Database lock/failure, crash-window compensation and repair edge cases use native fixtures, not additional live fault injection. An application without a durable acknowledgement is deliberately refunded at restart even if its previous car briefly received the repair. Audio/art/UX polish remains T18; real-RTC capacity, impairment and soak work remains T19/T20.
 
 Next action: stop for milestone review. **T18 — Coherent presentation and UX** is next and has not started.
+
+## T18 — Coherent presentation and UX
+
+Status: **complete, 24 October 2026**. Authorized after T17 and resumed after usage-limit interruptions. T19 remains unstarted.
+
+Implemented:
+
+- Added an original articulated character rig with four clothing palettes, in-place movement/jump/aim/fire/reload/driving/incapacitated poses and bounded shared remote instancing. Added eight procedural facade patterns, fixed sun/sky, authored location signs, cosmetic car wheels/steering/lean/lights, bounded muzzle flash and tire dust, cheaper distant actors and explicit GPU disposal. Camera FOV eases across walk/drive/aim; reduced motion removes extra cosmetic motion. Collision and verified content anchors are unchanged.
+- Replaced the long gameplay paragraph with structured objective, wallet/heat, health/ammo or speed/car-health and interaction panels. Added contextual onboarding, nearest-terminal choices, readable errors and responsive layouts. Built north-up minimap/full map from verified footprints with nearby public vehicles, current destination/courier route, keyboard/drag pan, bounded zoom, focus buttons and modal focus/input handling.
+- Added gesture-gated synthesized WebAudio with master/effects buses, mute, spatial cues, normalized-speed engine and siren loops, priority eviction and a 32-voice cap. Pause/map/blur/hidden state stops or suspends audio. Added locally validated/persisted names, sensitivity/inversion, quality, reduced motion, volumes and twelve remappable actions with duplicate swaps/reset. Join/Resume/map cancel pending remaps.
+- Updated frontend ownership diagrams, provenance, README, milestone status and [32 — Presentation and UX](32-presentation-and-ux.md). Matching build IDs advance to `t18-local`; network version 2, content, independent WASM bridge and SQLite schema remain unchanged. Late review fixed hidden name labels, narrow map border overflow, stale shadow programs after quality changes, seated heads protruding through car roofs, pending remap capture and foot skids incorrectly using the driving cue.
+
+Verification:
+
+- `npm run check` — **PASS**, **221 TypeScript / 134 Rust tests** including generated drift, release WASM, strict typing, ESLint/formatting and Clippy with warnings denied. `npm run build` — **PASS** using compatible bundled Node 24.22.1 / npm 10.9.2. Existing Vite Three.js chunk advisory remains. New focused tests cover settings/remap validation, audio gesture/mute/voice bounds, map transforms, tutorial/errors, animation transitions/seat roof bounds for all three cars, facades and camera behavior.
+- Live production client with actual WS/RTC and SQLite: a separate fresh Harbour Test guest completed the Quay courier using ordinary controls and HUD/map guidance, earning **150 credits and one completed job**, retained on rejoin. Full map route, focus/zoom, remap M→N, persistence after reload, Low/mute/reduced motion and 640×720 layouts were checked. Drove a compact with acceleration/steering/handbrake/reverse, observed authoritative collision damage, stopped/exited; final seated-pose check confirmed roof clearance. No live actor/economic/database injection. Temporary viewport overrides were reset. Evidence is linked in the presentation guide.
+- Medium scene sample: **60 FPS / 16.7 ms, 152 draw calls / 34,418 triangles, 19 resident chunks / zero pending or fallback, 983 KiB instance matrices, 0.000 m correction p95**. G3 local functional acceptance is recorded across native gameplay coverage and browser presentation checks; this sample does not establish full-capacity performance.
+
+Limits: audio gating/mute/pause were verified through tests and visible settings state, without a recorded subjective mix listening assessment. Assets are original code-generated low-poly art and synthesized effects; detailed remote aiming remains absent from the current entity contract. Chrome was not controlled. The full real-RTC impairment/lifecycle matrix, 16-player capacity and soak gates remain T19/T20.
+
+Next action: stop for milestone review. **T19 — Impairment and lifecycle regression** is next and has not started.

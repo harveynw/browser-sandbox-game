@@ -495,3 +495,357 @@ select {
 .game-job-choices:empty {
   display: none;
 }
+
+/* T18 coastal kit: sand, ink, sea glass and amber. */
+.game-mode {
+  --ink: #102831;
+  --paper: #fff2dc;
+  --sea: #8ae2cd;
+  --gold: #f4c563;
+}
+.game-menu {
+  box-sizing: border-box;
+  width: min(510px, calc(100vw - 32px));
+  padding: 26px;
+  background: #102831f7;
+  border: 1px solid #7ca79d;
+  border-radius: 14px;
+  box-shadow: 0 24px 90px #05192077;
+}
+.game-menu h1 {
+  color: var(--paper);
+  font-size: clamp(30px, 5vw, 46px);
+}
+.game-menu p {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.game-menu .stage {
+  color: var(--gold);
+  font-size: 11px;
+}
+.game-menu > p[role="status"] {
+  color: #e4efea;
+}
+.game-menu .game-profile {
+  padding: 10px 12px;
+  background: #ffffff0a;
+  border-left: 3px solid var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.game-menu .game-profile:empty {
+  display: none;
+}
+.game-menu .actions {
+  gap: 8px;
+}
+.game-menu button {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.game-menu button:hover {
+  background: #d0f3e7;
+}
+.game-menu label {
+  font-size: 14px;
+}
+.game-menu input[type="text"],
+.player-name input {
+  width: 170px;
+  padding: 8px;
+  border: 1px solid #719c96;
+  background: #1e3a44;
+  border-radius: 4px;
+  color: var(--paper);
+}
+.game-menu select {
+  max-width: 215px;
+  font-size: 13px;
+}
+.game-menu input[type="range"] {
+  width: 140px;
+}
+.game-menu output {
+  display: block;
+  margin: 12px 0;
+  color: var(--sea);
+  font-size: 13px;
+}
+.game-menu [role="status"] {
+  overflow-wrap: anywhere;
+}
+.game-menu .game-note {
+  color: #a9c6c5;
+  font-size: 13px;
+}
+.game-menu .game-links {
+  border-top: 1px solid #ffffff1c;
+  padding-top: 12px;
+  font-size: 12px;
+}
+.game-menu .game-job-choices button {
+  text-align: left;
+  border-color: var(--gold);
+  background: #f1d5a2;
+}
+.game-menu .game-job-choices button::before {
+  content: "↗ ";
+}
+.game-hud {
+  inset: 0;
+  width: auto;
+  max-width: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+.game-hud[hidden] {
+  display: none;
+}
+.game-hud > * {
+  box-sizing: border-box;
+  margin: 0;
+  background: #102831ed;
+  border: 1px solid #7ca79d66;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 16px #07192033;
+}
+.hud-objective {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: min(420px, calc(100vw - 350px));
+  border-left: 3px solid var(--gold);
+}
+.hud-wallet {
+  position: absolute;
+  top: 18px;
+  right: 138px;
+  min-width: 156px;
+  text-align: right;
+  color: var(--gold);
+  font-weight: 600;
+}
+.hud-vitals {
+  position: absolute;
+  bottom: 18px;
+  left: 204px;
+  min-width: 220px;
+}
+.hud-prompt {
+  position: absolute;
+  bottom: 124px;
+  left: 204px;
+  max-width: min(520px, calc(100vw - 240px));
+  color: var(--sea);
+}
+.hud-tutorial {
+  position: absolute;
+  bottom: 212px;
+  left: 204px;
+  max-width: 420px;
+  border-left: 3px solid var(--sea);
+}
+.hud-warning {
+  position: absolute;
+  top: 180px;
+  left: 18px;
+  max-width: 420px;
+  color: #ffe0a4;
+  border-color: #dca85e;
+}
+.city-minimap {
+  left: 18px;
+  right: auto;
+  bottom: 18px;
+  width: 164px !important;
+  height: 164px !important;
+  border: 2px solid #a4c8bd;
+  border-radius: 8px;
+  background: #102831;
+}
+.game-metrics {
+  left: auto;
+  right: 12px;
+}
+.game-debug-cross {
+  width: 16px;
+  height: 16px;
+  color: #fff1d3;
+  font-size: 22px;
+  text-align: center;
+  line-height: 14px;
+  text-shadow: 0 1px 3px #102831;
+}
+.game-debug-cross::before,
+.game-debug-cross::after {
+  background: #fff1d3;
+  box-shadow: 0 1px 3px #102831;
+}
+.game-debug-cross::before {
+  width: 12px;
+  height: 1px;
+}
+.game-debug-cross::after {
+  width: 1px;
+  height: 12px;
+}
+.city-map-panel {
+  position: fixed;
+  z-index: 5;
+  inset: 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 20px;
+  background: #102831fa;
+  border: 1px solid #83b5a8;
+  border-radius: 12px;
+  color: var(--paper);
+  overflow: auto;
+}
+.city-map-panel[hidden] {
+  display: none;
+}
+.city-map-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.city-map-panel h2 {
+  margin: 0;
+  font-size: clamp(18px, 3vw, 28px);
+}
+.city-map-panel p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+.city-map-panel canvas {
+  flex: 1;
+  min-height: 260px;
+  max-height: 65vh;
+  height: auto;
+  width: 100%;
+  cursor: grab;
+  border: 1px solid #729b92;
+  border-radius: 6px;
+}
+.city-map-panel .map-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.city-map-panel button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.game-app[data-reduced="true"] * {
+  scroll-behavior: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .game-app * {
+    scroll-behavior: auto;
+  }
+}
+@media (max-width: 700px) {
+  .hud-objective {
+    top: 66px;
+    width: calc(100vw - 36px);
+    font-size: 16px;
+  }
+  .hud-wallet {
+    top: 12px;
+    left: 18px;
+    right: 130px;
+    min-width: 0;
+    padding: 6px 12px;
+    white-space: normal;
+    font-size: 14px;
+  }
+  .hud-vitals {
+    left: 18px;
+    right: 18px;
+    bottom: 14px;
+    min-width: 0;
+    font-size: 16px;
+    padding: 8px 12px;
+  }
+  .city-minimap {
+    left: auto;
+    right: 18px;
+    bottom: 116px;
+    width: 132px !important;
+    height: 132px !important;
+  }
+  .hud-prompt {
+    left: 18px;
+    bottom: 116px;
+    max-width: calc(100vw - 176px);
+    font-size: 16px;
+    padding: 8px 10px;
+  }
+  .hud-tutorial {
+    left: 18px;
+    right: 18px;
+    bottom: 266px;
+    max-width: none;
+    font-size: 15px;
+  }
+  .hud-warning {
+    top: 230px;
+    left: 18px;
+    right: 18px;
+    font-size: 15px;
+  }
+  .game-menu {
+    max-height: calc(100dvh - 24px);
+    padding: 20px;
+  }
+  .game-menu select {
+    max-width: 170px;
+  }
+  .city-map-panel {
+    inset: 10px;
+    padding: 12px;
+  }
+}
+@media (max-height: 550px) {
+  .hud-tutorial {
+    display: none;
+  }
+  .hud-objective {
+    max-height: 110px;
+    overflow: hidden;
+  }
+  .city-map-panel canvas {
+    min-height: 180px;
+  }
+}
+
+.game-app [hidden] {
+  display: none !important;
+}
+.city-map-panel canvas {
+  box-sizing: border-box;
+}
+.hud-tutorial {
+  font-size: 16px;
+}
+
+@media (max-width: 420px) {
+  .game-menu label,
+  .city-map-panel header {
+    flex-wrap: wrap;
+  }
+  .game-menu select {
+    max-width: 100%;
+  }
+}

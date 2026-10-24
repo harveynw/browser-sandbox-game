@@ -1,13 +1,16 @@
-%% Frontend module system — current implementation through T17.
+%% Frontend module system — current implementation through T18.
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["apps/client/src/ — application"]
     main["main.ts<br/>Page routing"]:::app
-    game["game/<br/>GameApp · frame loop · menus / HUD<br/>Entry / exit and terminal prompts<br/>Job choices / checkpoints / repair payment feedback<br/>Private heat / pursuit and arrest feedback"]:::app
+    game["game/<br/>GameApp · frame loop · presentation orchestration<br/>Entry / exit and terminal prompts<br/>Job choices / checkpoints / repair payment feedback<br/>Private heat / pursuit and arrest feedback"]:::app
     diagnostics["game/diagnostics.ts<br/>Compact telemetry · 12-second graphs<br/>Expandable remote entity table"]:::app
     input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
+    settings["game/settings.ts · ui/settings-panel.ts<br/>Validated local preferences / names / key remaps"]:::app
+    hud["ui/hud.ts · ui/city-map.ts<br/>10 Hz objective / vitals / tutorial<br/>North-up minimap · keyboard / pan / zoom map"]:::app
+    audio["audio/sound.ts<br/>Gesture-gated WebAudio · 32-voice pool<br/>Spatial cues / engine / siren · pause / mute"]:::gfx
     tools["Diagnostic routes<br/>content/inspector.ts · simulation/page.ts<br/>app.ts"]:::other
   end
   subgraph group_1["apps/client/src/ — networking"]
@@ -21,8 +24,9 @@ flowchart TD
     bridge["simulation/bridge.ts<br/>Character / vehicle WASM adapter<br/>Car proxies and collision queries"]:::sim
   end
   subgraph group_3["apps/client/src/ — graphics"]
-    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Baked minimap · job / repair markers<br/>Private objective target · courier-only route<br/>Pooled shot / impact effects and pistol<br/>Police car beacons"]:::gfx
-    camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks · first-person aim"]:::gfx
+    renderer["render/renderer.ts<br/>Three.js scene, players, pedestrians and cars<br/>Instanced streamed chunks / fallback<br/>Job / repair signs and markers<br/>Private objective target · courier-only route<br/>Pooled shot / impact / dust effects and pistol<br/>Police car beacons"]:::gfx
+    actors["render/character.ts · render/facades.ts<br/>In-place rig clips · four palettes · dynamic instancing<br/>Eight facade patterns · cosmetic wheels / lean"]:::gfx
+    camera["render/camera.ts<br/>Walking / driving camera<br/>Obstruction checks · eased FOV / reduced motion"]:::gfx
   end
   subgraph group_4["Shared frontend packages"]
     content["packages/content/<br/>Full collision / config preload<br/>Hashed visual ChunkStream · 192 / 256 m"]:::content
@@ -33,6 +37,11 @@ flowchart TD
 
   main -->|"game page"| game
   main -->|"diagnostic pages"| tools
+  settings -->|"persisted bindings / presentation options"| game
+  settings -->|"bindings"| input
+  game -->|"read-only status / public nearby poses"| hud
+  game -->|"gesture / confirmed events / listener"| audio
+  renderer -->|"pose and batch geometry"| actors
   input -->|"controls"| game
   game -->|"client frame / network / render samples"| diagnostics
   game -->|"advance frame"| session

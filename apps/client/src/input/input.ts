@@ -1,22 +1,8 @@
 import type { InputFrame } from "@port-meridian/protocol";
-const bound = new Set([
-  "KeyW",
-  "KeyA",
-  "KeyS",
-  "KeyD",
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-  "ShiftLeft",
-  "ShiftRight",
-  "Space",
-  "KeyE",
-  "KeyF",
-  "KeyR",
-  "KeyQ",
-]);
+import { defaults, type Bindings, type Control } from "../game/settings";
 export class InputState {
+  bindings: Bindings = { ...defaults };
+  private map = false;
   readonly keys = new Set<string>();
   yaw = 0;
   pitch = -0.15;
@@ -30,13 +16,42 @@ export class InputState {
   private interact = false;
   private job = false;
   press(code: string, repeat = false): void {
-    if (!this.active || !bound.has(code)) return;
+    if (!this.active || !this.handles(code)) return;
+    const action = this.action(code);
     this.keys.add(code);
-    if (code === "KeyQ" && !repeat) this.aiming = !this.aiming;
-    if (code === "KeyR" && !repeat) this.reload = true;
-    if (code === "Space" && !repeat) this.jump = true;
-    if (code === "KeyE" && !repeat) this.interact = true;
-    if (code === "KeyF" && !repeat) this.job = true;
+    if (action === "map" && !repeat) this.map = true;
+    if (action === "fire" && !repeat && this.aiming) this.fire = true;
+    if (action === "aim" && !repeat) this.aiming = !this.aiming;
+    if (action === "reload" && !repeat) this.reload = true;
+    if (action === "jump" && !repeat) this.jump = true;
+    if (action === "interact" && !repeat) this.interact = true;
+    if (action === "job" && !repeat) this.job = true;
+  }
+  private action(code: string): Control | undefined {
+    const direct = (Object.keys(this.bindings) as Control[]).find(
+      (a) => this.bindings[a] === code,
+    );
+    if (direct) return direct;
+    const alternate: Record<string, Control> = {
+      ArrowUp: "forward",
+      ArrowDown: "backward",
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      ShiftRight: "sprint",
+    };
+    const a = alternate[code];
+    return a && this.bindings[a] === defaults[a] ? a : undefined;
+  }
+  handles(code: string): boolean {
+    return this.action(code) !== undefined;
+  }
+  down(action: Control): boolean {
+    return this.active && [...this.keys].some((k) => this.action(k) === action);
+  }
+  consumeMap(): boolean {
+    const map = this.active && this.map;
+    this.map = false;
+    return map;
   }
   release(code: string): void {
     this.keys.delete(code);
@@ -49,6 +64,7 @@ export class InputState {
     this.jump = false;
     this.interact = false;
     this.job = false;
+    this.map = false;
     this.active = false;
   }
   look(x: number, y: number): void {
@@ -92,22 +108,16 @@ export class InputState {
     return value;
   }
   sample(driving = false): Omit<InputFrame, "tick"> {
-    const down = (...codes: string[]) =>
-      this.active && codes.some((c) => this.keys.has(c));
+    const down = (action: Control) => this.down(action);
     const result = {
-      move_x:
-        (Number(down("KeyD", "ArrowRight")) -
-          Number(down("KeyA", "ArrowLeft"))) *
-        32767,
-      move_z:
-        (Number(down("KeyW", "ArrowUp")) - Number(down("KeyS", "ArrowDown"))) *
-        32767,
+      move_x: (Number(down("right")) - Number(down("left"))) * 32767,
+      move_z: (Number(down("forward")) - Number(down("backward"))) * 32767,
       look_yaw: this.yaw,
       look_pitch: this.pitch,
       buttons:
-        (!this.aiming && down("ShiftLeft", "ShiftRight") ? 1 : 0) |
+        (!this.aiming && down("sprint") ? 1 : 0) |
         (!driving && this.active && this.aiming ? 8 : 0) |
-        (driving ? (down("Space") ? 4 : 0) : this.active && this.jump ? 2 : 0),
+        (driving ? (down("jump") ? 4 : 0) : this.active && this.jump ? 2 : 0),
     };
     this.jump = false;
     return result;
@@ -173,7 +183,7 @@ export function bindInput(
         if (document.pointerLockElement === canvas) document.exitPointerLock();
         return;
       }
-      if (bound.has(event.code)) {
+      if (state.handles(event.code)) {
         event.preventDefault();
         state.press(event.code, event.repeat);
       }
@@ -184,7 +194,7 @@ export function bindInput(
     "keyup",
     (event) => {
       state.release(event.code);
-      if (state.active && ownsFocus() && bound.has(event.code))
+      if (state.active && ownsFocus() && state.handles(event.code))
         event.preventDefault();
     },
     options,

@@ -17,6 +17,15 @@ export class FollowCamera {
     vehicleHeight = 1.4,
     aiming = false,
   ): number {
+    const fov = aiming && !driving ? 54 : driving ? 70 : 65;
+    const next = reducedMotion
+      ? fov
+      : camera.fov +
+        (fov - camera.fov) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.15));
+    if (Math.abs(camera.fov - next) > 0.001) {
+      camera.fov = next;
+      camera.updateProjectionMatrix();
+    }
     const range = aiming && !driving ? 0.1 : driving ? 7 : 4.5;
     const lift = driving ? Math.max(0, vehicleHeight - 1.4) : 0;
     const target = new Vector3(
