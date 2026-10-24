@@ -1,0 +1,16 @@
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.43s
+     Running tests/actual_transport.rs (target/debug/deps/actual_transport-1453d2b94785ef11)
+
+running 1 test
+T19 loss progress receipts=30
+T19 actual RTC: receipts=30/50 under every-seventh-datagram loss; dropped=34, forwarded=197; UDP blackout retained WS and RTC recovered
+T19 actual kill/reconnect cycle=0, peer=PeerKey { id: 0, generation: 1 }
+T19 actual kill/reconnect cycle=1, peer=PeerKey { id: 0, generation: 2 }
+T19 actual kill/reconnect cycle=2, peer=PeerKey { id: 0, generation: 3 }
+T19 actual kill/reconnect cycle=3, peer=PeerKey { id: 0, generation: 4 }
+T19 actual kill/reconnect cycle=4, peer=PeerKey { id: 0, generation: 5 }
+T19 actual RTC backpressure: 655 queued packets, outstanding=65500 bytes; next send rejected
+test real_rtc_datagram_loss_recovery_and_rapid_kill_reconnect ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.33s

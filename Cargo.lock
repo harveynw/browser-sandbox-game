@@ -2590,9 +2590,11 @@ dependencies = [
 name = "server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "bytes",
  "content",
  "ctrlc",
+ "futures-util",
  "getrandom 0.3.4",
  "net",
  "protocol",
@@ -2601,7 +2603,10 @@ dependencies = [
  "serde_json",
  "sim-core",
  "tiny_http",
+ "tokio",
+ "tokio-tungstenite",
  "toml",
+ "webrtc",
 ]
 
 [[package]]

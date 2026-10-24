@@ -2,7 +2,7 @@
 
 [Index](../README.md)
 
-The [current module diagrams](diagrams/README.md) map the implemented frontend and backend through T18. Keep their Mermaid sources in sync with architecture changes; the proposed layout below includes later milestones.
+The [current module diagrams](diagrams/README.md) map the implemented frontend and backend through T19. Keep their Mermaid sources in sync with architecture changes; the proposed layout below includes later milestones.
 
 ## Stack and ownership
 

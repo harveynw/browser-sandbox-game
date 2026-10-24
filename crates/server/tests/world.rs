@@ -1773,3 +1773,6 @@ mod t16;
 
 #[path = "scenarios/t17.rs"]
 mod t17;
+
+#[path = "scenarios/t19.rs"]
+mod t19;

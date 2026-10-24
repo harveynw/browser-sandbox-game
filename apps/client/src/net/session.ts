@@ -38,6 +38,7 @@ export class GameSession {
   private phase: "connecting" | "loading" | "playing" | "closed" = "connecting";
   private baseline = 0;
   private baselineOpen = false;
+  private baselineReady = false;
   private readonly shown = new Set<number>();
   readonly clock = new ServerClock();
   readonly replicas = new ReplicaStore();
@@ -274,7 +275,7 @@ export class GameSession {
       throw new Error("Expected hello");
     const info = this.hello.message.data;
     if (
-      info.build_id !== "t18-local" ||
+      info.build_id !== "t19-local" ||
       info.content_hash !== this.assets.manifest.content_hash ||
       info.sim_config_hash !== this.assets.manifest.sim_config_hash
     )
@@ -295,6 +296,7 @@ export class GameSession {
     this.ticket = undefined;
   }
   private receive(channel: Channel, bytes: Uint8Array): void {
+    if (this.phase === "closed") return;
     const envelope = decodeServer(bytes, channel);
     const message = envelope.message;
     this.receivedBytes += bytes.length;
@@ -334,6 +336,9 @@ export class GameSession {
     this.lastMessageAt = performance.now();
     switch (message.kind) {
       case "baseline_begin":
+        if (this.baselineOpen || message.data.baseline_id <= this.baseline)
+          throw new Error("Duplicate or overlapping baseline");
+        this.baselineReady = false;
         this.phase = "loading";
         this.events.phase?.("loading");
         this.deadline = performance.now() + 30_000;
@@ -351,8 +356,9 @@ export class GameSession {
         break;
       case "entity_show":
         if (
-          message.data.baseline_id !== null &&
-          (!this.baselineOpen || message.data.baseline_id !== this.baseline)
+          this.baselineOpen
+            ? message.data.baseline_id !== this.baseline
+            : message.data.baseline_id !== null
         )
           throw new Error("Wrong baseline show");
         if (this.baselineOpen && this.shown.has(message.data.descriptor.id))
@@ -373,6 +379,7 @@ export class GameSession {
         )
           throw new Error("Incomplete baseline");
         this.baselineOpen = false;
+        this.baselineReady = true;
         this.replicas.finishBaseline();
         this.log(
           `Baseline ${this.baseline} complete: ${this.shown.size} entities; verified assets ready`,
@@ -385,6 +392,7 @@ export class GameSession {
       case "start_play": {
         if (
           this.phase !== "loading" ||
+          !this.baselineReady ||
           message.data.baseline_id !== this.baseline ||
           message.data.owner.player_id !== this.player
         )
@@ -559,6 +567,7 @@ export class GameSession {
     if (this.phase !== "playing") return;
     this.stopMovement();
     this.local?.stop();
+    this.baselineReady = false;
     this.phase = "loading";
     this.resyncPending = true;
     this.deadline = performance.now() + 30_000;

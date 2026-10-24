@@ -48,8 +48,15 @@ export class BrowserTransport {
           peer = this.peer;
         socket.binaryType = "arraybuffer";
         let signalling = Promise.resolve();
+        let pendingSignals = 0;
         socket.onmessage = ({ data }: MessageEvent<unknown>) => {
           if (typeof data === "string") {
+            // Bound retained signalling strings while an async SDP operation is stalled.
+            if (data.length > 65_536 || pendingSignals >= 32) {
+              this.close("Signalling queue full or message too large");
+              return;
+            }
+            pendingSignals++;
             signalling = signalling
               .then(async () => {
                 if (this.isClosed()) return;
@@ -85,7 +92,10 @@ export class BrowserTransport {
               })
               .catch(() =>
                 this.close("Invalid signalling or failed negotiation"),
-              );
+              )
+              .finally(() => {
+                pendingSignals--;
+              });
           } else this.receive("reliable", data);
         };
         socket.onclose = () => this.close("WebSocket closed");

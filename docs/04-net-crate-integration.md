@@ -117,3 +117,8 @@ The final cross-network result is an experiment, not something that can be infer
 ## T03 implementation checkpoint
 
 The exact pinned crate now powers the localhost Rust listener and typed browser adapter. Two actual browser pages passed concurrent WS/RTC MessagePack probes; local reconnect, recycled peer IDs, and server-originated kill/reconnect also passed. The existing dependency did not require a fork. See [the diagnostic guide](17-transport-diagnostic.md) and [implementation log](implementation-log.md) for evidence and the distinction between live checks, deterministic boundary tests, and remaining dependency limitations. The original design-time observations above remain valid.
+
+
+## T19 regression checkpoint
+
+The unchanged pinned crate now has an explicitly run native localhost regression through the real game adapter and WebSocket/RTC peer, with an actual UDP loss/blackout relay, configured test-peer send-buffer pressure and five server-kill/reconnect cycles using recycled IDs. Native world tests also inject old-generation close/data across twelve rejoins. [Coverage and captured evidence](33-impairment-and-lifecycle.md) distinguish these checks from application scheduler tests and from the dependency's still-opaque internal queues and untagged numeric events. Passing this local stress sample does not prove internal races absent or make a public-release claim.

@@ -19,5 +19,12 @@ rusqlite = { version = "=0.40.2", features = ["bundled"] }
 toml = "=1.0.7"
 ctrlc = { version = "=3.5.2", features = ["termination"] }
 
+[dev-dependencies]
+tokio = { version = "=1.54.0", features = ["rt", "net", "sync", "time", "macros"] }
+tokio-tungstenite = "=0.26.2"
+futures-util = "=0.3.34"
+async-trait = "=0.1.92"
+webrtc = { git = "https://github.com/webrtc-rs/webrtc", rev = "f6b017b0b8f3ed3e47b920b563620800898cfaf0" }
+
 [lints]
 workspace = true

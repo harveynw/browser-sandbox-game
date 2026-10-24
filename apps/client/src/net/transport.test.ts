@@ -177,3 +177,47 @@ describe("BrowserTransport failure boundaries", () => {
     transport.close();
   });
 });
+
+it("bounds signalling retained behind a stalled offer and ignores its completion after close", async () => {
+  const { transport, socket, peer } = await connected();
+  let release: (() => void) | undefined;
+  peer.setRemoteDescription.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+  );
+  socket.onmessage?.({ data: JSON.stringify({ sdp: "stalled" }) });
+  await Promise.resolve();
+  for (let i = 0; i < 32; i++)
+    socket.onmessage?.({
+      data: JSON.stringify({ candidate: { candidate: `ice-${i}` } }),
+    });
+  expect(transport.state).toBe("closed");
+  release?.();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(peer.createAnswer).not.toHaveBeenCalled();
+  expect(peer.addIceCandidate).not.toHaveBeenCalled();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it("rejects oversized signalling before retaining it and permits pressure recovery", async () => {
+  const first = await connected();
+  first.channel.bufferedAmount = 65_537;
+  for (let i = 0; i < 1000; i++)
+    expect(first.transport.send("unreliable", new Uint8Array([1]))).toBe(
+      "backpressured",
+    );
+  expect(first.channel.send).not.toHaveBeenCalled();
+  first.channel.bufferedAmount = 0;
+  expect(first.transport.send("unreliable", new Uint8Array([2]))).toBe(
+    "queued",
+  );
+  first.socket.bufferedAmount = 262_145;
+  await vi.advanceTimersByTimeAsync(1000);
+  first.socket.bufferedAmount = 0;
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(first.transport.state).toBe("ready");
+  first.socket.onmessage?.({ data: "x".repeat(65_537) });
+  expect(first.transport.state).toBe("closed");
+});
