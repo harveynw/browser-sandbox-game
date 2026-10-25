@@ -19,11 +19,11 @@ Use the real net-crate transport even on localhost. A local game must still exer
 
 Bind listeners to `127.0.0.1`, not `0.0.0.0`. Do not enable STUN/TURN or change router settings. The crate’s default host candidates are the intended loopback path; confirm through the actual two-browser spike.
 
-T07 now implements the HTTP/Vite-proxy topology above and real memory guest admission. See [21 — Authoritative localhost sessions](21-authoritative-sessions.md) for the exact available commands and explicit browser-reported readiness gate. T17 implements persistence-only local config, SQLite profiles and bounded shutdown; setup/dev:all supervision and unattended probes remain later work.
+T07 now implements the HTTP/Vite-proxy topology above and real memory guest admission. See [21 — Authoritative localhost sessions](21-authoritative-sessions.md) for the exact available commands and explicit browser-reported readiness gate. T17 implements persistence-only local config, SQLite profiles and bounded shutdown; T21 implements setup/dev:all/preview:local supervision and real native startup probes. See [37 — Local launch](37-local-launch.md).
 
 ## Required developer commands
 
-These are interfaces for T01/T21 to implement, not commands already available:
+These commands are implemented. See the launch guide for prerequisites and verification:
 
 ```text
 npm ci
@@ -32,10 +32,12 @@ npm run dev:all            supervise Rust server + Vite; stream labelled logs
 npm run dev               Vite alone
 cargo run -p server -- --config config/dev.toml
 npm run build
-npm run preview:local     built client plus API proxy, while local server runs
+npm run preview:local     build and supervise production preview plus local server
+npm run config:test       generate a unique disposable SQLite test config
+npm run test:local        explicit loopback/process lifecycle tests
 ```
 
-`dev:all` starts the server first, waits for readiness with a 20-second bounded timeout, then starts Vite. If either child exits unexpectedly, stop its sibling and print the failing process/port. Ctrl+C closes both and flushes persistence. Never leave orphan listeners after a failed launch.
+`dev:all` starts the server first and waits for liveness, then starts Vite and completes a real WS/RTC probe through its HTTP proxy within a twenty-second startup deadline (excluding builds). Full transport readiness cannot precede serving the proxy used by that probe. If either child exits unexpectedly, stop its sibling and print the failing process/port. Ctrl+C closes both and flushes persistence. Never leave orphan listeners after a failed launch.
 
 The setup command checks required tools and explains missing ones; it must not silently install global toolchains or modify system configuration. Record the tested Rust stable toolchain, Node LTS version, wasm target, and WASM packaging tool version in the project README when implemented. Commit lockfiles.
 
@@ -66,9 +68,9 @@ Keep origin checks and wire validation in local development so the architecture 
 ## Health and logs
 
 - `/health/live`: process supervisor alive.
-- `/health/ready`: valid content, persistence worker ready, complete local net-crate probe succeeded.
+- `/health/ready`: valid content, persistence worker ready, recent complete local net-crate probe succeeded (five-second receipt expiry).
 - `/api/build`: exact build/protocol/content/sim hashes.
-- `/metrics`: loopback-only debug metrics.
+- `/api/metrics`: loopback-only cached debug metrics.
 
 `Server::new` returning is not proof that its listener bound. A complete transport probe catches the pinned crate’s background startup errors. On local port conflict, fail launch with the port and process name, rather than leave the browser loading.
 

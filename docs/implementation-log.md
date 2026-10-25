@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T20 in progress, 25 October 2026; G4 incomplete**. T01–T19 are complete. Historical entries retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T21 complete, 25 October 2026; T20 performance deferred by user, G4 incomplete**. T01–T19 and T21 are complete. Historical entries retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -25,8 +25,8 @@ Latest checkpoint: **T20 in progress, 25 October 2026; G4 incomplete**. T01–T1
 | T17 — Local profile persistence | Complete |
 | T18 — Presentation and UX | Complete |
 | T19 — Impairment and lifecycle suite | Complete |
-| T20 — Capacity and performance | In progress — G4 incomplete |
-| T21 — One-command local launch | Not started |
+| T20 — Capacity and performance | Deferred by user — G4 incomplete |
+| T21 — One-command local launch | Complete |
 | T22 — Final acceptance and handoff | Not started |
 
 ## T01 — Workspace and commands
@@ -682,3 +682,15 @@ A subsequent ten-minute real 16-player stress measurement completed: 24 traffic 
 `npm run check`: 111 TypeScript / 137 Rust tests, generation/WASM/type/lint/format/Clippy pass. Existing explicit real-socket suite: three profiles pass. Production build passes, retaining its known chunk-size advisory. See [36 — Capacity and performance](36-capacity-and-performance.md) for hardware, scope, raw samples, failure traces, source fingerprint, commands and exact unmet metrics.
 
 Next work remains T20: resolve RTC freshness and memory growth under impairment, then perform the full soak/reference/traversal acceptance measurements. T21 has not started.
+
+## T21 — One-command localhost launch
+
+Status: **complete, 25 October 2026**. The user explicitly requested proceeding while deferring network-performance work to revisit their own net crate. T20/G4 remains deferred and has not been relabelled as passed.
+
+Added `setup`, `dev:all`, `preview:local`, `config:test` and `test:local`. The supervisor checks installed Node/npm/Rust/WASM tools and fixed loopback ports, prepares builds, starts owned release-server/Vite process groups, validates liveness/proxy/frontend and runs an ordinary guest through native real WS/RTC admission, baseline, StartPlay and nonce-matched receipts. A separate mode-0600 probe cookie reuses its own guest; the probe leaves before announcing ready. Full readiness follows frontend startup because the probe uses its HTTP proxy. This corrects the earlier readiness-before-proxy ordering without weakening the receipt gate.
+
+Unexpected child exit, startup/build failure and Ctrl+C/SIGTERM stop owned siblings and descendants, escalating after bounded graceful shutdown. Missing tools and occupied ports give concrete guidance; existing listeners are never killed automatically. Temporary SQLite configuration retains test saves in a printed OS-temp directory; normal profile data is preserved. Vite's standalone and combined bindings are explicitly 127.0.0.1. The runbook documents prerequisites, build reuse, normal/private guest contexts, saves, five-second readiness expiry and POSIX platform scope. Diagrams include the supervisor and native operator probe.
+
+Verification: full setup; real dev startup and induced server-exit/sibling cleanup; full production preview build, Chromium Play/WS/RTC and movement; actual terminal Ctrl+C with persistence drained and no listeners; same-test-database restart with probe profile count 2→2; unchanged normal database hash. Seven process/socket tests and two example tests pass; existing full check passes 111 TypeScript / 137 workspace Rust tests plus drift/WASM/typing/lint/format/Clippy. [37 — Local launch](37-local-launch.md) contains commands, scope and captured evidence. The normal saved production preview was restored afterward.
+
+Next task: **T22 — Final acceptance and handoff**, retaining the user-authorized G4 deferral. No T22 acceptance claim is made here.

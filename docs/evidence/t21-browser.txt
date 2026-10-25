@@ -1,0 +1,113 @@
+Browser tab: 6, Title: "Port Meridian — explore the city", URL: "http://localhost:4173/".
+0 AXWebArea Port Meridian — explore the city, URL: localhost:4173/
+	1 container Description: Port Meridian — Old Quay, ID: app
+		2 image Port Meridian third-person game
+		24 container
+			25 button (expanded) Diagnostics, Secondary Actions: Collapse
+				26 text Diagnostics
+			27 container Client diagnostics
+				134 text PASS · player 8 · epoch 1 · tick 4461 · WS 108 · RTC 108
+				29 container
+					30 text Frame avg
+					135 text 16.6 ms
+					32 image Frame avg, last 12 seconds
+					136 text 12s · 0–33 ms
+				34 container
+					35 text Round trip
+					137 text 17.0 ms
+					37 image Round trip, last 12 seconds
+					138 text 12s · 0–50 ms
+				39 container
+					40 text Correction
+					139 text 0.000 m
+					42 image Correction, last 12 seconds
+					140 text 12s · 0–0.050 m
+				44 container
+					45 heading NETWORK, Value: 2
+						46 text NETWORK
+					47 definition list
+						48 container Player / epoch
+							49 text Player / epoch
+						50 text 8 / 1
+						51 container Server / owner
+							52 text Server / owner
+						141 text 4461 / 4461
+						54 container Up / down
+							55 text Up / down
+						142 text 10.6 / 59.8 KiB/s
+						57 container Input lead
+							58 text Input lead
+						59 text 3 ticks
+						60 container Cached join
+							61 text Cached join
+						62 text 1995 ms
+				63 container
+					64 heading PREDICTION, Value: 2
+						65 text PREDICTION
+					66 definition list
+						67 container Predicted tick
+							68 text Predicted tick
+						143 text 4466
+						70 container Correction / p95
+							71 text Correction / p95
+						72 text 0.000 / 0.000 m
+						73 container Replay steps
+							74 text Replay steps
+						127 text 2
+						76 container History ring
+							77 text History ring
+						144 text 5 / 128
+				79 container
+					80 heading RENDERING, Value: 2
+						81 text RENDERING
+					82 definition list
+						83 container FPS / frame avg
+							84 text FPS / frame avg
+						145 text 60 / 16.6 ms
+						86 container Draws / triangles
+							87 text Draws / triangles
+						146 text 121 / 20,566
+						89 container Geometries
+							90 text Geometries
+						91 text 5
+						92 container WASM memory
+							93 text WASM memory
+						94 text 1.4 MiB
+				95 container
+					96 heading STREAMING, Value: 2
+						97 text STREAMING
+					98 definition list
+						99 container Resident chunks
+							100 text Resident chunks
+						101 text 14 / 36
+						102 container Pending / fallback
+							103 text Pending / fallback
+						104 text 0 / 0
+						105 container Instance matrices
+							106 text Instance matrices
+						147 text 526 KiB
+						108 container Remote entities
+							109 text Remote entities
+						148 text 39
+				111 text Position XYZ -183.00 0.02 161.00 Look / camera 0.000 / -0.150 rad · 4.50 m
+				112 button (collapsed) Entities · 39 remote · 0 stale, Secondary Actions: Expand
+					149 text Entities · 39 remote · 0 stale
+				114 button (collapsed) Performance capture, Secondary Actions: Expand
+					115 text Performance capture
+			116 button Resync world
+		5 container
+			6 text PORT MERIDIAN / SIX DISTRICTS
+			7 heading Port Meridian, Value: 1
+				8 text Port Meridian
+			133 text Paused — the online world continues. 0 credits · 0 completed jobs · Heat 0/3 W / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menu Jobs: cyan Quay terminal · 22 m · Approach within 3 m to choose courier / recovery · M city map
+			22 button Resume / mouse look
+			20 button Leave game
+			23 button City map · M
+			13 button (collapsed) Settings & controls, Secondary Actions: Expand
+				14 text Settings & controls
+			15 text Cyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.
+			16 link Description: Map inspector, Value: localhost:4173/map
+			17 link Description: Movement trace, Value: localhost:4173/simulation
+			18 link Description: Connection diagnostic, Value: localhost:4173/diagnostic
+
+The focused UI element is 2 image Port Meridian third-person game

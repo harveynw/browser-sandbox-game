@@ -7,13 +7,13 @@ const proxy = {
 
 export default defineConfig({
   server: {
-    host: "localhost",
+    host: "127.0.0.1",
     port: 5173,
     strictPort: true,
     proxy,
   },
   preview: {
-    host: "localhost",
+    host: "127.0.0.1",
     port: 4173,
     strictPort: true,
     proxy,

@@ -1,0 +1,24 @@
+
+> port-meridian@0.1.0 dev:all
+> node tools/local.mjs dev --temporary --no-build
+
+[setup] Node 24.22.1, npm 10.9.2, Rust 1.94.0, wasm-bindgen 0.2.129, WASM target, rustfmt and Clippy available.
+[config] Disposable database retained at /var/folders/jw/m2t9_07x74v07_268plld8yr0000gn/T/port-meridian-7rOYy5
+[server] starting
+[server] T19 localhost world world-0d8f0ae2094e02a8a620806696d86597: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001
+[server] Profile storage: SQLite WAL
+[server] Localhost development issuer only. Readiness UNPROVEN until the browser reports WS and RTC pong receipt. Open http://localhost:5173 and choose Play, or /diagnostic and Connect.
+[frontend] starting
+[frontend] 5:48:28 PM [vite] (client) Re-optimizing dependencies because lockfile has changed
+[frontend] 
+[frontend]   VITE v8.3.4  ready in 130 ms
+[frontend] 
+[frontend]   ➜  Local:   http://127.0.0.1:5173/
+[probe] starting
+[probe] PASS: complete baseline, StartPlay, nonce-matched WS + RTC receipts, proxy /health/ready 200; probe left.
+[ready] http://localhost:5173/ — HTTP proxy, admission, WS and RTC verified. Ctrl+C stops both processes and flushes saves.
+[ready] Probe guest has left. /health/ready remains a short-lived transport receipt; idle expiry is normal. Use separate browser profiles/private contexts for two players.
+[server] Local peer 0 closed: remote closed
+[server] Shutdown persistence drained: true; unresolved repair debits recover at next boot.
+[shutdown] Owned process groups stopped; SQLite saves preserved.
+[local] server exited unexpectedly (0).

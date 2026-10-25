@@ -1,9 +1,11 @@
-%% Backend module system — current implementation through T20 instrumentation (G4 incomplete).
+%% Backend module system — current implementation through T21 local launch (G4 deferred by user).
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["crates/server/src/ — startup and world"]
+    launcher["tools/local.mjs<br/>Tool checks / builds / owned process groups<br/>Deadline / sibling cleanup / shutdown"]:::app
+    probe["examples/local_probe.rs<br/>Normal guest admission / full baseline<br/>Real nonce-matched WS + RTC startup receipts"]:::other
     main["main.rs<br/>Startup and main loop"]:::app
     config["config.rs · config/dev.toml<br/>SQLite default / explicit memory mode"]:::app
     persistence["persistence.rs · SQLite worker thread<br/>Migrations / WAL / atomic economic ledger<br/>Repair acknowledgements and restart refunds"]:::other
@@ -35,6 +37,10 @@ flowchart TD
     assets["Baked content package<br/>Six districts · collision / configuration<br/>Visual streaming belongs to browser"]:::content
     net["net-crate<br/>WebSocket + WebRTC server"]:::other
 
+  launcher -->|"spawn release server"| main
+  launcher -->|"run after frontend proxy is live"| probe
+  probe <-->|"normal WS / RTC signalling and messages"| net
+  probe <-->|"HTTP through Vite proxy / receipt report"| control
   main -->|"validate local configuration"| config
   config -->|"open and recover before listeners"| persistence
   admission <-->|"bounded commands / committed results"| persistence

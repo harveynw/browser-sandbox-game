@@ -1,9 +1,10 @@
-%% Frontend module system — current implementation through T20 instrumentation (G4 incomplete).
+%% Frontend module system — current implementation through T21 local launch (G4 deferred by user).
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
 flowchart TD
   subgraph group_0["apps/client/src/ — application"]
+    launcher["tools/local.mjs<br/>Owned Vite dev / production preview<br/>Loopback proxy and page checks / Ctrl+C"]:::app
     main["main.ts<br/>Page routing"]:::app
     game["game/<br/>GameApp · frame loop · presentation orchestration<br/>Entry / exit and terminal prompts<br/>Job choices / checkpoints / repair payment feedback<br/>Private heat / pursuit and arrest feedback"]:::app
     diagnostics["game/diagnostics.ts<br/>Compact telemetry · 12-second graphs<br/>Expandable remote entity table<br/>Bounded performance capture / copyable JSON"]:::app
@@ -36,6 +37,7 @@ flowchart TD
   end
     backend["Backend<br/>HTTP :3001 · WS / WebRTC :3000"]:::other
 
+  launcher -->|"serve application and /api /health proxy"| main
   main -->|"game page"| game
   main -->|"diagnostic pages"| tools
   settings -->|"persisted bindings / presentation options"| game

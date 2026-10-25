@@ -33,8 +33,8 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
 | Complete | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
 | Complete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
-| In progress — G4 incomplete | T20 Capacity and performance | T19 | Measured 16-player budgets |
-| Not started | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
+| Deferred by user — G4 incomplete | T20 Capacity and performance | T19 | Measured 16-player budgets |
+| Complete | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
 | Not started | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
 
 The dependencies describe the recommended execution order; they are not permission to delegate or run overlapping edits automatically.
@@ -205,13 +205,15 @@ Optimize measured bottlenecks: AOI priorities, idle rates, path queue, instancin
 
 **Done:** G4 passes or exact unmet metrics remain explicitly incomplete. Record hardware, browser version, build, seed, duration, p50/p95/p99, and packet sizes. Do not substitute an unpopulated scene benchmark.
 
-Current evidence: [36 — Capacity and performance](36-capacity-and-performance.md). The populated benchmark and instrumentation are implemented; target RTC latency, reference hardware and soak gates remain incomplete.
+Current evidence: [36 — Capacity and performance](36-capacity-and-performance.md). The populated benchmark and instrumentation are implemented; target RTC latency, reference hardware and soak gates remain incomplete. On 25 October 2026 the user explicitly deferred network-performance work to revisit their net crate and authorized proceeding to T21. G4 has not been marked passed.
 
 ## T21 — Local launch and build packaging
 
 Implement `setup`, `dev:all`, `preview:local`, temporary test config generation, child-process supervision, loopback readiness, and clean shutdown. Document normal/private browser-context testing and local save location.
 
 **Done:** fresh documented setup launches through one command; production client build runs locally; occupied ports and missing toolchains give actionable errors; Ctrl+C leaves no listeners. No cloud/TLS/TURN work.
+
+Completed 25 October 2026. [37 — Local launch](37-local-launch.md) records setup, supervised dev/production preview, real startup receipts, process failure/descendant cleanup, Ctrl+C port release and save preservation. The user-authorized T20 deferral above remains in force.
 
 ## T22 — Final acceptance and handoff
 

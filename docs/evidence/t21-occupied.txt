@@ -1,0 +1,7 @@
+
+> port-meridian@0.1.0 preview:local
+> node tools/local.mjs preview --no-build
+
+[setup] Node 24.22.1, npm 10.9.2, Rust 1.94.0, wasm-bindgen 0.2.129, WASM target, rustfmt and Clippy available.
+[shutdown] Owned process groups stopped; SQLite saves preserved.
+[local] Port 3000 on 127.0.0.1 is unavailable (EADDRINUSE). Stop its owner first; inspect with lsof -nP -iTCP:3000 -sTCP:LISTEN on macOS/Linux. This launcher never kills unrelated processes.

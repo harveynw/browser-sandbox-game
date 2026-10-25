@@ -31,7 +31,12 @@
     "bridge:generate": "cargo run -p xtask --locked -- generate-bridge",
     "bridge:check": "cargo run -p xtask --locked -- check-bridge",
     "predev": "npm run bridge:generate && npm run build:wasm",
-    "content:audit": "node tools/audit-content.mjs"
+    "content:audit": "node tools/audit-content.mjs",
+    "setup": "node tools/local.mjs setup",
+    "dev:all": "node tools/local.mjs dev",
+    "preview:local": "node tools/local.mjs preview",
+    "config:test": "node tools/local.mjs config",
+    "test:local": "node --test tools/local.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

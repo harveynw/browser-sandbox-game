@@ -1,6 +1,6 @@
 # 36 — Capacity and performance
 
-T20 now has a reproducible populated benchmark and timing/byte/memory instrumentation. **G4 remains incomplete:** the target impairment run exposes excessive RTC latency, and reference-hardware and soak evidence is still missing. T21 has not started. Network v3, build `protocol-simple-local` and the pinned net/WebRTC dependencies are unchanged.
+T20 now has a reproducible populated benchmark and timing/byte/memory instrumentation. **G4 remains incomplete:** the target impairment run exposes excessive RTC latency, and reference-hardware and soak evidence is still missing. On 25 October 2026 the user explicitly deferred network-performance work to revisit their own net crate and authorized proceeding to T21. Network v3, build `protocol-simple-local` and the pinned net/WebRTC dependencies are unchanged.
 
 ## Measurement surface
 
@@ -82,7 +82,7 @@ The static package audit reports a conservative first play of **707,125 bytes gz
 
 Verification: `npm run check` passes **111 TypeScript / 137 Rust tests**, generation checks, release WASM, typing, lint, format and Clippy with warnings denied. Four explicit socket/soak tests are ignored by the default runner. The separate existing actual-transport suite passes **three profiles**, including loss, blackout recovery, reconnect and bounded send pressure. The full production build passes with the existing Three.js chunk-size advisory. [Full check](evidence/t20-check.txt), [build](evidence/t20-build.txt), [actual transport](evidence/t20-actual-transport.txt).
 
-Still incomplete: investigate growing RTC delivery delay and server memory under target impairment; establish representative browser prediction under that profile; rerun a full 60-minute capped-population soak after the transport issue is resolved; run continuous ten-minute traversal and ten settled joins with heap/resource comparisons; validate reference laptop/2-vCPU budgets, and time first play at a stated network speed. These are T20/G4 work. **Do not advance T21 on the strength of a successful load-harness exit.**
+Still incomplete: investigate growing RTC delivery delay and server memory under target impairment; establish representative browser prediction under that profile; rerun a full 60-minute capped-population soak after the transport issue is resolved; run continuous ten-minute traversal and ten settled joins with heap/resource comparisons; validate reference laptop/2-vCPU budgets, and time first play at a stated network speed. These are T20/G4 work. The user subsequently authorized proceeding to T21 while deferring network-performance work. This is an explicit sequencing decision, not a G4 pass.
 
 ### Corrected clock and cached-join follow-up
 

@@ -54,7 +54,7 @@ fn run() -> Result<(), String> {
     let mut transport =
         NetCrateTransport::start("127.0.0.1:3000").map_err(|e| format!("WS bind/start: {e}"))?;
     println!(
-        "T19 localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
+        "Port Meridian localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
         world.id
     );
     println!(
@@ -66,7 +66,7 @@ fn run() -> Result<(), String> {
         }
     );
     println!(
-        "Localhost development issuer only. Readiness UNPROVEN until the browser reports WS and RTC pong receipt. Open http://localhost:5173 and choose Play, or /diagnostic and Connect."
+        "Localhost development issuer only. Readiness UNPROVEN until a real client probe reports WS and RTC pong receipt. Open http://localhost:5173 and choose Play, or /diagnostic and Connect."
     );
     let mut scheduler = Scheduler::default();
     let mut previous = Instant::now();
