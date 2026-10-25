@@ -33,14 +33,14 @@ Generated schemas remain metadata for tools/documentation. Three local WASM sche
 
 The production session JS chunk changed from **173.32 kB / 47.73 kB gzip** to **31.96 kB / 10.31 kB gzip**. This is a measured chunk-size comparison, not a total download or frame-time benchmark. The separate Three.js chunk advisory remains.
 
-## Verification and open transport issue
+## Verification and transport investigation (historical)
 
 - `npm run check`: **110 TypeScript / 132 Rust tests pass**, plus strict typing, lint/formatting, generated protocol/content/bridge drift, release WASM and Clippy with warnings denied. The actual socket tests are explicitly ignored in the default native runner and run separately.
 - `npm run build`: passes.
 - The separately run healthy RTC/blackout/backpressure/reconnect test passes: five recycled-ID kills/rejoins, stale-generation isolation and a sixth-peer send-buffer rejection at 65,500 outstanding bytes under its 65,536-byte limit. [Captured healthy transport run](evidence/protocol-simple-healthy-rtc.txt).
 - Production browser using real WS/RTC: joined the v3 SQLite-backed server, retained 150 credits/one completed job, walked to Quay, accepted and cancelled courier, entered/drove/braked/exited a compact and completed Resync world. Epoch advanced to 4, both paths had 75 receipts, correction p95 was 0.000 m and pending/fallback chunks were zero. [Live v3 evidence](evidence/protocol-simple-v3-live.png). No live actor/economic state injection was used.
 
-The deliberately lossy native RTC test **does not currently pass its progress threshold**. It also fails with the committed pre-simplification v2 codec in a temporary checkout, using the same paced diagnostic probe. Within eight seconds, all 50 requests were sent but v3 observed two unique replies and the old codec observed five; both fail the unchanged requirement of more than fifteen. The original short-window v3 probe also failed (nine receipts). These observations isolate an existing loss-path/test problem; they do not identify its precise dependency or harness cause.
+At the time of the cleanup, the deliberately lossy native RTC test **did not pass its progress threshold**. The later [RTC regression repair](35-rtc-loss-regression.md) resolves the harness issue and restores T19 completion; the original observations below are retained for traceability. It also fails with the committed pre-simplification v2 codec in a temporary checkout, using the same paced diagnostic probe. Within eight seconds, all 50 requests were sent but v3 observed two unique replies and the old codec observed five; both fail the unchanged requirement of more than fifteen. The original short-window v3 probe also failed (nine receipts). These observations isolate an existing loss-path/test problem; they do not identify its precise dependency or harness cause.
 
 The actual transport test is split so this loss failure cannot prevent independent healthy-path, blackout recovery, backpressure and rapid reconnect checks from running:
 
@@ -49,4 +49,4 @@ cargo test -p server --test actual_transport real_rtc_backpressure_and_rapid_kil
 cargo test -p server --test actual_transport real_rtc_loss_and_blackout_recovery --locked -- --ignored --nocapture
 ```
 
-The second command remains an open **T19** regression investigation, with likely owners `server/tests/support/rtc.rs`, the UDP relay and the pinned RTC dependency. First inspect datagram direction/SCTP acknowledgement/abandonment progress; do not lower the threshold or hide the failure. T19 is reopened as incomplete and T20 remains unstarted. Earlier T19 passing evidence is historical, not a current all-loss-path pass claim. [v3 failing probe](evidence/protocol-simple-loss-v3.txt), [old-codec comparison](evidence/protocol-simple-loss-baseline.txt).
+The second command originally reopened **T19**. Investigation in document 35 identified deliberate latest-Pong coalescing and a direction-coupled periodic loss schedule. The corrected independent-record/seeded-loss probe retains the more-than-fifteen threshold and passes, alongside the retained periodic recovery stress case. T19 is complete again and T20 remains unstarted. The original [v3 failing probe](evidence/protocol-simple-loss-v3.txt) and [old-codec comparison](evidence/protocol-simple-loss-baseline.txt) remain historical evidence.

@@ -32,7 +32,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T16 Remaining jobs and repair | T15 | Time trial/recovery/repair rules |
 | Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
 | Complete | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
-| Incomplete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
+| Complete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
 | Not started | T20 Capacity and performance | T19 | Measured 16-player budgets |
 | Not started | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
 | Not started | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
@@ -195,7 +195,7 @@ G3 local functional acceptance passed on 24 October 2026: native gameplay checks
 
 Implement the full matrix in 11 using seeded packet scheduler plus real local transport tests. Cover pre-open data, baseline ordering, same-tick packet splits, epochs, stale sessions, backgrounding, queue saturation, resync, and ID reuse.
 
-**Done:** every documented regression has a reproducible test or clearly recorded manual evidence where automation is infeasible. Fix failures without weakening authority or bypassing real RTC. Originally completed 24 October 2026; reopened after the protocol simplification reproduced an RTC-loss progress failure with both old and new codecs. See [the follow-up](34-protocol-simplification.md). The historical [coverage and limits](33-impairment-and-lifecycle.md) distinguish all six seeded application profiles from the actual UDP loss/backpressure and kill/reconnect run. Dependency-internal queue/ID limitations remain explicit.
+**Done:** every documented regression has a reproducible test or clearly recorded manual evidence where automation is infeasible. Fix failures without weakening authority or bypassing real RTC. Completed 24 October 2026; the post-v3 loss investigation is resolved by [the RTC regression repair](35-rtc-loss-regression.md). The probe now distinguishes intentional Pong coalescing from actual packet loss, uses independent seeded loss and retains periodic-loss recovery stress. Three actual transport profiles pass without lowering the independent-loss progress threshold. Dependency-internal queue/ID limitations remain explicit.
 
 ## T20 — Capacity and performance
 

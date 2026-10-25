@@ -40,16 +40,74 @@ impl PeerConnectionEventHandler for Handler {
         let _ = self.0.try_send(Signal::Channel(c));
     }
 }
+/// Independent streams make the loss profile reproducible without coupling
+/// its direction to the SCTP DATA/SACK packet cadence.
+struct DatagramLoss([u32; 2]);
+impl Default for DatagramLoss {
+    fn default() -> Self {
+        Self([0x19c0_ff01, 0x19c0_ff02])
+    }
+}
+impl DatagramLoss {
+    fn drop(&mut self, direction: usize, one_in: usize) -> bool {
+        if one_in == 0 {
+            return false;
+        }
+        let state = &mut self.0[direction];
+        *state ^= *state << 13;
+        *state ^= *state >> 17;
+        *state ^= *state << 5;
+        (*state as usize).is_multiple_of(one_in)
+    }
+}
+#[test]
+fn independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic() {
+    let mut a = DatagramLoss::default();
+    let mut b = DatagramLoss::default();
+    let mut forward = 0;
+    let mut reverse = 0;
+    for _ in 0..1400 {
+        let drop = a.drop(0, 7);
+        assert_eq!(drop, b.drop(0, 7));
+        forward += usize::from(drop);
+        // Only one schedule sees this extra reverse traffic.
+        reverse += usize::from(a.drop(1, 7));
+        assert!(!a.drop(0, 0));
+    }
+    assert!((150..250).contains(&forward));
+    assert!((150..250).contains(&reverse));
+}
+
 #[derive(Default)]
 struct Route {
     client: Option<SocketAddr>,
     server: Option<SocketAddr>,
 }
+#[derive(Debug, Default, Clone, Copy)]
+pub struct RelayStats {
+    // Index 0 is client -> server, index 1 is server -> client.
+    received: [usize; 2],
+    dropped: [usize; 2],
+    forwarded: [usize; 2],
+    unknown: usize,
+}
+impl RelayStats {
+    pub fn since(&self, before: Self) -> Self {
+        Self {
+            received: std::array::from_fn(|i| self.received[i] - before.received[i]),
+            dropped: std::array::from_fn(|i| self.dropped[i] - before.dropped[i]),
+            forwarded: std::array::from_fn(|i| self.forwarded[i] - before.forwarded[i]),
+            unknown: self.unknown - before.unknown,
+        }
+    }
+}
 pub struct Relay {
+    pub stats: Arc<Mutex<RelayStats>>,
     address: SocketAddr,
     route: Arc<Mutex<Route>>,
     stop: Arc<AtomicBool>,
-    pub drop_every: Arc<AtomicUsize>,
+    pub loss_one_in: Arc<AtomicUsize>,
+    pub periodic_loss: Arc<AtomicBool>,
     pub blocked: Arc<AtomicBool>,
     pub dropped: Arc<AtomicUsize>,
     pub forwarded: Arc<AtomicUsize>,
@@ -63,49 +121,68 @@ impl Relay {
         let route = Arc::new(Mutex::new(Route::default()));
         let stop = Arc::new(AtomicBool::new(false));
         let blocked = Arc::new(AtomicBool::new(false));
-        let drop_every = Arc::new(AtomicUsize::new(0));
+        let loss_one_in = Arc::new(AtomicUsize::new(0));
+        let periodic_loss = Arc::new(AtomicBool::new(false));
+        let periodic = periodic_loss.clone();
         let dropped = Arc::new(AtomicUsize::new(0));
         let forwarded = Arc::new(AtomicUsize::new(0));
         let (r, s, b, n, d, f) = (
             route.clone(),
             stop.clone(),
             blocked.clone(),
-            drop_every.clone(),
+            loss_one_in.clone(),
             dropped.clone(),
             forwarded.clone(),
         );
+        let stats = Arc::new(Mutex::new(RelayStats::default()));
+        let counters = stats.clone();
         let worker = thread::spawn(move || {
             let mut bytes = [0u8; 65536];
+            // Separate seeded streams avoid phase-locking loss to a protocol's
+            // DATA/SACK cadence or concentrating every global seventh packet on one direction.
+            let mut random = DatagramLoss::default();
             let mut count = 0;
             while !s.load(Ordering::Relaxed) {
                 if let Ok((size, from)) = socket.recv_from(&mut bytes) {
                     let target = {
                         let r = r.lock().unwrap();
                         if Some(from) == r.server {
-                            r.client
+                            r.client.map(|to| (1, to))
                         } else if Some(from) == r.client {
-                            r.server
+                            r.server.map(|to| (0, to))
                         } else {
                             None
                         }
                     };
-                    if let Some(target) = target {
-                        count += 1;
+                    if let Some((direction, target)) = target {
+                        counters.lock().unwrap().received[direction] += 1;
                         let every = n.load(Ordering::Relaxed);
-                        if b.load(Ordering::Relaxed) || (every > 0 && count % every == 0) {
+                        count += 1;
+                        let drop = if periodic.load(Ordering::Relaxed) {
+                            every > 0 && count % every == 0
+                        } else {
+                            random.drop(direction, every)
+                        };
+                        if b.load(Ordering::Relaxed) || drop {
                             d.fetch_add(1, Ordering::Relaxed);
+                            counters.lock().unwrap().dropped[direction] += 1;
                         } else if socket.send_to(&bytes[..size], target).is_ok() {
                             f.fetch_add(1, Ordering::Relaxed);
+                            counters.lock().unwrap().forwarded[direction] += 1;
                         }
+                    } else {
+                        counters.lock().unwrap().unknown += 1;
                     }
                 }
             }
         });
         Ok(Self {
+            stats,
             address,
             route,
             stop,
-            drop_every,
+            loss_one_in,
+            periodic_loss,
             blocked,
             dropped,
             forwarded,
@@ -226,6 +303,14 @@ impl Peer {
         event=async move{match channel{Some(c)=>c.poll().await,None=>pending().await}}=>{match event.ok_or("RTC ended")?{DataChannelEvent::OnOpen=>self.open=true,DataChannelEvent::OnMessage(m)=>{assert!(!m.is_string);return Ok(Some((false,m.data.to_vec())));},DataChannelEvent::OnClose=>return Err("RTC closed".into()),_=>{}}}
         }
         Ok(None)
+    }
+    pub async fn outstanding(&self) -> Result<usize> {
+        Ok(self
+            .channel
+            .as_ref()
+            .ok_or("no RTC channel")?
+            .outstanding_bytes()
+            .await?)
     }
     pub async fn check_backpressure(&mut self, packet: &[u8]) -> Result {
         self.relay.blocked.store(true, Ordering::Relaxed);

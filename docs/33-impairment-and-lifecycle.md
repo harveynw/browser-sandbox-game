@@ -1,6 +1,6 @@
 # 33 — Impairment and lifecycle regression
 
-T19 originally recorded completion on 24 October 2026. **Reopened:** the later [protocol simplification](34-protocol-simplification.md) reproduced a loss-progress failure with both old and new codecs; that investigation remains incomplete. The results below describe the original run. Browser/server build IDs are `t19-local`. Network version 2, content, WASM bridge and SQLite schema remain unchanged. This milestone adds failure tests and session hardening; T20 owns the 16-peer populated capacity and soak measurements.
+T19 is complete, including the post-v3 [RTC regression repair](35-rtc-loss-regression.md). That investigation corrected the old probe's Pong-coalescing assumption and separated independent loss from periodic recovery stress. The original v2 results below remain historical; current commands, counts and acceptance evidence are in document 35.
 
 ## Running the suites
 
@@ -8,11 +8,11 @@ Use the documented Node 24 and Rust toolchains:
 
 ```sh
 npm run check
-cargo test -p server --test actual_transport --locked -- --ignored --nocapture
+cargo test -p server --test actual_transport --locked -- --ignored --nocapture --test-threads=1
 npm run build
 ```
 
-The first command runs **240 TypeScript / 135 Rust tests** and compiles the actual transport test. The real socket test is explicitly ignored by the default native runner because it binds loopback TCP/UDP; the second command runs that additional test. It uses ephemeral ports and in-memory diagnostic envelopes, never the running game's profile database. A ten-second deadline bounds negotiation/individual receipts. No external network, HTTP throttling, substitute game server or release test endpoint is involved.
+The current first command runs **110 TypeScript / 134 Rust tests** and compiles the actual transport tests. The real socket test is explicitly ignored by the default native runner because it binds loopback TCP/UDP; the second command runs the three current socket profiles. It uses ephemeral ports and in-memory diagnostic envelopes, never the running game's profile database. A ten-second deadline bounds negotiation/individual receipts. No external network, HTTP throttling, substitute game server or release test endpoint is involved.
 
 ## Deterministic delivery
 

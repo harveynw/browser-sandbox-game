@@ -122,3 +122,8 @@ The exact pinned crate now powers the localhost Rust listener and typed browser 
 ## T19 regression checkpoint
 
 The unchanged pinned crate now has an explicitly run native localhost regression through the real game adapter and WebSocket/RTC peer, with an actual UDP loss/blackout relay, configured test-peer send-buffer pressure and five server-kill/reconnect cycles using recycled IDs. Native world tests also inject old-generation close/data across twelve rejoins. [Coverage and captured evidence](33-impairment-and-lifecycle.md) distinguish these checks from application scheduler tests and from the dependency's still-opaque internal queues and untagged numeric events. Passing this local stress sample does not prove internal races absent or make a public-release claim.
+
+
+## Post-v3 T19 loss probe correction
+
+[RTC regression repair](35-rtc-loss-regression.md) distinguishes intentionally coalesced Pongs from transport loss, measures independent snapshot records under separately seeded directional UDP loss, and preserves the old periodic pattern as a bounded recovery stress case. All three actual RTC profiles pass with the pinned dependency unchanged. No production queue behavior or generation protection was weakened; internal dependency limitations above remain applicable.

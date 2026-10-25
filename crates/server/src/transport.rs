@@ -644,4 +644,55 @@ mod tests {
                 .is_empty()
         );
     }
+    #[test]
+    fn loss_probes_need_independent_records_instead_of_the_latest_pong_stream() {
+        let (mut transport, key) = boundary();
+        let state = protocol::EntityState::Character(protocol::CharacterState {
+            motor: sim_core::spawn_character([0.0, 0.0, 0.0], 0.0).unwrap(),
+            health: protocol::CharacterHealth(100),
+            mode: protocol::CharacterMode::OnFoot,
+            vehicle_id: None,
+        });
+        for id in 1..=50 {
+            assert_eq!(
+                transport.send(key, Delivery::Unreliable, pong(id)),
+                if id == 1 {
+                    SendOutcome::Queued
+                } else {
+                    SendOutcome::ReplacedStale
+                }
+            );
+            let packet = crate::replication::snapshot(
+                "diagnostic",
+                "session",
+                0,
+                vec![protocol::StateRecord {
+                    entity_id: protocol::EntityId(id),
+                    visibility_id: protocol::VisibilityId(1),
+                    state: state.clone(),
+                }],
+            );
+            assert_eq!(
+                transport.send(key, Delivery::Unreliable, packet),
+                SendOutcome::Queued
+            );
+        }
+        let mut q = transport.queues.lock().unwrap();
+        let p = q.peer(key).unwrap();
+        assert_eq!(p.latest.len(), 1);
+        let last =
+            protocol::decode_server(&p.latest[&UnreliableStream::Pong], Delivery::Unreliable)
+                .unwrap();
+        assert_eq!(last, pong(50));
+        let mut ids = std::collections::BTreeSet::new();
+        for packet in p.snapshots.drain().unwrap() {
+            assert!(packet.len() <= protocol::limits::UNRELIABLE_BYTES);
+            let message = protocol::decode_server(&packet, Delivery::Unreliable).unwrap();
+            let protocol::ServerMessage::Snapshot(snapshot) = message.message else {
+                panic!("snapshot")
+            };
+            ids.extend(snapshot.records.into_iter().map(|r| r.entity_id.0));
+        }
+        assert_eq!(ids, (1..=50).collect());
+    }
 }

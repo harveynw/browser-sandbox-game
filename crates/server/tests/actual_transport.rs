@@ -1,4 +1,4 @@
-//! Run explicitly: cargo test -p server --test actual_transport -- --ignored --nocapture
+//! Run explicitly: cargo test -p server --test actual_transport -- --ignored --nocapture --test-threads=1
 //! Real UDP impairment requires loopback listeners, so it is separate from sandboxed checks.
 #[path = "support/rtc.rs"]
 mod rtc;
@@ -10,7 +10,7 @@ use std::{
     net::TcpListener,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
     time::Duration,
@@ -26,6 +26,25 @@ fn ping(nonce: u32) -> Vec<u8> {
         }),
     })
     .unwrap()
+}
+// Distinct entities survive the adapter's per-entity snapshot queue. Pong echoes
+// are deliberately latest-only and cannot measure individual datagram delivery.
+fn probe_snapshot(nonce: u32) -> ServerEnvelope {
+    server::replication::snapshot(
+        "diagnostic",
+        "session",
+        0,
+        vec![StateRecord {
+            entity_id: EntityId(nonce),
+            visibility_id: VisibilityId(1),
+            state: EntityState::Character(CharacterState {
+                motor: sim_core::spawn_character([0.0, 0.0, 0.0], 0.0).unwrap(),
+                health: CharacterHealth(100),
+                mode: CharacterMode::OnFoot,
+                vehicle_id: None,
+            }),
+        }],
+    )
 }
 async fn receipt(client: &mut Peer, reliable: bool, nonce: u32) -> Result {
     tokio::time::timeout(rtc::DEADLINE, async {
@@ -61,14 +80,26 @@ impl Drop for Pump {
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
 async fn real_rtc_backpressure_and_rapid_kill_reconnect() -> Result {
-    run_transport(false).await
+    run_transport(LossProfile::Off).await
 }
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "known loss-progress failure also reproduced against the pre-simplification codec"]
+#[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
 async fn real_rtc_loss_and_blackout_recovery() -> Result {
-    run_transport(true).await
+    run_transport(LossProfile::Independent).await
 }
-async fn run_transport(loss: bool) -> Result {
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
+async fn real_rtc_periodic_loss_recovers_without_unbounded_sends() -> Result {
+    run_transport(LossProfile::Periodic).await
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LossProfile {
+    Off,
+    Independent,
+    Periodic,
+}
+async fn run_transport(profile: LossProfile) -> Result {
+    let loss = profile != LossProfile::Off;
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?;
     drop(listener);
@@ -78,6 +109,10 @@ async fn run_transport(loss: bool) -> Result {
     let (tx, rx) = std::sync::mpsc::sync_channel(16);
     let (commands, command_rx) =
         std::sync::mpsc::sync_channel::<(PeerKey, std::sync::mpsc::SyncSender<SendOutcome>)>(4);
+    let ingress = Arc::new(AtomicUsize::new(0));
+    let received = ingress.clone();
+    let replaced = Arc::new(AtomicUsize::new(0));
+    let coalesced = replaced.clone();
     let worker = thread::spawn(move || {
         while !stopping.load(Ordering::Relaxed) {
             while let Ok((old, ack)) = command_rx.try_recv() {
@@ -103,6 +138,9 @@ async fn run_transport(loss: bool) -> Result {
                     }
                     TransportEvent::Message { peer, message } => {
                         if let ClientMessage::Ping(p) = message.message {
+                            if (10..60).contains(&p.nonce) {
+                                received.fetch_add(1, Ordering::Relaxed);
+                            }
                             let reply = ServerEnvelope {
                                 v: ProtocolVersion(3),
                                 world_id: Some(OpaqueId("diagnostic".into())),
@@ -115,7 +153,18 @@ async fn run_transport(loss: bool) -> Result {
                                 }),
                             };
                             transport.send(peer, Delivery::Reliable, reply.clone());
-                            transport.send(peer, Delivery::Unreliable, reply);
+                            let probe = loss && (10..60).contains(&p.nonce);
+                            let unreliable = if probe {
+                                probe_snapshot(p.nonce)
+                            } else {
+                                reply
+                            };
+                            if transport.send(peer, Delivery::Unreliable, unreliable)
+                                == SendOutcome::ReplacedStale
+                                && probe
+                            {
+                                coalesced.fetch_add(1, Ordering::Relaxed);
+                            }
                             if p.nonce == 999 {
                                 transport.disconnect(peer, "test kill");
                             }
@@ -158,7 +207,12 @@ async fn run_transport(loss: bool) -> Result {
         if cycle == 0 {
             let mut rtc_receipts = None;
             if loss {
-                client.relay.drop_every.store(7, Ordering::Relaxed);
+                let relay_before = *client.relay.stats.lock().unwrap();
+                client
+                    .relay
+                    .periodic_loss
+                    .store(profile == LossProfile::Periodic, Ordering::Relaxed);
+                client.relay.loss_one_in.store(7, Ordering::Relaxed);
                 // Measure unique nonce progress with paced requests and a bounded
                 // settling interval, rather than counting short receipt windows.
                 let mut receipts = BTreeSet::new();
@@ -174,9 +228,11 @@ async fn run_transport(loss: bool) -> Result {
                         }
                         reply = client.receive(false) => {
                             let message = decode_server(&reply?, Delivery::Unreliable)?;
-                            if let ServerMessage::Pong(p) = message.message
-                                && (10..60).contains(&p.nonce) {
-                                receipts.insert(p.nonce);
+                            if let ServerMessage::Snapshot(snapshot) = message.message {
+                                for record in snapshot.records {
+                                    assert!((10..60).contains(&record.entity_id.0));
+                                    receipts.insert(record.entity_id.0);
+                                }
                             }
                         }
                     }
@@ -184,8 +240,25 @@ async fn run_transport(loss: bool) -> Result {
                 assert_eq!(nonce, 60, "all impairment probes were sent");
                 let count = receipts.len();
                 rtc_receipts = Some(count);
-                println!("T19 loss progress unique_receipts={count}/50");
-                assert!(count > 15, "RTC made no progress under packet loss");
+                println!(
+                    "T19 loss progress unique_receipts={count}/50; server_ingress={}; replaced_probe_records={}; client_outstanding={}; relay={:?}",
+                    ingress.load(Ordering::Relaxed),
+                    replaced.load(Ordering::Relaxed),
+                    client.outstanding().await?,
+                    client.relay.stats.lock().unwrap().since(relay_before)
+                );
+                assert_eq!(
+                    replaced.load(Ordering::Relaxed),
+                    0,
+                    "independent probe records must not coalesce"
+                );
+                if profile == LossProfile::Independent {
+                    assert!(
+                        count > 15,
+                        "RTC made no progress under independent packet loss"
+                    );
+                }
+                assert!(client.outstanding().await? <= 65536);
                 assert!(client.relay.dropped.load(Ordering::Relaxed) > 0);
             }
             client.relay.blocked.store(true, Ordering::Relaxed);
@@ -199,11 +272,11 @@ async fn run_transport(loss: bool) -> Result {
             }
             assert_eq!(client.relay.forwarded.load(Ordering::Relaxed), before);
             client.relay.blocked.store(false, Ordering::Relaxed);
-            client.relay.drop_every.store(0, Ordering::Relaxed);
+            client.relay.loss_one_in.store(0, Ordering::Relaxed);
             client.send(false, ping(200)).await?;
             receipt(&mut client, false, 200).await?;
             println!(
-                "T19 actual RTC: loss_probe={loss}; unique_receipts={rtc_receipts:?}; dropped={}, forwarded={}; UDP blackout retained WS and RTC recovered",
+                "T19 actual RTC: loss_profile={profile:?}; unique_receipts={rtc_receipts:?}; dropped={}, forwarded={}; UDP blackout retained WS and RTC recovered",
                 client.relay.dropped.load(Ordering::Relaxed),
                 client.relay.forwarded.load(Ordering::Relaxed)
             );
