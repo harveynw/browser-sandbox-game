@@ -169,7 +169,7 @@ GET  /health/ready      200 only after world + persistence + transport probe rea
 GET  /api/build         protocol_version, build_id, content_hash, sim_config_hash
 POST /api/session      create/reuse guest; return profile display defaults
 POST /api/join-ticket  one-use ticket, expires_in_ms=30000, ws_url
-GET  /metrics          private operator network only
+GET  /api/metrics      implemented loopback-only cached timing/queue/population/byte report
 ```
 
 Profile cookie: opaque random secret, HttpOnly, Secure in production, SameSite=Lax. Store only its hash server-side. Join ticket: cryptographically random 256-bit opaque token; bind to profile and shard, expire after 30 seconds, consume once in ClientHello, cap pending tickets. Ticket issuance requires same-origin requests and strict Origin checks. Local dev may use an explicitly configured development guest issuer; never hardcode a release token.
@@ -224,3 +224,5 @@ A debit reserves one of the 4,096 ledger entries for its possible `refund:<repai
 `admission::Profiles` now selects memory or a bounded SQLite worker. Default local configuration selects SQLite. Migration 1 adds the tables above plus `repair_pending(event_id PRIMARY KEY, profile_id UNIQUE)` as a durable debit/application acknowledgement boundary. The SHA-256 cookie hash is stored as 64 ASCII hex bytes in the BLOB column. No raw cookie is persisted. HTTP profile preparation uses 202/200; ClientHello consumes its ticket and awaits committed name/profile data before allocating a player. The world never waits on a database receive.
 
 Worker requests/results and outstanding work are capped at 64. Busy/locked SQL gets three attempts with a 50 ms busy timeout; ongoing economic outcomes retry with their original IDs after 30 ticks. Successful repair application clears its pending debit through the worker; interrupted application refunds atomically. Startup refunds unresolved debits once before listeners, so a crashed world cannot strand a repair charge. An OS ownership lock prevents a second server from running recovery against a live save. See [31 — Local profiles](31-local-profiles.md) for shutdown, tests and configuration.
+
+T20 measurement semantics and bounded collection are documented in [Capacity and performance](36-capacity-and-performance.md). Excess input batches above the strict sixty-per-rolling-second processing cap are discarded and counted; sustained byte floods still retire their session.

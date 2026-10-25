@@ -1,3 +1,4 @@
+import { TimingHistogram } from "./performance";
 import type { GameSession } from "../net/session";
 import type { RenderActor } from "../world/replica";
 import type { CharacterMotor } from "@port-meridian/protocol";
@@ -36,6 +37,18 @@ export class Diagnostics {
     unit: string;
     minimum: number;
   }[] = [];
+  private capture:
+    | {
+        started: number;
+        frames: TimingHistogram;
+        prediction: TimingHistogram;
+        excluded: number;
+        memory: unknown[];
+        lastMemory: number;
+      }
+    | undefined;
+  private readonly captureStatus = document.createElement("p");
+  private readonly reportText = document.createElement("textarea");
   private frameTime = 0;
   private frameCount = 0;
   constructor() {
@@ -76,7 +89,13 @@ export class Diagnostics {
     for (const [title, labels] of [
       [
         "Network",
-        ["Player / epoch", "Server / owner", "Up / down", "Input lead"],
+        [
+          "Player / epoch",
+          "Server / owner",
+          "Up / down",
+          "Input lead",
+          "Cached join",
+        ],
       ],
       [
         "Prediction",
@@ -138,9 +157,78 @@ export class Diagnostics {
     actorList.className = "debug-actor-list";
     actorList.append(table);
     this.actors.append(this.actorSummary, actorList);
-    this.element.append(this.connection, charts, sections, pose, this.actors);
+    const capturePanel = document.createElement("details"),
+      captureTitle = document.createElement("summary");
+    captureTitle.textContent = "Performance capture";
+    const start = document.createElement("button"),
+      stop = document.createElement("button");
+    start.textContent = "Start performance capture";
+    stop.textContent = "Stop and show report";
+    this.reportText.readOnly = true;
+    this.reportText.rows = 8;
+    this.reportText.setAttribute("aria-label", "Performance report JSON");
+    start.onclick = () => {
+      this.capture = {
+        started: performance.now(),
+        frames: new TimingHistogram(),
+        prediction: new TimingHistogram(),
+        excluded: 0,
+        memory: [],
+        lastMemory: -Infinity,
+      };
+      this.reportText.value = "";
+      this.captureStatus.textContent =
+        "Recording visible playing frames, including slow frames. Stop to view JSON.";
+    };
+    stop.onclick = () => {
+      const c = this.capture;
+      if (!c) return;
+      this.reportText.value = JSON.stringify(
+        {
+          duration_s: (performance.now() - c.started) / 1000,
+          frames: c.frames.report(),
+          prediction_and_reconciliation_per_frame: c.prediction.report(),
+          excluded_hidden_or_not_playing_frames: c.excluded,
+          memory: c.memory,
+          user_agent: navigator.userAgent,
+          logical_cpus: navigator.hardwareConcurrency,
+          viewport: [innerWidth, innerHeight],
+          pixel_ratio: devicePixelRatio,
+          scope:
+            "Visible playing frames; prediction includes WASM, proxy preparation, reset/replay and input sampling. Heap only when supplied by browser. Memory samples bounded to 720.",
+        },
+        null,
+        2,
+      );
+      this.capture = undefined;
+      this.captureStatus.textContent =
+        "Capture stopped. Copy JSON to save the report.";
+    };
+    capturePanel.append(
+      captureTitle,
+      start,
+      stop,
+      this.captureStatus,
+      this.reportText,
+    );
+    this.element.append(
+      this.connection,
+      charts,
+      sections,
+      pose,
+      this.actors,
+      capturePanel,
+    );
   }
-  frame(ms: number): void {
+  frame(ms: number, predictionMs = 0, visiblePlaying = false): void {
+    if (this.capture) {
+      if (visiblePlaying) {
+        this.capture.frames.observe(ms);
+        this.capture.prediction.observe(predictionMs);
+      } else {
+        this.capture.excluded++;
+      }
+    }
     if (ms >= 0 && ms < 1000) {
       this.frameTime += ms;
       this.frameCount++;
@@ -151,6 +239,22 @@ export class Diagnostics {
     if (node && node.textContent !== value) node.textContent = value;
   }
   update(s: Sample): void {
+    const c = this.capture;
+    if (c && s.now - c.lastMemory >= 10000 && c.memory.length < 720) {
+      const heap =
+        (performance as Performance & { memory?: { usedJSHeapSize: number } })
+          .memory?.usedJSHeapSize ?? null;
+      c.memory.push({
+        elapsed_s: (s.now - c.started) / 1000,
+        heap_bytes: heap,
+        wasm_bytes: s.wasmBytes,
+        resident_chunks: s.streaming?.resident,
+        geometries: s.streaming?.geometries,
+        matrix_bytes: s.streaming?.matrixBytes,
+      });
+      c.lastMemory = s.now;
+      this.captureStatus.textContent = `Recording ${((s.now - c.started) / 1000).toFixed(0)}s · frame p95 ${c.frames.report().p95_ms.toFixed(2)}ms · prediction p95 ${c.prediction.report().p95_ms.toFixed(2)}ms`;
+    }
     const n = s.net,
       r = s.streaming;
     const frame = this.frameCount
@@ -191,6 +295,7 @@ export class Diagnostics {
       "Up / down",
       `${number(n ? n.up / 1024 : undefined, 1)} / ${number(n ? n.down / 1024 : undefined, 1)} KiB/s`,
     );
+    this.set("Cached join", `${number(n?.joinMs)} ms`);
     this.set("Input lead", `${number(n?.lead)} ticks`);
     this.set("Predicted tick", number(n?.predicted));
     this.set(

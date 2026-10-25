@@ -1,4 +1,4 @@
-%% Backend module system — current implementation through T19.
+%% Backend module system — current implementation through T20 instrumentation (G4 incomplete).
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -8,6 +8,7 @@ flowchart TD
     config["config.rs · config/dev.toml<br/>SQLite default / explicit memory mode"]:::app
     persistence["persistence.rs · SQLite worker thread<br/>Migrations / WAL / atomic economic ledger<br/>Repair acknowledgements and restart refunds"]:::other
     database["var/profiles.sqlite<br/>Profiles · economic events · unresolved repairs"]:::other
+    performance["performance.rs<br/>Bounded world / complete-tick histograms<br/>Per-peer encoded bytes and queue snapshots"]:::other
     scheduler["scheduler.rs<br/>Fixed-step scheduling · 30 Hz"]:::app
     loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
     world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
@@ -20,7 +21,7 @@ flowchart TD
     vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
   end
   subgraph group_1["crates/server/src/ — networking and admission"]
-    control["control.rs · HTTP thread<br/>Sessions, tickets and health"]:::net
+    control["control.rs · HTTP thread<br/>Sessions, tickets, health and cached /api/metrics"]:::net
     admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Committed profile cache · bounded worker operations<br/>Memory adapter for tests"]:::net
     transport["transport.rs · network pump thread<br/>Bounded queues, codecs and channel routing"]:::net
     replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
@@ -44,6 +45,10 @@ flowchart TD
   loader -->|"loaded world"| world
   main <-->|"elapsed time"| scheduler
   main -->|"30 Hz steps"| world
+  world -->|"per-system timing"| performance
+  main -->|"complete tick timing"| performance
+  transport -->|"queue depths / close reasons"| control
+  performance -->|"read-only cached metrics"| control
   main -->|"start / publish health"| control
   main -->|"start pump"| transport
   browser <-->|"HTTP :3001"| control

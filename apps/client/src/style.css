@@ -289,6 +289,15 @@ main.game-app {
   padding: 5px 8px;
   font: inherit;
 }
+.game-debug p {
+  font: inherit;
+  margin: 6px 0;
+}
+.game-debug textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+}
 .game-debug {
   padding: 0 10px 10px;
 }

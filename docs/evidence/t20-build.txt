@@ -1,0 +1,72 @@
+
+> port-meridian@0.1.0 build
+> npm run protocol:generate && npm run content:bake && cargo build --workspace --locked && npm run bridge:generate && npm run build:wasm && npm run typecheck && npm run build --workspace @port-meridian/client
+
+
+> port-meridian@0.1.0 protocol:generate
+> cargo run -p xtask --locked -- generate
+
+   Compiling sim-wasm v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/sim-wasm)
+   Compiling xtask v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/xtask)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.23s
+     Running `target/debug/xtask generate`
+Generated 5 protocol/fixture files.
+
+> port-meridian@0.1.0 content:bake
+> cargo run -p xtask --locked -- bake-content
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `target/debug/xtask bake-content`
+Generated 9 content contract/fixture files
+Baked 58 assets: a322579fa1fedb5e3c058552fa96bcc8e22e0b21a36098b883b6cc35741c9939 (243 road nodes, 243 pedestrian nodes)
+   Compiling sim-wasm v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/sim-wasm)
+   Compiling xtask v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/xtask)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.66s
+
+> port-meridian@0.1.0 bridge:generate
+> cargo run -p xtask --locked -- generate-bridge
+
+   Compiling sim-wasm v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/sim-wasm)
+   Compiling xtask v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/xtask)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.26s
+     Running `target/debug/xtask generate-bridge`
+Bridge contracts generated: 7 files
+
+> port-meridian@0.1.0 build:wasm
+> node tools/build-wasm.mjs
+
+    Finished `release` profile [optimized] target(s) in 0.16s
+
+> port-meridian@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/client/tsconfig.json && tsc --noEmit -p packages/protocol/tsconfig.json && tsc --noEmit -p packages/content/tsconfig.json
+
+
+> @port-meridian/client@0.1.0 build
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 246 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                               0.44 kB │ gzip:   0.28 kB
+dist/assets/sim_wasm_bg-C2oRLFzz.wasm     1,444.83 kB │ gzip: 407.89 kB
+dist/assets/index-BjN7LtGP.css               11.59 kB │ gzip:   3.38 kB
+dist/assets/rolldown-runtime-BWaJ3C7D.js      0.91 kB │ gzip:   0.51 kB
+dist/assets/app-y6fTJjN3.js                   1.83 kB │ gzip:   0.82 kB
+dist/assets/index-D7k9Ebtu.js                 3.51 kB │ gzip:   1.56 kB
+dist/assets/page-aJ9ZgKE1.js                  7.02 kB │ gzip:   3.05 kB
+dist/assets/decode-DnhcptxO.js               20.98 kB │ gzip:   5.87 kB
+dist/assets/inspector-BqPk9A1r.js            27.32 kB │ gzip:   7.56 kB
+dist/assets/session-BNzWqHBf.js              32.42 kB │ gzip:  10.42 kB
+dist/assets/app-CY4PzMs-.js                  76.57 kB │ gzip:  25.34 kB
+dist/assets/bridge-v6QARcD5.js              126.14 kB │ gzip:  35.21 kB
+dist/assets/src-CHawIlLS.js                 149.57 kB │ gzip:  42.37 kB
+dist/assets/three.module-ouYARURa.js        550.60 kB │ gzip: 137.28 kB
+
+✓ built in 278ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

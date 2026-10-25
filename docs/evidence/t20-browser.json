@@ -1,0 +1,493 @@
+{
+  "duration_s": 574.9725,
+  "frames": {
+    "samples": 68997,
+    "p50_ms": 8.3,
+    "p95_ms": 9.05,
+    "p99_ms": 9.25,
+    "max_ms": 9.5,
+    "mean_ms": 8.333302897227416,
+    "fps": 120.00043828152596
+  },
+  "prediction_and_reconciliation_per_frame": {
+    "samples": 68997,
+    "p50_ms": 0.1,
+    "p95_ms": 0.55,
+    "p99_ms": 0.75,
+    "max_ms": 1.300000011920929,
+    "mean_ms": 0.13114773106915031,
+    "fps": 7624.9889483237
+  },
+  "excluded_hidden_or_not_playing_frames": 0,
+  "memory": [
+    {
+      "elapsed_s": 0.039599999999998546,
+      "heap_bytes": 25938724,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 14,
+      "geometries": 38,
+      "matrix_bytes": 538880
+    },
+    {
+      "elapsed_s": 10.0565,
+      "heap_bytes": 38997090,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 20.1645,
+      "heap_bytes": 23915292,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 30.239,
+      "heap_bytes": 35397708,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 40.2978,
+      "heap_bytes": 26985009,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 50.29789999999999,
+      "heap_bytes": 24453389,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 60.381,
+      "heap_bytes": 39452650,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 580352
+    },
+    {
+      "elapsed_s": 70.4807,
+      "heap_bytes": 27732216,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 80.531,
+      "heap_bytes": 46375166,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 90.57239999999999,
+      "heap_bytes": 33224618,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 100.63069999999999,
+      "heap_bytes": 48298808,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 110.68839999999999,
+      "heap_bytes": 31740005,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 120.69760000000001,
+      "heap_bytes": 46124842,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 130.7637,
+      "heap_bytes": 28148771,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 140.79760000000002,
+      "heap_bytes": 38563607,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 150.8971,
+      "heap_bytes": 24498157,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 160.9056,
+      "heap_bytes": 36480808,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 170.9307,
+      "heap_bytes": 26829966,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 180.9472,
+      "heap_bytes": 45406123,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 190.9715,
+      "heap_bytes": 29890189,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 200.9716,
+      "heap_bytes": 26893770,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 210.9721,
+      "heap_bytes": 37213052,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 221.0302,
+      "heap_bytes": 22513788,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 231.0384,
+      "heap_bytes": 37710749,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 593728
+    },
+    {
+      "elapsed_s": 241.0387,
+      "heap_bytes": 32803141,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 618240
+    },
+    {
+      "elapsed_s": 251.0803,
+      "heap_bytes": 28519007,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 17,
+      "geometries": 38,
+      "matrix_bytes": 614080
+    },
+    {
+      "elapsed_s": 261.1053,
+      "heap_bytes": 33175326,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 271.12190000000004,
+      "heap_bytes": 19667439,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 281.1634,
+      "heap_bytes": 20152603,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 291.20509999999996,
+      "heap_bytes": 38232241,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 301.305,
+      "heap_bytes": 28801295,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 311.3378,
+      "heap_bytes": 43115544,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 321.3883,
+      "heap_bytes": 33610287,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 331.455,
+      "heap_bytes": 34314310,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 341.5049,
+      "heap_bytes": 27085437,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 351.5215,
+      "heap_bytes": 47420991,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 605760
+    },
+    {
+      "elapsed_s": 361.57120000000003,
+      "heap_bytes": 36422325,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 371.663,
+      "heap_bytes": 38196610,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 381.7049,
+      "heap_bytes": 36963824,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 391.78740000000005,
+      "heap_bytes": 34708142,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 401.821,
+      "heap_bytes": 32431993,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 411.8629,
+      "heap_bytes": 27997565,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 421.87940000000003,
+      "heap_bytes": 24633997,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 431.8961,
+      "heap_bytes": 20679060,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 18,
+      "geometries": 38,
+      "matrix_bytes": 623168
+    },
+    {
+      "elapsed_s": 441.9293,
+      "heap_bytes": 18816712,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 601088
+    },
+    {
+      "elapsed_s": 451.9877,
+      "heap_bytes": 25988373,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 462.0295,
+      "heap_bytes": 22420871,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 472.1374,
+      "heap_bytes": 46502751,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 482.2125,
+      "heap_bytes": 41661216,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 492.246,
+      "heap_bytes": 36661816,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 502.3373,
+      "heap_bytes": 24096333,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 512.3956999999999,
+      "heap_bytes": 22265902,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 522.4037,
+      "heap_bytes": 41655298,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 532.4122,
+      "heap_bytes": 32861576,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 16,
+      "geometries": 38,
+      "matrix_bytes": 591616
+    },
+    {
+      "elapsed_s": 542.4955,
+      "heap_bytes": 33808570,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 15,
+      "geometries": 38,
+      "matrix_bytes": 582912
+    },
+    {
+      "elapsed_s": 552.529,
+      "heap_bytes": 34782245,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 14,
+      "geometries": 38,
+      "matrix_bytes": 569536
+    },
+    {
+      "elapsed_s": 562.5455999999999,
+      "heap_bytes": 30121600,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 14,
+      "geometries": 38,
+      "matrix_bytes": 569536
+    },
+    {
+      "elapsed_s": 572.5622,
+      "heap_bytes": 24310670,
+      "wasm_bytes": 1507328,
+      "resident_chunks": 14,
+      "geometries": 38,
+      "matrix_bytes": 569536
+    }
+  ],
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "logical_cpus": 8,
+  "viewport": [549, 776],
+  "pixel_ratio": 2,
+  "scope": "Visible playing frames; prediction includes WASM, proxy preparation, reset/replay and input sampling. Heap only when supplied by browser. Memory samples bounded to 720."
+}

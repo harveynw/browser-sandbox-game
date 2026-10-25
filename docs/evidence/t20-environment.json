@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-25",
+  "host": {
+    "model": "MacBookPro18,3",
+    "cpu": "Apple M1 Pro",
+    "logical_cpus": 8,
+    "ram_bytes": 17179869184,
+    "os": "macOS 14.5 (23F79), arm64"
+  },
+  "server": "release profile, Rust 1.94.0",
+  "source_base_commit": "b6cb1c9",
+  "source_files_sha256": "64f6dce657ddba5a05e04fb44e28e2f82df68b18b060d20b6d6f223f2c7b1236",
+  "browser": {
+    "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+    "viewport": [549, 776],
+    "pixel_ratio": 2,
+    "logical_cpus": 8
+  },
+  "scope": "Single shared Mac, server and native load generator in separate processes. Build/check activity also ran on host. Not an isolated 2-vCPU or reference laptop result. 600s run used owner-anchored native input clock; separate follow-up uses reliable clock replies. Browser remained loopback. No completed 60-minute soak."
+}

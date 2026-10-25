@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T12 complete, 21 October 2026**. The user requested a stop/check-in after each major chunk. T13 has not been started. Historical entries below retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T20 in progress, 25 October 2026; G4 incomplete**. T01–T19 are complete. Historical entries retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -20,12 +20,12 @@ Latest checkpoint: **T12 complete, 21 October 2026**. The user requested a stop/
 | T12 — Full city and content kit | Complete |
 | T13 — Traffic and pedestrians | Complete |
 | T14 — Pistol and damage | Complete |
-| T15 — Police and heat | Not started |
-| T16 — Remaining jobs and repair | Not started |
-| T17 — Local profile persistence | Not started |
-| T18 — Presentation and UX | Not started |
-| T19 — Impairment and lifecycle suite | Not started |
-| T20 — Capacity and performance | Not started |
+| T15 — Police and heat | Complete |
+| T16 — Remaining jobs and repair | Complete |
+| T17 — Local profile persistence | Complete |
+| T18 — Presentation and UX | Complete |
+| T19 — Impairment and lifecycle suite | Complete |
+| T20 — Capacity and performance | In progress — G4 incomplete |
 | T21 — One-command local launch | Not started |
 | T22 — Final acceptance and handoff | Not started |
 
@@ -668,3 +668,17 @@ Next action: stop for milestone review. **T20 — Capacity and performance** is 
 ### Finalization check — 25 October 2026
 
 Resumed after the usage-limit interruption. Confirmed the saved full-check/build/format results, all three actual RTC profiles and both independent-loss repeat runs passed; reviewed source, milestone status and evidence links, and verified a clean whitespace diff. The repair was awaiting its Git commit. No new milestone work or additional passing-test claims were introduced during this finalization.
+
+## T20 — Populated measurement and input-burst recovery
+
+Status: **in progress, 25 October 2026; G4 incomplete**. Authorized by “okay proceed” after the completed T19 regression repair.
+
+Implemented fixed-memory server tick/per-system histograms, cached loopback `/api/metrics`, per-session encoded bytes, application queue/close-reason reporting, bounded browser frame/prediction/memory capture and a fifteen-native-RTC-peer production-server harness plus browser observer. The relay adds seeded target latency/jitter/loss/reorder/duplicate scheduling and actual UDP byte accounting; a summary CLI produces interval rates and distributions. Normal SQLite saves were preserved through a separate temporary benchmark database.
+
+Two target-profile runs reproduced a disconnect caused by a delayed 30 Hz input stream crossing the strict sixty-batch rolling cap in one burst. Excess batches now remain capped and are discarded/counted without retiring a legitimate session. Scope/epoch/ring/byte/queue limits remain. Delayed-burst recovery and sustained-byte-flood actor cleanup have distinct regressions.
+
+A subsequent ten-minute real 16-player stress measurement completed: 24 traffic target (observed 22–24), 32 peds, 8 police, 4 authored parked cars; tick p50/p95/p99 1.625/5.725/7.300 ms and aggregate encoded egress 909.641 KiB/s on this Mac. It exposed RTC tail latency approaching twenty seconds and server RSS growth. Native input clock anchoring was then corrected to use reliable Pong timing, with a follow-up run documented in the capacity guide. A 574.973-second narrow-viewport browser capture measured frame p95 9.05 ms and prediction CPU p95 0.55 ms with loopback networking; it is not the reference/target-network acceptance test.
+
+`npm run check`: 111 TypeScript / 137 Rust tests, generation/WASM/type/lint/format/Clippy pass. Existing explicit real-socket suite: three profiles pass. Production build passes, retaining its known chunk-size advisory. See [36 — Capacity and performance](36-capacity-and-performance.md) for hardware, scope, raw samples, failure traces, source fingerprint, commands and exact unmet metrics.
+
+Next work remains T20: resolve RTC freshness and memory growth under impairment, then perform the full soak/reference/traversal acceptance measurements. T21 has not started.

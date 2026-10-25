@@ -22,7 +22,13 @@ pub struct Player {
     pub display_name: DisplayName,
     pub(crate) slot: usize,
 }
+#[derive(Default, serde::Serialize)]
+pub struct TrafficCounters {
+    pub up_bytes: u64,
+    pub down_bytes: u64,
+}
 pub struct Session {
+    pub traffic: TrafficCounters,
     pub id: Option<String>,
     pub profile: Option<ProfileView>,
     pub player: Option<EntityId>,
@@ -51,8 +57,9 @@ pub struct Session {
     action_rate: Budget,
     last_replicated: BTreeMap<u32, u32>,
 }
-#[derive(Default, Debug)]
+#[derive(Default, Debug, serde::Serialize)]
 pub struct Metrics {
+    pub rate_limited_inputs: u64,
     pub late_inputs: u64,
     pub future_inputs: u64,
     pub conflicting_inputs: u64,
@@ -65,6 +72,7 @@ pub struct Metrics {
     pub max_refresh_age_ticks: u32,
 }
 pub struct World {
+    pub timings: crate::performance::WorldTimings,
     pub tick: u32,
     pub id: String,
     pub sessions: BTreeMap<PeerKey, Session>,
@@ -156,6 +164,7 @@ impl World {
             }
         }
         let mut world = Self {
+            timings: Default::default(),
             police,
             recoveries: BTreeMap::new(),
             repairs: BTreeMap::new(),
@@ -704,6 +713,7 @@ impl World {
             return Err("ingress byte budget exceeded");
         }
         self.metrics.ingress_bytes += bytes as u64;
+        s.traffic.up_bytes += bytes as u64;
         s.last_heard = now;
         match message.message {
             ClientMessage::ClientHello(hello)
@@ -786,7 +796,11 @@ impl World {
             }
             ClientMessage::InputBatch(batch) => {
                 if !s.input_rate.allow(now) {
-                    return Err("input rate exceeded");
+                    // RTC congestion can release more than a second of legitimate
+                    // 30 Hz input at once. Keep the strict processing cap, discard
+                    // excess stale work, and let fresh input recover the session.
+                    self.metrics.rate_limited_inputs += 1;
+                    return Ok(());
                 }
                 if s.phase != SessionPhase::Playing {
                     return Ok(());
@@ -992,6 +1006,7 @@ impl World {
         if self.tick >= u32::MAX - 1 {
             return Err("world tick exhausted; restart required".into());
         }
+        let mut timing = std::time::Instant::now();
         profiles.poll_store(self.tick);
         let events = transport.drain(128);
         let closed: BTreeSet<_> = events
@@ -1036,6 +1051,7 @@ impl World {
                     self.sessions.insert(
                         peer,
                         Session {
+                            traffic: Default::default(),
                             id: None,
                             profile: None,
                             player: None,
@@ -1135,6 +1151,8 @@ impl World {
                 self.closing.insert(*peer, "guest replaced");
             }
         }
+        self.timings.admission.observe(timing.elapsed());
+        timing = std::time::Instant::now();
         let next = self.tick + 1;
         let mut failed = Vec::new();
         // Entity order, not network arrival order, determines simulation iteration.
@@ -1217,6 +1235,8 @@ impl World {
         self.decide_police(next, &observers)?;
         // Preserve intended pedestrian motion for swept impact queries. Resolving
         // new car overlaps first would erase the contact before damage observes it.
+        self.timings.planning.observe(timing.elapsed());
+        timing = std::time::Instant::now();
         self.population
             .step_pedestrians(next, &self.collision, &self.config)?;
         for car_id in self.vehicles.keys().copied().collect::<Vec<_>>() {
@@ -1301,6 +1321,8 @@ impl World {
                 }
             }
         }
+        self.timings.motors.observe(timing.elapsed());
+        timing = std::time::Instant::now();
         self.tick = next;
         self.vehicle_impacts(&previous_cars, impacts, &previous_peds);
         for ped in self
@@ -1324,6 +1346,8 @@ impl World {
         }
         self.advance_repairs(profiles)?;
         self.advance_missions(profiles, &previous_cars)?;
+        self.timings.gameplay.observe(timing.elapsed());
+        timing = std::time::Instant::now();
         self.sync_visible()?;
         if self.tick.is_multiple_of(3) {
             let updates: Result<Vec<_>, String> = self
@@ -1418,6 +1442,8 @@ impl World {
             }
             self.output.extend(batches);
         }
+        self.timings.replication.observe(timing.elapsed());
+        timing = std::time::Instant::now();
         let mut flushed = 0;
         while let Some((peer, delivery, message)) = self.output.pop_front() {
             // A failed reliable send retires this session immediately. Never send the
@@ -1451,6 +1477,7 @@ impl World {
                     }
                     continue;
                 }
+                session.traffic.down_bytes += bytes as u64;
                 if let ServerMessage::Snapshot(data) = &message.message {
                     self.metrics.snapshot_packets += 1;
                     self.metrics.max_snapshot_bytes = self.metrics.max_snapshot_bytes.max(bytes);
@@ -1479,6 +1506,7 @@ impl World {
         for (peer, reason) in std::mem::take(&mut self.closing) {
             transport.disconnect(peer, reason);
         }
+        self.timings.flush.observe(timing.elapsed());
         Ok(())
     }
 }

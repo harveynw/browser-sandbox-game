@@ -554,7 +554,11 @@ export class GameApp {
   }
   private animate(now: number): void {
     if (this.disposed) return;
-    this.debug.frame(now - this.previous);
+    this.debug.frame(
+      now - this.previous,
+      this.session?.takePredictionWork() ?? 0,
+      this.phase === "playing" && !document.hidden,
+    );
     const dt = Math.max(0, Math.min((now - this.previous) / 1000, 0.1));
     this.previous = now;
     try {

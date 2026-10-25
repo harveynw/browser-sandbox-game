@@ -28,6 +28,8 @@ export interface SessionEvents {
 /** Own admission, protocol scope, readiness and authoritative samples. */
 export class GameSession {
   private readonly transport = new BrowserTransport();
+  private readonly startedAt = performance.now();
+  private joinMs: number | undefined;
   private readonly abort = new AbortController();
   private hello: ServerEnvelope | undefined;
   private assets: LoadedPackage | undefined;
@@ -43,6 +45,20 @@ export class GameSession {
   readonly clock = new ServerClock();
   readonly replicas = new ReplicaStore();
   private local: LocalPrediction | undefined;
+  private predictionWorkMs = 0;
+  private measurePrediction<T>(work: () => T): T {
+    const started = performance.now();
+    try {
+      return work();
+    } finally {
+      this.predictionWorkMs += performance.now() - started;
+    }
+  }
+  takePredictionWork(): number {
+    const ms = this.predictionWorkMs;
+    this.predictionWorkMs = 0;
+    return ms;
+  }
   private lastMessageAt = performance.now();
   private resyncAt = -Infinity;
   private resyncPending = false;
@@ -399,6 +415,7 @@ export class GameSession {
           throw new Error("Invalid StartPlay");
         const owner = message.data.owner;
         clearTimeout(this.joinTimeout);
+        this.joinMs ??= performance.now() - this.startedAt;
         this.phase = "playing";
         this.events.phase?.("playing");
         this.epoch = owner.control_epoch;
@@ -407,7 +424,9 @@ export class GameSession {
         this.ownerTick = owner.server_tick;
         this.motor = owner.player_state.motor;
         this.observeTick(owner.server_tick);
-        this.local?.install(owner, performance.now());
+        this.measurePrediction(() =>
+          this.local?.install(owner, performance.now()),
+        );
         this.events.owner?.(owner);
         this.log(
           `StartPlay: player ${this.player}, epoch ${this.epoch}, server tick ${owner.server_tick}`,
@@ -431,7 +450,9 @@ export class GameSession {
           this.phase === "playing" &&
           message.data.control_epoch > this.epoch
         ) {
-          this.local?.reconcile(message.data, performance.now());
+          this.measurePrediction(() =>
+            this.local?.reconcile(message.data, performance.now()),
+          );
           return;
         }
         if (
@@ -443,7 +464,9 @@ export class GameSession {
         )
           return;
         this.ownerTick = message.data.server_tick;
-        this.local?.reconcile(message.data, performance.now());
+        this.measurePrediction(() =>
+          this.local?.reconcile(message.data, performance.now()),
+        );
         this.motor = message.data.player_state.motor;
         this.events.owner?.(message.data);
         this.observeTick(message.data.server_tick);
@@ -471,7 +494,9 @@ export class GameSession {
         this.driving = message.data.state.kind === "vehicle";
         this.ownerTick = message.data.server_tick;
         this.motor = message.data.player_state.motor;
-        this.local?.install(message.data, performance.now());
+        this.measurePrediction(() =>
+          this.local?.install(message.data, performance.now()),
+        );
         this.events.owner?.(message.data);
         break;
       case "pong": {
@@ -598,8 +623,8 @@ export class GameSession {
       this.requestResync();
       return;
     }
-    if (this.local?.advance(now, sample).length) {
-      const frames = this.local.batch();
+    if (this.measurePrediction(() => this.local?.advance(now, sample).length)) {
+      const frames = this.local?.batch() ?? [];
       if (frames.length)
         this.send(
           { kind: "input_batch", data: { control_epoch: this.epoch, frames } },
@@ -822,6 +847,7 @@ export class GameSession {
       this.rateAt = now;
     }
     return {
+      joinMs: this.joinMs,
       player: this.player,
       epoch: this.epoch,
       tick: this.serverTick,

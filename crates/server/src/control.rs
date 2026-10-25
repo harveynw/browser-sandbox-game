@@ -24,6 +24,10 @@ pub struct Status {
     pub transport_healthy: bool,
 }
 pub struct Control {
+    pub metrics: Value,
+    tick_work: crate::performance::Histogram,
+    populated_tick_work: crate::performance::Histogram,
+    scheduler_poll_gap: crate::performance::Histogram,
     pub profiles: Profiles,
     pub status: Status,
     pub build: Value,
@@ -62,6 +66,10 @@ impl Control {
     pub fn new(world: &World) -> Self {
         let hello = world.build();
         Self {
+            metrics: json!({}),
+            tick_work: Default::default(),
+            populated_tick_work: Default::default(),
+            scheduler_poll_gap: Default::default(),
             profiles: Profiles::default(),
             status: Status::default(),
             build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
@@ -88,6 +96,26 @@ impl Control {
             transport_healthy: healthy,
         };
     }
+    pub fn finish_tick(&mut self, elapsed: Duration, populated: bool) {
+        self.tick_work.observe(elapsed);
+        if populated {
+            self.populated_tick_work.observe(elapsed);
+        }
+    }
+    pub fn record_performance(&mut self, world: &World, queues: Value, gap: Duration, now: u64) {
+        self.scheduler_poll_gap.observe(gap);
+        if !world.tick.is_multiple_of(30) {
+            return;
+        }
+        let peers:Vec<_>=world.sessions.values().map(|s|json!({"player_id":s.player.map(|id|id.0),"phase":format!("{:?}",s.phase),"epoch":s.epoch,"traffic":s.traffic,"input_ring":s.inputs.len()})).collect();
+        let parked = world
+            .population
+            .pools
+            .values()
+            .filter(|p| **p == crate::population::VehiclePool::Parked)
+            .count();
+        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":world.sessions.len(),"traffic":world.population.traffic.len(),"parked":parked,"pedestrians":world.population.pedestrians.len(),"police":world.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":world.population.metrics.path_jobs,"max_path_jobs_per_tick":world.population.metrics.max_path_jobs_per_tick,"blocked_spawns":world.population.metrics.blocked_spawns},"queues":queues,"peers":peers});
+    }
     pub fn route(
         &mut self,
         method: &str,
@@ -102,6 +130,7 @@ impl Control {
         }
         if method == "GET" {
             return match path {
+                "/api/metrics" => Reply::new(200, self.metrics.clone()),
                 "/api/build" => Reply::new(200, self.build.clone()),
                 "/health/live" | "/health/ready" => {
                     let alive = self.status.tick > 0

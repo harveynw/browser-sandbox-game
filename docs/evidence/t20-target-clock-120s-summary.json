@@ -1,0 +1,495 @@
+{
+  "completed": true,
+  "profile": "target",
+  "seed": 424242,
+  "measured_interval_s": 120.007195667,
+  "requested_s": 120,
+  "build": {
+    "build_id": "protocol-simple-local",
+    "content_hash": "a322579fa1fedb5e3c058552fa96bcc8e22e0b21a36098b883b6cc35741c9939",
+    "protocol_version": 3,
+    "sim_config_hash": "2107d4412daf7286e6ef515aec6453991a587cde18923e87c52dec8a34d4808c"
+  },
+  "sampled_players": {
+    "min": 16,
+    "max": 16
+  },
+  "final_population": {
+    "blocked_spawns": 0,
+    "max_path_jobs_per_tick": 4,
+    "parked": 4,
+    "path_jobs": 2649,
+    "pedestrians": 32,
+    "players": 16,
+    "police": 8,
+    "sessions": 16,
+    "traffic": 24,
+    "vehicles": 36
+  },
+  "server_tick": {
+    "max_ms": 55.213,
+    "mean_ms": 2.5218070562293273,
+    "min_ms": 0.977,
+    "p50_ms": 1.625,
+    "p95_ms": 5.75,
+    "p99_ms": 6.9,
+    "samples": 3628
+  },
+  "server_systems_since_startup": {
+    "admission": {
+      "max_ms": 7.325,
+      "mean_ms": 0.0739030534351145,
+      "min_ms": 0.001,
+      "p50_ms": 0.075,
+      "p95_ms": 0.125,
+      "p99_ms": 0.175,
+      "samples": 3930
+    },
+    "flush": {
+      "max_ms": 21.47,
+      "mean_ms": 0.24144376590330788,
+      "min_ms": 0,
+      "p50_ms": 0.025,
+      "p95_ms": 0.975,
+      "p99_ms": 1.625,
+      "samples": 3930
+    },
+    "gameplay": {
+      "max_ms": 0.542,
+      "mean_ms": 0.04150712468193384,
+      "min_ms": 0.001,
+      "p50_ms": 0.05,
+      "p95_ms": 0.075,
+      "p99_ms": 0.1,
+      "samples": 3930
+    },
+    "motors": {
+      "max_ms": 43.22,
+      "mean_ms": 0.8466315521628499,
+      "min_ms": 0.024,
+      "p50_ms": 0.875,
+      "p95_ms": 1.025,
+      "p99_ms": 1.15,
+      "samples": 3930
+    },
+    "planning": {
+      "max_ms": 2.994,
+      "mean_ms": 0.27151119592875317,
+      "min_ms": 0.004,
+      "p50_ms": 0.2,
+      "p95_ms": 0.8,
+      "p99_ms": 1.075,
+      "samples": 3930
+    },
+    "replication": {
+      "max_ms": 15.921,
+      "mean_ms": 0.9367796437659032,
+      "min_ms": 0.004,
+      "p50_ms": 0.225,
+      "p95_ms": 3.4,
+      "p99_ms": 4.125,
+      "samples": 3930
+    }
+  },
+  "ticks_per_wall_second": 29.99820119111358,
+  "application_egress_kib_s": 925.6766705587833,
+  "peers": [
+    {
+      "player": 42,
+      "up_kib_s": 10.131675993924132,
+      "down_kib_s": 59.99706152239005
+    },
+    {
+      "player": 7,
+      "up_kib_s": 11.034779392413114,
+      "down_kib_s": 59.872052742361326
+    },
+    {
+      "player": 8,
+      "up_kib_s": 11.072057430514375,
+      "down_kib_s": 59.99869716649796
+    },
+    {
+      "player": 9,
+      "up_kib_s": 11.075052042612446,
+      "down_kib_s": 59.99012020684751
+    },
+    {
+      "player": 43,
+      "up_kib_s": 11.030279336733132,
+      "down_kib_s": 59.9919267391458
+    },
+    {
+      "player": 44,
+      "up_kib_s": 11.077997829513267,
+      "down_kib_s": 59.995783929728645
+    },
+    {
+      "player": 45,
+      "up_kib_s": 11.065848492930604,
+      "down_kib_s": 56.973243818829744
+    },
+    {
+      "player": 75,
+      "up_kib_s": 11.00038204094967,
+      "down_kib_s": 59.9958978551889
+    },
+    {
+      "player": 76,
+      "up_kib_s": 10.991219178932203,
+      "down_kib_s": 54.2177775368947
+    },
+    {
+      "player": 77,
+      "up_kib_s": 10.994360266622028,
+      "down_kib_s": 39.22005218439382
+    },
+    {
+      "player": 78,
+      "up_kib_s": 10.836972243282908,
+      "down_kib_s": 59.99550725361089
+    },
+    {
+      "player": 79,
+      "up_kib_s": 10.951263892515003,
+      "down_kib_s": 59.99178840108693
+    },
+    {
+      "player": 81,
+      "up_kib_s": 10.85005739614622,
+      "down_kib_s": 55.45612287724303
+    },
+    {
+      "player": 82,
+      "up_kib_s": 11.0751985182042,
+      "down_kib_s": 59.99439241160699
+    },
+    {
+      "player": 83,
+      "up_kib_s": 10.42757296433192,
+      "down_kib_s": 59.99265911710457
+    },
+    {
+      "player": 84,
+      "up_kib_s": 10.261445230684844,
+      "down_kib_s": 59.993586795852345
+    }
+  ],
+  "native_peers": [
+    {
+      "player": 42,
+      "join_ms": 1856.568333,
+      "up_sent_by_peer_kib_s": 10.131675993924132,
+      "down_received_by_peer_kib_s": 58.523647269876,
+      "displacement_path_m": 238.7632966233523,
+      "relay": {
+        "dropped_packets": [169, 198],
+        "duplicated": 198,
+        "forwarded_packets": [9486, 10564],
+        "forwarded_udp_payload_bytes": [1950940, 8074516],
+        "overflow": 0,
+        "peak_queue": 23,
+        "received_packets": [9556, 10671],
+        "received_udp_payload_bytes": [1962313, 8153207],
+        "reordered": 1025
+      }
+    },
+    {
+      "player": 7,
+      "join_ms": 834.666541,
+      "up_sent_by_peer_kib_s": 11.049654802508968,
+      "down_received_by_peer_kib_s": 58.8281700251315,
+      "displacement_path_m": 376.16005839392074,
+      "relay": {
+        "dropped_packets": [178, 204],
+        "duplicated": 202,
+        "forwarded_packets": [9868, 10849],
+        "forwarded_udp_payload_bytes": [2094069, 8111436],
+        "overflow": 0,
+        "peak_queue": 20,
+        "received_packets": [9944, 10962],
+        "received_udp_payload_bytes": [2108471, 8189252],
+        "reordered": 1070
+      }
+    },
+    {
+      "player": 8,
+      "join_ms": 818.4797080000001,
+      "up_sent_by_peer_kib_s": 11.06908723101493,
+      "down_received_by_peer_kib_s": 58.55645780242878,
+      "displacement_path_m": 414.6404879445326,
+      "relay": {
+        "dropped_packets": [179, 205],
+        "duplicated": 202,
+        "forwarded_packets": [9896, 10865],
+        "forwarded_udp_payload_bytes": [2097122, 8112556],
+        "overflow": 0,
+        "peak_queue": 23,
+        "received_packets": [9973, 10977],
+        "received_udp_payload_bytes": [2113007, 8190864],
+        "reordered": 1072
+      }
+    },
+    {
+      "player": 9,
+      "join_ms": 833.465167,
+      "up_sent_by_peer_kib_s": 11.078022242111892,
+      "down_received_by_peer_kib_s": 57.782000661163735,
+      "displacement_path_m": 506.41035513579845,
+      "relay": {
+        "dropped_packets": [178, 200],
+        "duplicated": 200,
+        "forwarded_packets": [9810, 10679],
+        "forwarded_udp_payload_bytes": [2090352, 7959491],
+        "overflow": 0,
+        "peak_queue": 20,
+        "received_packets": [9889, 10785],
+        "received_udp_payload_bytes": [2103392, 8044338],
+        "reordered": 1056
+      }
+    },
+    {
+      "player": 43,
+      "join_ms": 849.3027920000001,
+      "up_sent_by_peer_kib_s": 11.036219735732024,
+      "down_received_by_peer_kib_s": 56.786251450890674,
+      "displacement_path_m": 233.55659853019824,
+      "relay": {
+        "dropped_packets": [177, 198],
+        "duplicated": 200,
+        "forwarded_packets": [9659, 10524],
+        "forwarded_udp_payload_bytes": [2078164, 7855187],
+        "overflow": 0,
+        "peak_queue": 20,
+        "received_packets": [9734, 10633],
+        "received_udp_payload_bytes": [2094809, 7926790],
+        "reordered": 1034
+      }
+    },
+    {
+      "player": 44,
+      "join_ms": 828.2685,
+      "up_sent_by_peer_kib_s": 11.080968029012713,
+      "down_received_by_peer_kib_s": 59.89561903756789,
+      "displacement_path_m": 164.51611600536125,
+      "relay": {
+        "dropped_packets": [178, 201],
+        "duplicated": 202,
+        "forwarded_packets": [9847, 10707],
+        "forwarded_udp_payload_bytes": [2083842, 8013343],
+        "overflow": 0,
+        "peak_queue": 25,
+        "received_packets": [9924, 10815],
+        "received_udp_payload_bytes": [2100208, 8087387],
+        "reordered": 1061
+      }
+    },
+    {
+      "player": 45,
+      "join_ms": 1047.533292,
+      "up_sent_by_peer_kib_s": 11.066043793719608,
+      "down_received_by_peer_kib_s": 56.00078422764549,
+      "displacement_path_m": 348.1647184773283,
+      "relay": {
+        "dropped_packets": [178, 198],
+        "duplicated": 200,
+        "forwarded_packets": [9729, 10567],
+        "forwarded_udp_payload_bytes": [2076027, 7702442],
+        "overflow": 0,
+        "peak_queue": 21,
+        "received_packets": [9809, 10670],
+        "received_udp_payload_bytes": [2093315, 7778574],
+        "reordered": 1041
+      }
+    },
+    {
+      "player": 75,
+      "join_ms": 997.576042,
+      "up_sent_by_peer_kib_s": 11.0152330384469,
+      "down_received_by_peer_kib_s": 57.864230430867565,
+      "displacement_path_m": 178.5950854705461,
+      "relay": {
+        "dropped_packets": [177, 200],
+        "duplicated": 200,
+        "forwarded_packets": [9669, 10643],
+        "forwarded_udp_payload_bytes": [2064163, 7938215],
+        "overflow": 0,
+        "peak_queue": 23,
+        "received_packets": [9746, 10751],
+        "received_udp_payload_bytes": [2083861, 8020271],
+        "reordered": 1047
+      }
+    },
+    {
+      "player": 76,
+      "join_ms": 746.698958,
+      "up_sent_by_peer_kib_s": 10.990975052945947,
+      "down_received_by_peer_kib_s": 53.251762871747594,
+      "displacement_path_m": 642.3683140834546,
+      "relay": {
+        "dropped_packets": [169, 192],
+        "duplicated": 194,
+        "forwarded_packets": [9428, 10198],
+        "forwarded_udp_payload_bytes": [2041340, 7364878],
+        "overflow": 0,
+        "peak_queue": 21,
+        "received_packets": [9500, 10297],
+        "received_udp_payload_bytes": [2055841, 7438199],
+        "reordered": 994
+      }
+    },
+    {
+      "player": 77,
+      "join_ms": 624.500459,
+      "up_sent_by_peer_kib_s": 10.994457917016529,
+      "down_received_by_peer_kib_s": 38.42687871751583,
+      "displacement_path_m": 629.4030840391333,
+      "relay": {
+        "dropped_packets": [138, 161],
+        "duplicated": 164,
+        "forwarded_packets": [8089, 8335],
+        "forwarded_udp_payload_bytes": [1950251, 5428339],
+        "overflow": 0,
+        "peak_queue": 21,
+        "received_packets": [8141, 8421],
+        "received_udp_payload_bytes": [1957978, 5499526],
+        "reordered": 818
+      }
+    },
+    {
+      "player": 78,
+      "join_ms": 844.1063330000001,
+      "up_sent_by_peer_kib_s": 10.828061644784572,
+      "down_received_by_peer_kib_s": 57.6735273479374,
+      "displacement_path_m": 320.0191249397176,
+      "relay": {
+        "dropped_packets": [173, 198],
+        "duplicated": 200,
+        "forwarded_packets": [9611, 10564],
+        "forwarded_udp_payload_bytes": [2028119, 7866625],
+        "overflow": 0,
+        "peak_queue": 22,
+        "received_packets": [9683, 10667],
+        "received_udp_payload_bytes": [2049688, 7946578],
+        "reordered": 1035
+      }
+    },
+    {
+      "player": 79,
+      "join_ms": 823.5884159999999,
+      "up_sent_by_peer_kib_s": 11.059663967945456,
+      "down_received_by_peer_kib_s": 58.7727941139158,
+      "displacement_path_m": 67.95527320709152,
+      "relay": {
+        "dropped_packets": [177, 202],
+        "duplicated": 200,
+        "forwarded_packets": [9714, 10760],
+        "forwarded_udp_payload_bytes": [2065012, 8000310],
+        "overflow": 0,
+        "peak_queue": 22,
+        "received_packets": [9789, 10871],
+        "received_udp_payload_bytes": [2082812, 8083742],
+        "reordered": 1057
+      }
+    },
+    {
+      "player": 81,
+      "join_ms": 843.5041669999999,
+      "up_sent_by_peer_kib_s": 10.84689189585777,
+      "down_received_by_peer_kib_s": 54.46870650063417,
+      "displacement_path_m": 640.366079215426,
+      "relay": {
+        "dropped_packets": [168, 190],
+        "duplicated": 193,
+        "forwarded_packets": [9365, 10173],
+        "forwarded_udp_payload_bytes": [2009145, 7446336],
+        "overflow": 0,
+        "peak_queue": 24,
+        "received_packets": [9436, 10271],
+        "received_udp_payload_bytes": [2018098, 7519961],
+        "reordered": 993
+      }
+    },
+    {
+      "player": 82,
+      "join_ms": 1022.51075,
+      "up_sent_by_peer_kib_s": 11.072228318704754,
+      "down_received_by_peer_kib_s": 59.453970715832504,
+      "displacement_path_m": 360.04127865495866,
+      "relay": {
+        "dropped_packets": [177, 200],
+        "duplicated": 200,
+        "forwarded_packets": [9713, 10646],
+        "forwarded_udp_payload_bytes": [2053798, 7960410],
+        "overflow": 0,
+        "peak_queue": 20,
+        "received_packets": [9787, 10756],
+        "received_udp_payload_bytes": [2069929, 8028685],
+        "reordered": 1049
+      }
+    },
+    {
+      "player": 83,
+      "join_ms": 842.266333,
+      "up_sent_by_peer_kib_s": 10.42757296433192,
+      "down_received_by_peer_kib_s": 58.646279890305166,
+      "displacement_path_m": 93.67223280086728,
+      "relay": {
+        "dropped_packets": [169, 197],
+        "duplicated": 196,
+        "forwarded_packets": [9415, 10451],
+        "forwarded_udp_payload_bytes": [1946571, 7887423],
+        "overflow": 0,
+        "peak_queue": 25,
+        "received_packets": [9488, 10555],
+        "received_udp_payload_bytes": [1964622, 7965291],
+        "reordered": 1017
+      }
+    }
+  ],
+  "sampled_native_rtc_rtt": {
+    "samples": 195,
+    "p50_ms": 695.9800829999949,
+    "p95_ms": 3310.0175420000014,
+    "p99_ms": 4492.872957999993,
+    "max_ms": 5479.304917000009
+  },
+  "sampled_owner_lag_ms": {
+    "samples": 195,
+    "p50_ms": 500,
+    "p95_ms": 3200,
+    "p99_ms": 4900,
+    "max_ms": 5200
+  },
+  "server_rss_kib": {
+    "first": 23584,
+    "last": 28832,
+    "min": 23584,
+    "max": 28832
+  },
+  "world_counters": {
+    "budget_drops": 88979,
+    "conflicting_inputs": 0,
+    "egress_bytes": 119307800,
+    "future_inputs": 0,
+    "ingress_bytes": 22214249,
+    "late_inputs": 16027,
+    "max_refresh_age_ticks": 30,
+    "max_snapshot_bytes": 1085,
+    "rate_limited_inputs": 116,
+    "snapshot_packets": 100803,
+    "stale_epochs": 22
+  },
+  "final_queues": {
+    "closed_reasons": {},
+    "failed": false,
+    "ingress_messages": 1,
+    "latest_streams": 16,
+    "lifecycle": 0,
+    "peers": 16,
+    "reliable_bytes": 5080,
+    "reliable_messages": 18,
+    "snapshot_records": 372
+  },
+  "scope": "Local host; cumulative server histograms since startup, populated_tick_work only samples 16-player ticks. UDP payload includes DTLS/SCTP/STUN; excludes IP/UDP and WS framing. Browser network is loopback."
+}

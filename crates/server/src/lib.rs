@@ -5,6 +5,7 @@ pub mod content_loader;
 pub mod control;
 pub mod jobs;
 pub mod missions;
+pub mod performance;
 pub mod persistence;
 pub mod police;
 pub mod population;

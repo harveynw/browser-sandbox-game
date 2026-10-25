@@ -1,0 +1,360 @@
+
+> port-meridian@0.1.0 check
+> npm run bridge:check && npm run build:wasm && npm run protocol:check && npm run content:check && npm run typecheck && npm run lint && npm run format:check && npm run test:unit && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked
+
+
+> port-meridian@0.1.0 bridge:check
+> cargo run -p xtask --locked -- check-bridge
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+     Running `target/debug/xtask check-bridge`
+Bridge contracts verified: 7 files
+
+> port-meridian@0.1.0 build:wasm
+> node tools/build-wasm.mjs
+
+    Finished `release` profile [optimized] target(s) in 0.12s
+
+> port-meridian@0.1.0 protocol:check
+> cargo run -p xtask --locked -- check-generated
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running `target/debug/xtask check-generated`
+Generated protocol and fixtures match.
+
+> port-meridian@0.1.0 content:check
+> cargo run -p xtask --locked -- check-content
+
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `target/debug/xtask check-content`
+Content contracts and baked package match a322579fa1fedb5e3c058552fa96bcc8e22e0b21a36098b883b6cc35741c9939
+
+> port-meridian@0.1.0 typecheck
+> tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/client/tsconfig.json && tsc --noEmit -p packages/protocol/tsconfig.json && tsc --noEmit -p packages/content/tsconfig.json
+
+
+> port-meridian@0.1.0 lint
+> eslint . --max-warnings 0
+
+
+> port-meridian@0.1.0 format:check
+> prettier --check . && cargo fmt --all -- --check
+
+Checking formatting...
+All matched files use Prettier code style!
+
+> port-meridian@0.1.0 test:unit
+> vitest run
+
+
+ RUN  v5.0.5 /Users/harvey/Documents/ChatGPT/gta-multiplayer-game
+
+
+ Test Files  22 passed (22)
+      Tests  111 passed (111)
+   Start at  11:39:52
+   Duration  1.43s (tests 66%, import 25%, transform 7%, worker 1%)
+
+    Checking server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.42s
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+   Compiling sim-wasm v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/sim-wasm)
+   Compiling xtask v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/xtask)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.83s
+     Running unittests src/lib.rs (target/debug/deps/content-7740db6a9ae69d3f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/baking.rs (target/debug/deps/baking-b5f24f20adc56686)
+
+running 10 tests
+test canonical_numbers_keys_and_invalid_domains ... ok
+test references_corridors_driveways_and_nonfinite_source_fail ... ok
+test duplicate_colliders_and_unsafe_asset_urls_fail ... ok
+test overlapping_spawn_is_rejected ... ok
+test broken_graph_connectivity_and_dangling_edges_fail ... ok
+test asset_tampering_and_visual_face_drift_fail ... ok
+test repeated_bakes_are_byte_identical_and_cover_the_slice ... ok
+test content_and_simulation_hashes_have_distinct_coverage ... ok
+test full_city_bakes_six_districts_ring_named_anchors_and_reserved_jobs_deterministically ... ok
+test full_city_rejects_unreachable_trial_gate_reused_recovery_slot_and_ground_hole ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+     Running unittests src/lib.rs (target/debug/deps/protocol-abe9161c8b0f6102)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/contracts.rs (target/debug/deps/contracts-57c82776ce1fc325)
+
+running 6 tests
+test protocol_does_not_revalidate_gameplay_relationships_on_server_output ... ok
+test serde_defaults_replace_custom_unknown_field_and_required_null_guards ... ok
+test client_batches_are_small_unique_and_ascending ... ok
+test reference_messages_round_trip_and_broken_frames_fail ... ok
+test frame_depth_and_truncation_limits_use_the_decoder ... ok
+test serde_rejects_bad_client_types_versions_and_nonfinite_or_out_of_range_inputs ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/deps/server-072d330ac3f121ab)
+
+running 22 tests
+test police::tests::arrest_requires_ninety_continuous_ticks_and_resets_on_any_invalid_tick ... ok
+test police::tests::causal_dedup_cooldown_search_reacquisition_and_decay_are_exact ... ok
+test missions::tests::swept_gates_reject_near_misses_on_foot_and_same_tick_failure_or_timeout ... ok
+test missions::tests::swept_trial_consumes_one_ordered_gate_per_tick_and_distinct_return_finish ... ok
+test performance::bounded_histogram_tracks_tails_and_overflow_without_keeping_raw_samples ... ok
+test population::tests::intersections_first_request_wins_stable_ties_expire_and_release ... ok
+test police::tests::witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits ... ok
+test transport::tests::invalid_packet_closes_without_retaining_payload ... ok
+test transport::tests::loss_probes_need_independent_records_instead_of_the_latest_pong_stream ... ok
+test population::tests::pedestrians_use_authored_edges_wait_for_crossings_and_flee_on_graph ... ok
+test transport::tests::preopen_duplicate_close_and_recycled_ids ... ok
+test population::tests::traffic_parks_in_an_authored_free_slot_and_becomes_available ... ok
+test transport::tests::owner_updates_cannot_overwrite_rtc_pongs_in_the_same_tick ... ok
+test transport::tests::split_snapshot_output_retains_every_entity_and_baseline_clears_stale_pending_state ... ok
+test transport::tests::stalled_lifecycle_fails_without_unbounded_growth ... ok
+test transport::tests::stalled_ingress_is_bounded_and_stale_sends_cannot_reach_reconnect ... ok
+test population::tests::parked_budget_includes_eight_reserved_and_tags_survive_possession ... ok
+test transport::tests::reliable_full_disconnects_and_unreliable_replaces_stale ... ok
+test population::tests::sensor_brakes_and_unreachable_graph_stops_without_moving_through_static_geometry ... ok
+test police::tests::patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling ... ok
+test population::tests::same_seed_and_observers_produce_identical_population_and_motion ... ok
+test population::tests::seeded_population_traversal_is_bounded_hidden_collision_safe_and_recycles ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.48s
+
+     Running unittests src/main.rs (target/debug/deps/server-093cb7c7baa28f50)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/actual_transport.rs (target/debug/deps/actual_transport-e6510b0dec12f420)
+
+running 4 tests
+test real_rtc_backpressure_and_rapid_kill_reconnect ... ignored, binds real loopback TCP/UDP; run explicit actual transport suite
+test real_rtc_loss_and_blackout_recovery ... ignored, binds real loopback TCP/UDP; run explicit actual transport suite
+test real_rtc_periodic_loss_recovers_without_unbounded_sends ... ignored, binds real loopback TCP/UDP; run explicit actual transport suite
+test rtc::independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic ... ok
+
+test result: ok. 1 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/capacity.rs (target/debug/deps/capacity-201934387038b26e)
+
+running 2 tests
+test populated_actual_rtc_capacity ... ignored, requires separate production server and a real browser observer; defaults to a 60-minute soak
+test rtc::independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/content_loader.rs (target/debug/deps/content_loader-8816abf33cdf794b)
+
+running 1 test
+test runtime_loader_rejects_tampered_missing_oversized_and_traversal_assets ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/control.rs (target/debug/deps/control-6d597a836dc6ccd2)
+
+running 3 tests
+test scheduler_caps_catchup_drops_wall_time_and_keeps_contiguous_fixed_steps ... ok
+test tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret ... ok
+test localhost_origin_cookie_json_and_expiring_readiness_gates_are_explicit ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/persistence.rs (target/debug/deps/persistence-cc58e0407a6d34eb)
+
+running 9 tests
+test bounded_submission_rejects_excess_work_without_blocking ... ok
+test local_config_selects_sqlite_or_disposable_memory_and_rejects_bad_modes_or_paths ... ok
+test schema_mismatch_and_invalid_database_fail_startup_explicitly ... ok
+test insufficient_funds_and_conflicting_or_unbacked_events_rollback_atomically ... ok
+test only_one_worker_can_own_a_database_and_recovery_does_not_run_in_a_second_server ... ok
+test migrations_hash_only_cookie_and_committed_rewards_survive_reopen_once ... ok
+test interrupted_repairs_refund_once_on_restart_but_acknowledged_repairs_stay_paid ... ok
+test durable_http_admission_returns_pending_cookie_then_only_committed_profile ... ok
+test facade_does_not_publish_uncommitted_rewards_and_retries_locked_database_with_same_id ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/replication.rs (target/debug/deps/replication-d365c0d527f97c55)
+
+running 4 tests
+test byte_budget_enforces_burst_refill_and_owner_reserve ... ok
+test input_rate_is_a_strict_rolling_second_not_a_refilling_burst ... ok
+test spatial_hysteresis_self_priority_and_visibility_cap_are_deterministic ... ok
+test actual_size_splits_are_independent_and_per_entity_coalescing_does_not_lose_other_packets ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/world.rs (target/debug/deps/world-0cc714e0101d5b3c)
+
+running 50 tests
+test all_blocked_exit_candidates_preserve_occupancy_and_epoch ... ok
+test courier_acceptance_is_private_scoped_cached_and_survives_resync ... ok
+test car_contacts_damage_both_cars_but_never_another_players_occupied_car ... ok
+test courier_completes_from_authoritative_car_motion_and_does_not_release_the_driver ... ok
+test duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_actor ... ok
+test delayed_input_burst_is_capped_without_retiring_a_healthy_session ... ok
+test exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it ... ok
+test full_magazine_reload_is_rejected_and_duplicate_requests_return_the_cached_result ... ok
+test future_ring_is_nine_ticks_and_one_frame_is_consumed_per_step ... ok
+test courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay ... ok
+test guest_replacement_disconnect_cleanup_and_generation_reuse_are_idempotent ... ok
+test loading_is_inert_and_ready_starts_once_with_ordered_baseline_and_status ... ok
+test loading_hello_and_playing_timeouts_remove_all_state ... ok
+test memory_rewards_are_atomic_bounded_and_reject_event_conflicts ... ok
+test loading_sessions_reserve_capacity_and_unknown_peers_cannot_allocate_a_seventeenth_player ... ok
+test other_observers_receive_show_then_hide_and_reliable_full_removes_ownership ... ok
+test full_city_installs_three_public_classes_without_spawning_recovery_reservations ... ok
+test playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after_aoi_return ... ok
+test pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driving ... ok
+test moving_vehicle_damages_pedestrians_through_the_world_swept_query ... ok
+test police_hear_real_shots_once_publish_private_heat_and_clear_targets_on_rejoin ... ok
+test resync_increments_epoch_and_visibility_without_moving_until_new_readiness ... ok
+test arrest_safely_releases_a_stationary_driver_and_rejects_old_epoch_inputs ... ok
+test shots_ignore_players_and_do_not_damage_another_guests_occupied_car ... ok
+test simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_car ... ok
+test secured_theft_is_witnessed_once_and_police_cars_cannot_be_possessed ... ok
+test static_impacts_apply_once_per_counterpart_per_fifteen_ticks ... ok
+test sustained_input_byte_flood_cannot_expand_the_ring_or_keep_an_actor ... ok
+test t16::cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward ... ok
+test full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken ... ok
+test t16::memory_worker_reserves_refund_capacity_and_retries_without_double_debit ... ok
+test courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoin ... ok
+test t16::delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_car ... ok
+test t16::repair_rejects_heat_and_funds_and_cancels_interrupted_dwell_without_debit ... ok
+test t16::recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconnect_and_destruction ... ok
+test t16::recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit ... ok
+test t16::repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once ... ok
+test t16::trial_requires_driving_orders_gates_and_rewards_once ... ok
+test t17::sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car ... ok
+test t19::recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins ... ok
+test police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss ... ok
+test unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors ... ok
+test t17::sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart ... ok
+test t17::sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restores_profile_only ... ok
+test populated_snapshots_preserve_budget_for_a_complete_resync_baseline ... ok
+test sixteen_wanted_guests_share_at_most_eight_police_with_rotating_fair_assignments ... ok
+test walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds ... ok
+test unseen_target_is_not_tracked_and_escapes_after_search_timer ... ok
+test fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile ... ok
+test destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.83s
+
+     Running unittests src/lib.rs (target/debug/deps/sim_core-b527bc5fe4e082ac)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/character.rs (target/debug/deps/character-5dd4775e60eb390e)
+
+running 17 tests
+test camera_sphere_keeps_radius_at_walls_corners_and_awnings ... ok
+test camera_yaw_convention_aim_turn_limit_and_shortest_arc ... ok
+test free_fall_clamps_and_air_control_is_weaker ... ok
+test grazing_step_corner_clips_instead_of_committing_a_penetrating_endpoint ... ok
+test a_low_ceiling_stops_upward_velocity ... ok
+test ground_acceleration_and_neutral_braking_are_fixed_step ... ok
+test invalid_restore_input_and_tick_fail_without_mutating_state ... ok
+test loaders_reject_invalid_configuration_and_collision_records ... ok
+test jump_edge_cooldown_gravity_and_landing ... ok
+test filters_overlap_and_ray_identity_do_not_leak_engine_handles ... ok
+test ground_snap_does_not_cancel_a_launch_or_magnetize_an_airborne_actor ... ok
+test low_steps_climb_but_tall_obstacles_block ... ok
+test walking_sprinting_diagonals_and_backward_limits ... ok
+test baked_slice_spawns_have_real_capsule_support_and_clearance ... ok
+test wall_slide_and_diagonal_corner_do_not_penetrate ... ok
+test seeded_inputs_remain_finite_collision_safe_and_bounded ... ok
+test recorded_sixty_second_trace_matches_all_frozen_checkpoints ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/city.rs (target/debug/deps/city-bdd5e7a3e84a857a)
+
+running 2 tests
+test compact_drives_a_continuous_full_outer_ring_without_visual_data ... ok
+test full_collision_supports_every_lane_sidewalk_access_and_all_three_vehicle_motors ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+     Running tests/hit_queries.rs (target/debug/deps/hit_queries-7e713faef5a94b47)
+
+running 2 tests
+test hit_rays_respect_capsule_box_range_and_rotation ... ok
+test swept_vehicle_detects_a_capsule_between_endpoints_and_rejects_near_misses ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vehicle.rs (target/debug/deps/vehicle-847a1c4b19bd8327)
+
+running 6 tests
+test thirty_metre_per_second_sweep_cannot_tunnel_through_a_thin_wall ... ok
+test proxy_exclusion_removal_and_character_collision_share_the_query_world ... ok
+test held_handbrake_overrides_throttle_stops_both_directions_and_releases ... ok
+test throttle_brake_reverse_steering_and_handbrake_are_bounded ... ok
+test driving_from_slice_parking_keeps_a_valid_flat_motor ... ok
+test recorded_native_vehicle_trace_retains_all_sixty_checkpoints ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/deps/sim_wasm-fa8007ed170f5c90)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bridge.rs (target/debug/deps/bridge-9082e81c3c76f4f1)
+
+running 1 test
+test native_byte_bridge_replays_frozen_checkpoints_and_retains_static_world ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src/main.rs (target/debug/deps/xtask-2af637d87eb8b059)
+
+running 2 tests
+test content_task::tests::content_drift_check_is_read_only_and_rejects_extra_files ... ok
+test generation::tests::drift_detection_is_read_only_and_catches_extra_files ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests content
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests protocol
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests server
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sim_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests sim_wasm
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

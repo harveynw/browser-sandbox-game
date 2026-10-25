@@ -1,0 +1,19 @@
+    Finished `release` profile [optimized] target(s) in 0.36s
+     Running tests/capacity.rs (target/release/deps/capacity-d4a19187141f77cd)
+
+running 1 test
+T20 synthetic RTC peers dispatched; join one browser at http://localhost:4173/ (16 total required)
+T20 measurement started: 15 real RTC bots plus browser, duration=600s
+T20 sample t=0s players=16 tick_p95=7.075ms traffic=24 peds=32 police=8
+T20 sample t=10s players=16 tick_p95=6.55ms traffic=24 peds=32 police=8
+Error: Protocol(ResetWithoutClosingHandshake)
+test populated_actual_rtc_capacity ... FAILED
+
+failures:
+
+failures:
+    populated_actual_rtc_capacity
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 25.83s
+
+error: test failed, to rerun pass `-p server --test capacity`

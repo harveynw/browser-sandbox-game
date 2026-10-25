@@ -20,7 +20,7 @@ toml = "=1.0.7"
 ctrlc = { version = "=3.5.2", features = ["termination"] }
 
 [dev-dependencies]
-tokio = { version = "=1.54.0", features = ["rt", "net", "sync", "time", "macros"] }
+tokio = { version = "=1.54.0", features = ["rt", "rt-multi-thread", "io-util", "net", "sync", "time", "macros"] }
 tokio-tungstenite = "=0.26.2"
 futures-util = "=0.3.34"
 async-trait = "=0.1.92"

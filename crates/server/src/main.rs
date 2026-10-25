@@ -75,16 +75,25 @@ fn run() -> Result<(), String> {
             return Err("transport/control worker failed".into());
         }
         let current = Instant::now();
-        let (steps, overloaded) = scheduler.advance(current.duration_since(previous));
+        let gap = current.duration_since(previous);
+        let (steps, overloaded) = scheduler.advance(gap);
         previous = current;
         for _ in 0..steps {
             let now = started.elapsed().as_millis() as u64;
+            let tick_started = Instant::now();
             let mut shared = control.lock().map_err(|_| "control state poisoned")?;
             if !shared.profiles.healthy() {
                 return Err("persistence worker failed".into());
             }
             world.step(&mut transport, &mut shared.profiles, now, !overloaded)?;
+            let queues = if world.tick.is_multiple_of(30) {
+                transport.queue_metrics()
+            } else {
+                serde_json::Value::Null
+            };
+            shared.record_performance(&world, queues, gap, now);
             shared.update(&world, now, transport.healthy(), overloaded);
+            shared.finish_tick(tick_started.elapsed(), world.players.len() == 16);
         }
         thread::sleep(Duration::from_millis(2));
     }

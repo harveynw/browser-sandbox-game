@@ -6,7 +6,7 @@
 
 A module is done when its public contract, representative failure behavior, and integration with the preceding milestone are verified. Placeholder implementations, fake “multiplayer” sharing local browser storage, or screenshots without a real server are not accepted.
 
-This document defines the acceptance targets. [T19 coverage and evidence](33-impairment-and-lifecycle.md) maps the implemented regression suite and actual UDP test; performance/capacity targets remain unverified until T20.
+This document defines the acceptance targets. [T19 coverage and evidence](33-impairment-and-lifecycle.md) maps the implemented regression suite and actual UDP test; [T20 measurements and outstanding G4 gates](36-capacity-and-performance.md) record populated local results and the remaining latency, reference-hardware and soak limitations.
 
 ## Test layers
 

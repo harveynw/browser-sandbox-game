@@ -33,7 +33,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T17 Local profile persistence | T16 | Restart-safe credits and idempotency |
 | Complete | T18 Presentation and UX | T17 | Coherent art, camera, audio, HUD |
 | Complete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
-| Not started | T20 Capacity and performance | T19 | Measured 16-player budgets |
+| In progress — G4 incomplete | T20 Capacity and performance | T19 | Measured 16-player budgets |
 | Not started | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
 | Not started | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
 
@@ -204,6 +204,8 @@ Run 15 actual-net-crate synthetic clients plus one browser observer with full po
 Optimize measured bottlenecks: AOI priorities, idle rates, path queue, instancing, allocation reuse, and chunk disposal. Do not add delta compression or Web Workers unless measurements justify a separately specified change.
 
 **Done:** G4 passes or exact unmet metrics remain explicitly incomplete. Record hardware, browser version, build, seed, duration, p50/p95/p99, and packet sizes. Do not substitute an unpopulated scene benchmark.
+
+Current evidence: [36 — Capacity and performance](36-capacity-and-performance.md). The populated benchmark and instrumentation are implemented; target RTC latency, reference hardware and soak gates remain incomplete.
 
 ## T21 — Local launch and build packaging
 

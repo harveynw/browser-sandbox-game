@@ -168,6 +168,9 @@ pub struct SnapshotBuffer {
     records: BTreeMap<u32, (u32, StateRecord)>,
 }
 impl SnapshotBuffer {
+    pub fn pending_records(&self) -> usize {
+        self.records.len()
+    }
     pub fn clear(&mut self) {
         self.scope = None;
         self.records.clear();

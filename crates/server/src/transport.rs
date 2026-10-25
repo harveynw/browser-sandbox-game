@@ -80,6 +80,7 @@ struct Queues {
     lifecycle: VecDeque<TransportEvent>,
     generation: u64,
     failed: bool,
+    closed_reasons: BTreeMap<&'static str, u64>,
 }
 impl Queues {
     fn open(&mut self, id: u32) -> bool {
@@ -109,6 +110,8 @@ impl Queues {
         if self.peer(key).is_none() {
             return false;
         }
+        *self.closed_reasons.entry(reason).or_default() += 1;
+        eprintln!("Local peer {} closed: {reason}", key.id);
         self.peers.remove(&key.id);
         // Never silently lose a terminal event: fail the boundary if consumer stalls.
         if self.lifecycle.len() >= 32 {
@@ -292,6 +295,11 @@ impl NetCrateTransport {
             stop,
             worker: Some(worker),
         })
+    }
+    /// Application boundary only; dependency-internal queues are opaque.
+    pub fn queue_metrics(&self) -> serde_json::Value {
+        let q = self.queues.lock().expect("queue lock");
+        serde_json::json!({"peers":q.peers.len(),"lifecycle":q.lifecycle.len(),"ingress_messages":q.peers.values().map(|p|p.ingress.len()).sum::<usize>(),"reliable_messages":q.peers.values().map(|p|p.reliable.len()).sum::<usize>(),"reliable_bytes":q.peers.values().map(|p|p.reliable_bytes).sum::<usize>(),"snapshot_records":q.peers.values().map(|p|p.snapshots.pending_records()).sum::<usize>(),"latest_streams":q.peers.values().map(|p|p.latest.len()).sum::<usize>(),"failed":q.failed,"closed_reasons":q.closed_reasons})
     }
     pub fn healthy(&self) -> bool {
         !self.queues.lock().expect("queue lock").failed

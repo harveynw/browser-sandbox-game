@@ -1,8 +1,10 @@
 //! Test-only real WebSocket/RTC peer and datagram impairment relay.
 //! Uses the same pinned WebRTC implementation as net; no release listener hooks.
+#![allow(dead_code)] // Helpers are shared by transport and capacity integration binaries.
 use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
 use std::{
+    collections::VecDeque,
     future::pending,
     net::{SocketAddr, UdpSocket},
     sync::{
@@ -10,7 +12,7 @@ use std::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::{net::TcpStream, sync::mpsc, time::timeout};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async, tungstenite::Message};
@@ -90,14 +92,33 @@ pub struct RelayStats {
     dropped: [usize; 2],
     forwarded: [usize; 2],
     unknown: usize,
+    received_bytes: [usize; 2],
+    forwarded_bytes: [usize; 2],
+    reordered: usize,
+    duplicated: usize,
+    overflow: usize,
+    peak_queue: usize,
 }
 impl RelayStats {
+    pub fn report(&self) -> serde_json::Value {
+        serde_json::json!({"received_packets":self.received,"dropped_packets":self.dropped,"forwarded_packets":self.forwarded,"received_udp_payload_bytes":self.received_bytes,"forwarded_udp_payload_bytes":self.forwarded_bytes,"reordered":self.reordered,"duplicated":self.duplicated,"overflow":self.overflow,"peak_queue":self.peak_queue})
+    }
     pub fn since(&self, before: Self) -> Self {
         Self {
             received: std::array::from_fn(|i| self.received[i] - before.received[i]),
             dropped: std::array::from_fn(|i| self.dropped[i] - before.dropped[i]),
             forwarded: std::array::from_fn(|i| self.forwarded[i] - before.forwarded[i]),
             unknown: self.unknown - before.unknown,
+            received_bytes: std::array::from_fn(|i| {
+                self.received_bytes[i] - before.received_bytes[i]
+            }),
+            forwarded_bytes: std::array::from_fn(|i| {
+                self.forwarded_bytes[i] - before.forwarded_bytes[i]
+            }),
+            reordered: self.reordered - before.reordered,
+            duplicated: self.duplicated - before.duplicated,
+            overflow: self.overflow - before.overflow,
+            peak_queue: self.peak_queue,
         }
     }
 }
@@ -106,6 +127,7 @@ pub struct Relay {
     address: SocketAddr,
     route: Arc<Mutex<Route>>,
     stop: Arc<AtomicBool>,
+    pub target_profile: Arc<AtomicBool>,
     pub loss_one_in: Arc<AtomicUsize>,
     pub periodic_loss: Arc<AtomicBool>,
     pub blocked: Arc<AtomicBool>,
@@ -124,6 +146,8 @@ impl Relay {
         let loss_one_in = Arc::new(AtomicUsize::new(0));
         let periodic_loss = Arc::new(AtomicBool::new(false));
         let periodic = periodic_loss.clone();
+        let target_profile = Arc::new(AtomicBool::new(false));
+        let target_mode = target_profile.clone();
         let dropped = Arc::new(AtomicUsize::new(0));
         let forwarded = Arc::new(AtomicUsize::new(0));
         let (r, s, b, n, d, f) = (
@@ -142,7 +166,30 @@ impl Relay {
             // DATA/SACK cadence or concentrating every global seventh packet on one direction.
             let mut random = DatagramLoss::default();
             let mut count = 0;
+            let mut impairment = DatagramLoss::default();
+            let mut queue: Vec<(Instant, SocketAddr, usize, Vec<u8>)> = Vec::new();
             while !s.load(Ordering::Relaxed) {
+                let target_enabled = target_mode.load(Ordering::Relaxed);
+                let _ = socket.set_read_timeout(Some(Duration::from_millis(if target_enabled {
+                    1
+                } else {
+                    10
+                })));
+                let now = Instant::now();
+                let mut i = 0;
+                while i < queue.len() {
+                    if queue[i].0 <= now {
+                        let (_, to, dir, packet) = queue.swap_remove(i);
+                        if socket.send_to(&packet, to).is_ok() {
+                            f.fetch_add(1, Ordering::Relaxed);
+                            let mut st = counters.lock().unwrap();
+                            st.forwarded[dir] += 1;
+                            st.forwarded_bytes[dir] += packet.len();
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
                 if let Ok((size, from)) = socket.recv_from(&mut bytes) {
                     let target = {
                         let r = r.lock().unwrap();
@@ -155,7 +202,11 @@ impl Relay {
                         }
                     };
                     if let Some((direction, target)) = target {
-                        counters.lock().unwrap().received[direction] += 1;
+                        {
+                            let mut st = counters.lock().unwrap();
+                            st.received[direction] += 1;
+                            st.received_bytes[direction] += size;
+                        }
                         let every = n.load(Ordering::Relaxed);
                         count += 1;
                         let drop = if periodic.load(Ordering::Relaxed) {
@@ -166,9 +217,40 @@ impl Relay {
                         if b.load(Ordering::Relaxed) || drop {
                             d.fetch_add(1, Ordering::Relaxed);
                             counters.lock().unwrap().dropped[direction] += 1;
+                        } else if target_enabled {
+                            // 50 +/-10ms each direction; independent 5% +40ms reorder and 1% duplicate.
+                            let reorder = impairment.drop(direction, 20);
+                            let duplicate = impairment.drop(direction, 100);
+                            impairment.drop(direction, 2);
+                            let jitter = (impairment.0[direction] % 21) as u64;
+                            let due = Instant::now()
+                                + Duration::from_millis(40 + jitter + if reorder { 40 } else { 0 });
+                            let mut st = counters.lock().unwrap();
+                            if queue.len() + 1 + usize::from(duplicate) > 512 {
+                                st.overflow += 1;
+                                st.dropped[direction] += 1;
+                                d.fetch_add(1, Ordering::Relaxed);
+                            } else {
+                                queue.push((due, target, direction, bytes[..size].to_vec()));
+                                if reorder {
+                                    st.reordered += 1;
+                                }
+                                if duplicate {
+                                    st.duplicated += 1;
+                                    queue.push((
+                                        due + Duration::from_millis(2),
+                                        target,
+                                        direction,
+                                        bytes[..size].to_vec(),
+                                    ));
+                                }
+                                st.peak_queue = st.peak_queue.max(queue.len());
+                            }
                         } else if socket.send_to(&bytes[..size], target).is_ok() {
                             f.fetch_add(1, Ordering::Relaxed);
-                            counters.lock().unwrap().forwarded[direction] += 1;
+                            let mut st = counters.lock().unwrap();
+                            st.forwarded[direction] += 1;
+                            st.forwarded_bytes[direction] += size;
                         }
                     } else {
                         counters.lock().unwrap().unknown += 1;
@@ -181,6 +263,7 @@ impl Relay {
             address,
             route,
             stop,
+            target_profile,
             loss_one_in,
             periodic_loss,
             blocked,
@@ -236,6 +319,7 @@ pub struct Peer {
     channel: Option<Arc<dyn DataChannel>>,
     pub relay: Relay,
     pub open: bool,
+    pending: VecDeque<(bool, Vec<u8>)>,
 }
 impl Peer {
     pub async fn connect(address: SocketAddr) -> Result<Self> {
@@ -255,10 +339,16 @@ impl Peer {
             channel: None,
             relay: Relay::new()?,
             open: false,
+            pending: VecDeque::new(),
         };
         timeout(DEADLINE, async {
             while !p.open {
-                p.poll().await?;
+                if let Some(packet) = p.poll().await? {
+                    if p.pending.len() >= 128 {
+                        return Err("pre-open application queue full".into());
+                    }
+                    p.pending.push_back(packet);
+                }
             }
             Result::Ok(())
         })
@@ -277,6 +367,19 @@ impl Peer {
                 .await?;
         }
         Ok(())
+    }
+    pub async fn receive_any(&mut self) -> Result<(bool, Vec<u8>)> {
+        if let Some(packet) = self.pending.pop_front() {
+            return Ok(packet);
+        }
+        timeout(DEADLINE, async {
+            loop {
+                if let Some(packet) = self.poll().await? {
+                    return Ok(packet);
+                }
+            }
+        })
+        .await?
     }
     pub async fn receive(&mut self, reliable: bool) -> Result<Vec<u8>> {
         timeout(DEADLINE, async {

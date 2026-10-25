@@ -1,0 +1,74 @@
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `release` profile [optimized] target(s) in 3.70s
+     Running tests/capacity.rs (target/release/deps/capacity-d4a19187141f77cd)
+
+running 1 test
+T20 synthetic RTC peers dispatched; join one browser at http://localhost:4173/ (16 total required)
+T20 measurement started: 15 real RTC bots plus browser, duration=600s
+T20 sample t=0s players=16 tick_p95=6.175ms traffic=24 peds=32 police=8
+T20 sample t=10s players=16 tick_p95=6.6ms traffic=24 peds=32 police=8
+T20 sample t=20s players=16 tick_p95=6.825ms traffic=24 peds=32 police=8
+T20 sample t=30s players=16 tick_p95=6.825ms traffic=24 peds=32 police=8
+T20 sample t=40s players=16 tick_p95=6.7ms traffic=24 peds=32 police=8
+T20 sample t=50s players=16 tick_p95=6.65ms traffic=24 peds=32 police=8
+test populated_actual_rtc_capacity has been running for over 60 seconds
+T20 sample t=60s players=16 tick_p95=6.575ms traffic=24 peds=32 police=8
+T20 sample t=70s players=16 tick_p95=6.525ms traffic=24 peds=32 police=8
+T20 sample t=80s players=16 tick_p95=6.45ms traffic=24 peds=32 police=8
+T20 sample t=90s players=16 tick_p95=6.375ms traffic=24 peds=32 police=8
+T20 sample t=100s players=16 tick_p95=6.35ms traffic=24 peds=32 police=8
+T20 sample t=110s players=16 tick_p95=6.275ms traffic=24 peds=32 police=8
+T20 sample t=120s players=16 tick_p95=6.25ms traffic=24 peds=32 police=8
+T20 sample t=130s players=16 tick_p95=6.2ms traffic=24 peds=32 police=8
+T20 sample t=140s players=16 tick_p95=6.175ms traffic=24 peds=32 police=8
+T20 sample t=150s players=16 tick_p95=6.125ms traffic=24 peds=32 police=8
+T20 sample t=160s players=16 tick_p95=6.175ms traffic=24 peds=32 police=8
+T20 sample t=170s players=16 tick_p95=6.25ms traffic=24 peds=32 police=8
+T20 sample t=180s players=16 tick_p95=6.175ms traffic=22 peds=32 police=8
+T20 sample t=190s players=16 tick_p95=6.175ms traffic=24 peds=32 police=8
+T20 sample t=200s players=16 tick_p95=6.125ms traffic=24 peds=32 police=8
+T20 sample t=210s players=16 tick_p95=6.1ms traffic=24 peds=32 police=8
+T20 sample t=220s players=16 tick_p95=6.05ms traffic=24 peds=32 police=8
+T20 sample t=230s players=16 tick_p95=6.025ms traffic=24 peds=32 police=8
+T20 sample t=240s players=16 tick_p95=6.0ms traffic=24 peds=32 police=8
+T20 sample t=250s players=16 tick_p95=6.0ms traffic=24 peds=32 police=8
+T20 sample t=260s players=16 tick_p95=5.95ms traffic=24 peds=32 police=8
+T20 sample t=270s players=16 tick_p95=5.925ms traffic=24 peds=32 police=8
+T20 sample t=280s players=16 tick_p95=5.925ms traffic=24 peds=32 police=8
+T20 sample t=290s players=16 tick_p95=5.9ms traffic=24 peds=32 police=8
+T20 sample t=300s players=16 tick_p95=5.9ms traffic=24 peds=32 police=8
+T20 sample t=310s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=320s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=330s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=340s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=350s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=360s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=370s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=380s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=390s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=400s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=410s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=420s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=430s players=16 tick_p95=5.875ms traffic=24 peds=32 police=8
+T20 sample t=440s players=16 tick_p95=5.85ms traffic=24 peds=32 police=8
+T20 sample t=450s players=16 tick_p95=5.825ms traffic=24 peds=32 police=8
+T20 sample t=460s players=16 tick_p95=5.825ms traffic=24 peds=32 police=8
+T20 sample t=470s players=16 tick_p95=5.8ms traffic=24 peds=32 police=8
+T20 sample t=480s players=16 tick_p95=5.8ms traffic=24 peds=32 police=8
+T20 sample t=490s players=16 tick_p95=5.8ms traffic=24 peds=32 police=8
+T20 sample t=500s players=16 tick_p95=5.8ms traffic=24 peds=32 police=8
+T20 sample t=510s players=16 tick_p95=5.775ms traffic=24 peds=32 police=8
+T20 sample t=520s players=16 tick_p95=5.775ms traffic=24 peds=32 police=8
+T20 sample t=530s players=16 tick_p95=5.75ms traffic=24 peds=32 police=8
+T20 sample t=540s players=16 tick_p95=5.75ms traffic=24 peds=32 police=8
+T20 sample t=550s players=16 tick_p95=5.75ms traffic=24 peds=32 police=8
+T20 sample t=560s players=16 tick_p95=5.75ms traffic=24 peds=32 police=8
+T20 sample t=570s players=16 tick_p95=5.75ms traffic=24 peds=32 police=8
+T20 sample t=581s players=16 tick_p95=5.725ms traffic=24 peds=32 police=8
+T20 sample t=591s players=16 tick_p95=5.725ms traffic=24 peds=32 police=8
+T20 sample t=600s players=16 tick_p95=5.725ms traffic=24 peds=32 police=8
+T20 measurement saved: /tmp/t20-target-fixed.json
+test populated_actual_rtc_capacity ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 604.85s
+

@@ -522,15 +522,22 @@ fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after
 }
 
 #[test]
-fn input_flood_cannot_expand_the_ring_or_keep_an_actor_after_rate_rejection() {
+fn sustained_input_byte_flood_cannot_expand_the_ring_or_keep_an_actor() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
     ready(&mut w, &mut a, &mut t, p);
-    for _ in 0..61 {
-        batch(&w, &mut t, p, w.tick + 1, 0, 32767, 1);
+    // A one-off delayed burst is tolerated; sustained raw ingress still exhausts
+    // the unchanged byte budget and retires the actor. Never grow the input ring.
+    for _ in 0..4 {
+        for _ in 0..100 {
+            batch(&w, &mut t, p, w.tick + 1, 0, 32767, 1);
+        }
+        step(&mut w, &mut a, &mut t);
+        if let Some(session) = w.sessions.get(&p) {
+            assert!(session.inputs.len() <= 8);
+        }
     }
-    step(&mut w, &mut a, &mut t);
     assert!(!w.sessions.contains_key(&p));
     assert!(w.players.is_empty());
     assert!(t.closed.contains(&p));
@@ -1776,3 +1783,33 @@ mod t17;
 
 #[path = "scenarios/t19.rs"]
 mod t19;
+
+#[test]
+fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let player = w.sessions[&p].player.unwrap().0;
+    // A delayed 30 Hz stream can be delivered as a burst. Only the first 60
+    // batches enter simulation; the ten excess future inputs must not be stored.
+    for _ in 0..60 {
+        batch(&w, &mut t, p, w.tick + 1, 0, 0, 1);
+    }
+    for _ in 0..10 {
+        batch(&w, &mut t, p, w.tick + 8, 32767, 0, 1);
+    }
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.metrics.rate_limited_inputs, 10);
+    assert_eq!(w.sessions[&p].phase, SessionPhase::Playing);
+    assert!(w.sessions[&p].inputs.is_empty());
+    assert!(!t.closed.contains(&p));
+    for _ in 0..31 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let before = w.players[&player].state.motor.position.0[0].0;
+    batch(&w, &mut t, p, w.tick + 1, 32767, 0, 1);
+    step(&mut w, &mut a, &mut t);
+    assert!(w.players[&player].state.motor.position.0[0].0 > before);
+    assert_eq!(w.metrics.rate_limited_inputs, 10);
+}
