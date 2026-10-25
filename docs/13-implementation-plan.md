@@ -35,7 +35,7 @@ Use the real crate early. Finish a small greybox game at T11 before investing in
 | Complete | T19 Impairment and lifecycle suite | T18 | Robust under loss/reorder/reconnect |
 | Deferred by user — G4 incomplete | T20 Capacity and performance | T19 | Measured 16-player budgets |
 | Complete | T21 One-command local launch | T20 | Reliable local setup/build/run/stop |
-| Not started | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
+| Complete locally — G4 deferred | T22 Final acceptance and handoff | T21 | Reproducible tested local alpha |
 
 The dependencies describe the recommended execution order; they are not permission to delegate or run overlapping edits automatically.
 
@@ -219,7 +219,9 @@ Completed 25 October 2026. [37 — Local launch](37-local-launch.md) records set
 
 Run the full document 11 script on the local production build, verify save/restart, inspect visual/audio/camera behavior, and review every task status. Complete the implementation log and README usage instructions with measured results and known limitations.
 
-**Done:** G0–G5 pass locally, no placeholder accepted feature, no unreviewed change to the specification, all claims tied to evidence. Link the local URL and commands; distinguish implemented alpha features from future public-hosting work.
+**Done (scope clarified by the user-authorized T20 deferral):** local functional G0/G1/G2/G3/G5 acceptance and handoff, with G4 explicitly deferred rather than passed. No placeholder accepted feature, all claims tied to evidence. Link the local URL and commands; record untested browser/hardware/manual qualifications and distinguish implemented local alpha features from future public hosting.
+
+Completed locally 25 October 2026. [38 — Local acceptance and handoff](38-local-acceptance-and-handoff.md) records production two-guest gameplay, real courier reward, persistent restart, police escape, presentation/audio lifecycle, the repaired patrol replacement regression and the final gate review. The full G0–G5/performance and browser-matrix release qualification is not claimed.
 
 ## If a task fails
 

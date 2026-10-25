@@ -1,0 +1,1997 @@
+{
+  "scope": "Production browser controls and DOM diagnostics only; distinct hostname guest-cookie scopes. No injected positions, health, heat or rewards. Control edges held across render frames; steering follows observed actor heading.",
+  "stages": [
+    {
+      "stage": "two guests",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu01 / Explore · W / A / S / D to walk. Mouse to look; drag if mouse capture is unavailable. Esc opens the menu.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1952 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "127 / 24,394",
+          "FPS / frame avg": "60 / 16.6 ms",
+          "Geometries": "5",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "558 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "7191",
+          "Remote entities": "52",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "7188 / 7188",
+          "Up / down": "10.6 / 64.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.800 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-183.00  0.02  177.00"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu01 / Explore · W / A / S / D to walk. Mouse to look; drag if mouse capture is unavailable. Esc opens the menu.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "160 / 34,174",
+          "FPS / frame avg": "61 / 16.5 ms",
+          "Geometries": "5",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "774 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "7191",
+          "Remote entities": "51",
+          "Replay steps": "1",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "7188 / 7188",
+          "Up / down": "10.2 / 58.5 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-183.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-1.185 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "A moves more than 10m",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 3 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 3 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1952 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "129 / 24,536",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "5 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "567 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "7796",
+          "Remote entities": "50",
+          "Replay steps": "2",
+          "Resident chunks": "15 / 36",
+          "Server / owner": "7791 / 7791",
+          "Up / down": "10.8 / 64.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-1.571 rad · 3.98 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-172.40  0.02  177.00"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu01 / Explore · W / A / S / D to walk. Mouse to look; drag if mouse capture is unavailable. Esc opens the menu.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "156 / 34,158",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "5",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "774 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "7795",
+          "Remote entities": "49",
+          "Replay steps": "1",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "7791 / 7791",
+          "Up / down": "10.2 / 59.2 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-172.6", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "exclusive compact possession and occupied feedback",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 20 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\n0 km/h · Car health 100E exit when stopped · W / A / S / D drive · Space handbrake · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 20 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1952 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "129 / 22,054",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "567 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 2",
+          "Predicted tick": "8985",
+          "Remote entities": "41",
+          "Replay steps": "2",
+          "Resident chunks": "15 / 36",
+          "Server / owner": "8982 / 8982",
+          "Up / down": "10.4 / 60.1 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "0.000 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 7.00 m",
+          "Position XYZ": "-152.00  0.80  175.75"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 18 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Vehicle occupied · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 18 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "162 / 31,774",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "846 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "8983",
+          "Remote entities": "40",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "8979 / 8979",
+          "Up / down": "10.7 / 59.8 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-152.0", "0.8", "175.8", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-1.571 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-154.20  0.02  176.99"
+        }
+      }
+    },
+    {
+      "stage": "confirmed A exits and B takes compact 1",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Vehicle occupied · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1952 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "128 / 20,282",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "5 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "567 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 3",
+          "Predicted tick": "10874",
+          "Remote entities": "37",
+          "Replay steps": "2",
+          "Resident chunks": "15 / 36",
+          "Server / owner": "10869 / 10869",
+          "Up / down": "11.6 / 60.4 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.800 rad · 0.00 m/s",
+          "Look / camera": "-0.013 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-153.60  0.02  183.96"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 20 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\n0 km/h · Car health 100E exit when stopped · W / A / S / D drive · Space handbrake · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 20 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "164 / 29,454",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "910 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 2",
+          "Predicted tick": "10870",
+          "Remote entities": "34",
+          "Replay steps": "1",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "10866 / 10866",
+          "Up / down": "10.9 / 59.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-153.6", "0.0", "184.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.013 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 5.88 m",
+          "Position XYZ": "-152.10  0.80  183.73"
+        }
+      }
+    },
+    {
+      "stage": "courier delivered in compact",
+      "A": {
+        "hud": "Delivery complete! +150 credits · Find a terminal for another job.150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\n0 km/h · Car health 100E exit when stopped · W / A / S / D drive · Space handbrake · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuDelivery complete! +150 credits · Find a terminal for another job.RetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1952 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "95 / 13,446",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "622 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 4",
+          "Predicted tick": "17496",
+          "Remote entities": "15",
+          "Replay steps": "2",
+          "Resident chunks": "18 / 36",
+          "Server / owner": "17493 / 17493",
+          "Up / down": "10.5 / 30.5 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "2.994 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 7.00 m",
+          "Position XYZ": "-44.05  0.80  50.78"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "152 / 29,446",
+          "FPS / frame avg": "60 / 16.6 ms",
+          "Geometries": "6",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "942 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 3",
+          "Predicted tick": "17497",
+          "Remote entities": "30",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "17493 / 17493",
+          "Up / down": "11.2 / 61.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "-0.013 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-153.60  0.02  183.95"
+        }
+      }
+    },
+    {
+      "stage": "A rejoin restores reward and releases car",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12 · ProtectedWalk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1834 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "125 / 17,370",
+          "FPS / frame avg": "60 / 16.8 ms",
+          "Geometries": "5",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "462 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "217 / 1",
+          "Predicted tick": "19266",
+          "Remote entities": "26",
+          "Replay steps": "1",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "19263 / 19263",
+          "Up / down": "0.0 / 0.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "0.000 rad · 0.01 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-183.00  0.02  177.00"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "158 / 28,846",
+          "FPS / frame avg": "60 / 16.8 ms",
+          "Geometries": "6",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "942 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 3",
+          "Predicted tick": "19267",
+          "Remote entities": "32",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "19263 / 19263",
+          "Up / down": "11.2 / 60.8 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["217", "player", "-183.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "-0.013 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-153.60  0.02  183.95"
+        }
+      }
+    },
+    {
+      "stage": "B removes departed nearby player",
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 19 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "158 / 29,870",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "942 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 3",
+          "Predicted tick": "20709",
+          "Remote entities": "35",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "20706 / 20706",
+          "Up / down": "11.5 / 60.9 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "-0.013 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-153.60  0.02  183.95"
+        }
+      }
+    },
+    {
+      "stage": "server shutdown disconnects both guests",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menuConnection delayed — waiting for the server",
+        "menu": "Port Meridian / Six districtsPort MeridianThe connection to the local game server was interrupted. Check that the server is running, then choose Retry.Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1797 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "— / —",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "—",
+          "History ring": "0 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "— KiB",
+          "Pending / fallback": "— / —",
+          "Player / epoch": "238 / 1",
+          "Predicted tick": "0",
+          "Remote entities": "0",
+          "Replay steps": "0",
+          "Resident chunks": "— / 36",
+          "Server / owner": "22323 / 22323",
+          "Up / down": "0.0 / 0.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "—",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "—"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menuConnection delayed — waiting for the server",
+        "menu": "Port Meridian / Six districtsPort MeridianThe connection to the local game server was interrupted. Check that the server is running, then choose Retry.Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1935 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "— / —",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "—",
+          "History ring": "0 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "— KiB",
+          "Pending / fallback": "— / —",
+          "Player / epoch": "65 / 3",
+          "Predicted tick": "0",
+          "Remote entities": "0",
+          "Replay steps": "0",
+          "Resident chunks": "— / 36",
+          "Server / owner": "22323 / 22323",
+          "Up / down": "0.0 / 0.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [],
+        "pose": {
+          "Actor yaw / speed": "—",
+          "Look / camera": "-0.013 / -0.150 rad · 4.50 m",
+          "Position XYZ": "—"
+        }
+      }
+    },
+    {
+      "stage": "full restart restores exactly one saved reward",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12 · ProtectedWalk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 11 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "2106 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "127 / 27,914",
+          "FPS / frame avg": "60 / 16.8 ms",
+          "Geometries": "5",
+          "History ring": "5 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "526 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "653",
+          "Remote entities": "60",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "648 / 648",
+          "Up / down": "10.3 / 91.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.800 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-183.00  0.02  177.00"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12 · ProtectedWalk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "2121 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "157 / 37,790",
+          "FPS / frame avg": "60 / 16.8 ms",
+          "Geometries": "5",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "678 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "652",
+          "Remote entities": "60",
+          "Replay steps": "1",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "648 / 648",
+          "Up / down": "0.0 / 0.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-183.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.800 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 3.21 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "later shot outside hearing range spends ammunition without heat",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 23 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 10 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianDrag the scene to look. Esc opens the menu.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 23 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "2106 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "104 / 22,242",
+          "FPS / frame avg": "60 / 16.6 ms",
+          "Geometries": "7",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "526 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "2832",
+          "Remote entities": "47",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "2829 / 2829",
+          "Up / down": "10.5 / 61.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "0.000 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 0.10 m",
+          "Position XYZ": "-195.13  0.02  177.00"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "2121 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "158 / 32,982",
+          "FPS / frame avg": "60 / 16.6 ms",
+          "Geometries": "7",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "838 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "2911",
+          "Remote entities": "47",
+          "Replay steps": "2",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "2907 / 2907",
+          "Up / down": "10.7 / 58.4 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-195.1", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "retreat behind Quay buildings",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 27 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 10 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 27 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "2106 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "132 / 23,232",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "8",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "526 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "3040",
+          "Remote entities": "44",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "3036 / 3036",
+          "Up / down": "10.8 / 59.4 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.800 rad · 2.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-195.13  0.02  192.97"
+        }
+      }
+    },
+    {
+      "stage": "Medium presentation and audio gesture lifecycle",
+      "presentationBefore": {
+        "audio": ["Sound paused"],
+        "quality": "medium",
+        "viewport": [1280, 720]
+      },
+      "audioPlaying": ["Sound on"],
+      "audioPaused": ["Sound paused"]
+    },
+    {
+      "stage": "fresh fixed world witnessed shot",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 27 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ●○○ · Pursuit · break sightHEALTH 100 / 100\nAMMO 11 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianDrag the scene to look. Esc opens the menu.150 credits · 1 completed job · Heat 1/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 27 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1939 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "104 / 26,454",
+          "FPS / frame avg": "60 / 16.8 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "558 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "627",
+          "Remote entities": "59",
+          "Replay steps": "1",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "624 / 624",
+          "Up / down": "10.3 / 60.0 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "0.000 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 0.10 m",
+          "Position XYZ": "-195.23  0.02  165.87"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1955 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "158 / 37,398",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "5 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "678 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "629",
+          "Remote entities": "59",
+          "Replay steps": "2",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "624 / 624",
+          "Up / down": "10.8 / 58.6 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-245.1", "0.0", "109.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "behind-building escape position",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ●○○ · Pursuit · break sightHEALTH 100 / 100\nAMMO 11 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.150 credits · 1 completed job · Heat 1/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1939 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "129 / 24,286",
+          "FPS / frame avg": "60 / 16.6 ms",
+          "Geometries": "6",
+          "History ring": "4 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "558 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "2863",
+          "Remote entities": "47",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "2859 / 2859",
+          "Up / down": "11.0 / 59.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "1.171 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-215.23  0.02  191.87"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1955 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "160 / 35,646",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "5 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "742 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "2864",
+          "Remote entities": "53",
+          "Replay steps": "2",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "2859 / 2859",
+          "Up / down": "10.9 / 60.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-245.1", "0.0", "109.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-1.185 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    },
+    {
+      "stage": "waiting unseen after retreat",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ●○○ · Searching · stay hiddenHEALTH 100 / 100\nAMMO 11 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.150 credits · 1 completed job · Heat 1/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1939 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "129 / 21,062",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "558 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "3450",
+          "Remote entities": "39",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "3447 / 3447",
+          "Up / down": "10.7 / 60.2 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "1.171 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-215.23  0.02  191.87"
+        }
+      }
+    },
+    {
+      "stage": "escape after hidden search",
+      "A": {
+        "hud": "Jobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city map150 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 11 / 12Walk to the left door of a parked car · E enter · M map · Esc menu",
+        "menu": "Port Meridian / Six districtsPort MeridianPaused — the online world continues.150 credits · 1 completed job · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 45 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioMutedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1939 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "129 / 22,686",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "558 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "8 / 1",
+          "Predicted tick": "5466",
+          "Remote entities": "40",
+          "Replay steps": "2",
+          "Resident chunks": "14 / 36",
+          "Server / owner": "5463 / 5463",
+          "Up / down": "10.6 / 60.3 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["65", "player", "-181.0", "0.0", "177.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "1.171 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-215.23  0.02  191.87"
+        }
+      },
+      "B": {
+        "hud": "Jobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city map0 CR\nHeat ○○○ · ClearHEALTH 100 / 100\nAMMO 12 / 12Walk to the left door of a parked car · E enter · M map · Esc menu03 / Earn · Find J on the minimap. Step inside the cyan Quay circle and press F for Courier · 150 credits. M opens the city map.",
+        "menu": "Port Meridian / Six districtsPort MeridianReady. Capture the mouse to explore; Esc opens this menu.0 credits · 0 completed jobs · Heat 0/3Player nameW / A / S / D / arrows move · Shift sprint · Space jump · Mouse look · Esc menuJobs: cyan Quay terminal · 9 m · Approach within 3 m to choose courier / recovery · M city mapRetryResume / mouse lookLeave gameCancel jobReload pageCity map · MSettings & controlsMouse sensitivityInvert mouse YReduced motionGraphics qualityMedium · detail & shadowsLow · simpler detail, no shadowsMaster volumeEffects volumeMute audioSound pausedOriginal synthesized effects. No music track. Sound pauses with menus and hidden tabs.Remap keysForward / accelerateWLeft / steer leftABackward / brakeSRight / steer rightDSprintShiftJump / handbrakeSpaceEnter / exit carEJobs / repairFToggle aimQReloadRCity mapMKeyboard fire (while aiming)XReset keysCyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.Map inspector Movement trace Connection diagnostic ",
+        "net": {
+          "Cached join": "1955 ms",
+          "Correction / p95": "0.000 / 0.000 m",
+          "Draws / triangles": "160 / 32,870",
+          "FPS / frame avg": "60 / 16.7 ms",
+          "Geometries": "6",
+          "History ring": "3 / 128",
+          "Input lead": "3 ticks",
+          "Instance matrices": "838 KiB",
+          "Pending / fallback": "0 / 0",
+          "Player / epoch": "65 / 1",
+          "Predicted tick": "5466",
+          "Remote entities": "44",
+          "Replay steps": "2",
+          "Resident chunks": "13 / 36",
+          "Server / owner": "5463 / 5463",
+          "Up / down": "10.8 / 59.4 KiB/s",
+          "WASM memory": "1.4 MiB"
+        },
+        "players": [["8", "player", "-245.1", "0.0", "109.0", "live"]],
+        "pose": {
+          "Actor yaw / speed": "-0.785 rad · 0.00 m/s",
+          "Look / camera": "0.000 / -0.150 rad · 4.50 m",
+          "Position XYZ": "-181.00  0.02  177.00"
+        }
+      }
+    }
+  ],
+  "driveTrace": [
+    {
+      "target": 0,
+      "xyz": [-152.1, 0.8, 183.73],
+      "yaw": -0.013,
+      "speed": 0,
+      "error": -1.247416018355676,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-152.04, 0.8, 183.06],
+      "yaw": -0.091,
+      "speed": 1.52,
+      "error": -1.194150308723098,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-151.73, 0.8, 181.6],
+      "yaw": -0.249,
+      "speed": 2.88,
+      "error": -1.0900480894159537,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-151.19, 0.8, 180.19],
+      "yaw": -0.448,
+      "speed": 4.55,
+      "error": -0.9440435211341438,
+      "key": "space+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-150.26, 0.8, 178.62],
+      "yaw": -0.598,
+      "speed": 1.78,
+      "error": -0.855635452738427,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-149.63, 0.8, 177.85],
+      "yaw": -0.732,
+      "speed": 3.45,
+      "error": -0.7534746155956159,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-148.19, 0.8, 176.59],
+      "yaw": -0.949,
+      "speed": 4.68,
+      "error": -0.5925822533473845,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-145.37, 0.8, 175.18],
+      "yaw": -1.265,
+      "speed": 6.05,
+      "error": -0.35296913440847844,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-142.09, 0.8, 174.65],
+      "yaw": -1.564,
+      "speed": 7.28,
+      "error": -0.10231737565291255,
+      "key": "space+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-139.21, 0.8, 174.93],
+      "yaw": -1.824,
+      "speed": 4.39,
+      "error": 0.15804148486166736,
+      "key": "w+a"
+    },
+    {
+      "target": 0,
+      "xyz": [-136.69, 0.8, 175.33],
+      "yaw": -1.596,
+      "speed": 5.91,
+      "error": -0.05174421243103633,
+      "key": "space"
+    },
+    {
+      "target": 0,
+      "xyz": [-134.78, 0.8, 175.35],
+      "yaw": -1.584,
+      "speed": 3.17,
+      "error": -0.08237442503791127,
+      "key": "w+d"
+    },
+    {
+      "target": 0,
+      "xyz": [-132.62, 0.8, 175.6],
+      "yaw": -1.799,
+      "speed": 4.54,
+      "error": 0.141838956779619,
+      "key": "space+a"
+    },
+    {
+      "target": 0,
+      "xyz": [-131.28, 0.8, 175.87],
+      "yaw": -1.709,
+      "speed": 1.8,
+      "error": 0.09859026063028355,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-129.95, 0.8, 175.9],
+      "yaw": -1.545,
+      "speed": 2.89,
+      "error": 1.533914609871931,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.67, 0.8, 175.79],
+      "yaw": -1.423,
+      "speed": 4.27,
+      "error": 1.419188652620886,
+      "key": "space+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.98, 0.8, 175.37],
+      "yaw": -1.272,
+      "speed": 1.24,
+      "error": 1.2778162085781952,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.16, 0.8, 175.04],
+      "yaw": -1.161,
+      "speed": 2.47,
+      "error": 1.1715114958372566,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-124.83, 0.8, 174.29],
+      "yaw": -0.977,
+      "speed": 3.99,
+      "error": 0.9951860721643484,
+      "key": "space+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.78, 0.8, 173.48],
+      "yaw": -0.861,
+      "speed": 1.11,
+      "error": 0.8853207742896431,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.24, 0.8, 172.93],
+      "yaw": -0.753,
+      "speed": 2.62,
+      "error": 0.7805186398859479,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.33, 0.8, 171.73],
+      "yaw": -0.575,
+      "speed": 3.86,
+      "error": 0.6080049555829663,
+      "key": "space+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.67, 0.8, 170.55],
+      "yaw": -0.459,
+      "speed": 0.82,
+      "error": 0.49609818699656427,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.37, 0.8, 169.8],
+      "yaw": -0.359,
+      "speed": 2.06,
+      "error": 0.3980261115757918,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.08, 0.8, 168.66],
+      "yaw": -0.195,
+      "speed": 3.72,
+      "error": 0.2360062899836181,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-120.91, 0.8, 166.59],
+      "yaw": 0.032,
+      "speed": 5.24,
+      "error": 0.010533908991749134,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.25, 0.8, 162.46],
+      "yaw": 0.081,
+      "speed": 6.45,
+      "error": -0.039475194769917864,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.53, 0.8, 158.92],
+      "yaw": 0.081,
+      "speed": 7.69,
+      "error": -0.04031016301933595,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-121.83, 0.8, 155.35],
+      "yaw": 0.081,
+      "speed": 4.66,
+      "error": -0.041304095034358224,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.27, 0.8, 149.9],
+      "yaw": 0.081,
+      "speed": 0,
+      "error": -0.04279311823935214,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.3, 0.8, 149.53],
+      "yaw": 0.081,
+      "speed": 1.48,
+      "error": -0.0428990066861967,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.39, 0.8, 148.43],
+      "yaw": 0.081,
+      "speed": 3,
+      "error": -0.04322238779680106,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.56, 0.8, 146.26],
+      "yaw": 0.081,
+      "speed": 4.08,
+      "error": -0.04382309913016162,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-122.75, 0.8, 143.94],
+      "yaw": 0.081,
+      "speed": 5.6,
+      "error": -0.044542630268129026,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.05, 0.8, 140.35],
+      "yaw": 0.081,
+      "speed": 6.68,
+      "error": -0.04574564235838172,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.3, 0.8, 137.24],
+      "yaw": 0.081,
+      "speed": 3.65,
+      "error": -0.04676680369061928,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.43, 0.8, 135.58],
+      "yaw": 0.081,
+      "speed": 5.31,
+      "error": -0.04730572044593975,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.77, 0.8, 131.46],
+      "yaw": 0.081,
+      "speed": 6.53,
+      "error": -0.04883401002906885,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-123.97, 0.8, 128.94],
+      "yaw": 0.081,
+      "speed": 3.65,
+      "error": -0.049755324083696276,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-124.17, 0.8, 126.55],
+      "yaw": 0.081,
+      "speed": 5.01,
+      "error": -0.05074451777631481,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-124.5, 0.8, 122.5],
+      "yaw": 0.081,
+      "speed": 6.23,
+      "error": -0.052436342161240004,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-124.79, 0.8, 118.95],
+      "yaw": 0.081,
+      "speed": 7.74,
+      "error": -0.054020419406560424,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-125.09, 0.8, 115.21],
+      "yaw": 0.081,
+      "speed": 4.71,
+      "error": -0.05574714522848251,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-125.26, 0.8, 113.12],
+      "yaw": 0.081,
+      "speed": 6.38,
+      "error": -0.056782670366108914,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-125.59, 0.8, 109.1],
+      "yaw": 0.081,
+      "speed": 7.74,
+      "error": -0.05891376608737566,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-125.85, 0.8, 105.91],
+      "yaw": 0.081,
+      "speed": 4.86,
+      "error": -0.060702532957987256,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.06, 0.8, 103.29],
+      "yaw": 0.081,
+      "speed": 6.09,
+      "error": -0.06222013819186828,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.32, 0.8, 100.04],
+      "yaw": 0.081,
+      "speed": 7.61,
+      "error": -0.06420829569487103,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.59, 0.8, 96.84],
+      "yaw": 0.081,
+      "speed": 4.72,
+      "error": -0.06644092963317746,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-126.85, 0.8, 93.58],
+      "yaw": 0.081,
+      "speed": 6.09,
+      "error": -0.06871166793231785,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.07, 0.8, 90.87],
+      "yaw": 0.081,
+      "speed": 7.76,
+      "error": -0.07076595651234724,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.38, 0.8, 87.12],
+      "yaw": 0.081,
+      "speed": 4.72,
+      "error": -0.07388349938684653,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.55, 0.8, 85.03],
+      "yaw": 0.081,
+      "speed": 6.1,
+      "error": -0.07570779961326099,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.86, 0.8, 81.14],
+      "yaw": 0.081,
+      "speed": 7.19,
+      "error": -0.07927458884555989,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.06, 0.8, 78.72],
+      "yaw": 0.081,
+      "speed": 4.45,
+      "error": -0.08176219497435441,
+      "key": "w+d"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.97, 0.8, 75.79],
+      "yaw": -0.188,
+      "speed": 5.82,
+      "error": 0.18839583056383666,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.71, 0.8, 73.28],
+      "yaw": 0.046,
+      "speed": 7.48,
+      "error": -0.04204259707835566,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.21, 0.8, 69.64],
+      "yaw": 0.138,
+      "speed": 4.45,
+      "error": -0.1410154991882991,
+      "key": "w+d"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.35, 0.8, 67.74],
+      "yaw": -0.025,
+      "speed": 5.83,
+      "error": 0.01983323168703782,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.96, 0.8, 64.08],
+      "yaw": -0.107,
+      "speed": 6.91,
+      "error": 0.10762421964426765,
+      "key": "space+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.84, 0.8, 61.21],
+      "yaw": 0.093,
+      "speed": 4.3,
+      "error": -0.09038605398483206,
+      "key": "w+d"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.86, 0.8, 58.78],
+      "yaw": -0.133,
+      "speed": 5.81,
+      "error": 0.13538175800052024,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.8, 0.8, 54.97],
+      "yaw": 0.172,
+      "speed": 7.17,
+      "error": -0.1683616678642561,
+      "key": "space+d"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.05, 0.8, 52.56],
+      "yaw": -0.02,
+      "speed": 4.71,
+      "error": 0.019048706527447567,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.7, 0.8, 47.29],
+      "yaw": -0.066,
+      "speed": 0,
+      "error": 0.07234375080718482,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.68, 0.8, 46.95],
+      "yaw": -0.066,
+      "speed": 1.82,
+      "error": 0.07281565591012416,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.62, 0.8, 46.09],
+      "yaw": -0.066,
+      "speed": 3.2,
+      "error": 0.07424455174862367,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.51, 0.8, 44.35],
+      "yaw": -0.066,
+      "speed": 4.72,
+      "error": 0.07704802849031095,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.34, 0.8, 41.81],
+      "yaw": -0.066,
+      "speed": 5.95,
+      "error": 0.08178438619428599,
+      "key": "w+a"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.61, 0.8, 37.96],
+      "yaw": 0.226,
+      "speed": 7.03,
+      "error": -0.21572638886242634,
+      "key": "space+d"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.03, 0.8, 35.57],
+      "yaw": 0.065,
+      "speed": 4.56,
+      "error": -0.06584340716577577,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-128.01, 0.8, 32.59],
+      "yaw": -0.005,
+      "speed": 5.65,
+      "error": 0.004693157419878807,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-128, 0.8, 30.2],
+      "yaw": -0.005,
+      "speed": 7.03,
+      "error": 0.005,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.98, 0.8, 26.28],
+      "yaw": -0.005,
+      "speed": 4.11,
+      "error": 0.005761034860686282,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.97, 0.8, 23.94],
+      "yaw": -0.005,
+      "speed": 5.63,
+      "error": 0.006253132176131871,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.95, 0.8, 20.2],
+      "yaw": -0.005,
+      "speed": 7,
+      "error": 0.007475242469613898,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.93, 0.8, 16.9],
+      "yaw": -0.005,
+      "speed": 3.96,
+      "error": 0.009141988147416156,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.92, 0.8, 14.24],
+      "yaw": -0.005,
+      "speed": 5.33,
+      "error": 0.010617918424955243,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.9, 0.8, 11.28],
+      "yaw": -0.005,
+      "speed": 6.85,
+      "error": 0.013865015990187874,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.89, 0.8, 8.43],
+      "yaw": -0.005,
+      "speed": 4.23,
+      "error": 0.018047895316508616,
+      "key": "space"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.88, 0.8, 6.6],
+      "yaw": -0.005,
+      "speed": 1.31,
+      "error": 0.02317981507297897,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.88, 0.8, 5.87],
+      "yaw": -0.005,
+      "speed": 2.98,
+      "error": 0.025440083075751633,
+      "key": "w"
+    },
+    {
+      "target": 1,
+      "xyz": [-127.86, 0.8, 3.8],
+      "yaw": -0.005,
+      "speed": 4.35,
+      "error": 0.04182544972883218,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-127.86, 0.8, 2.36],
+      "yaw": -0.005,
+      "speed": 1.46,
+      "error": -1.5376616109409549,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-127.77, 0.8, 1.34],
+      "yaw": -0.135,
+      "speed": 2.98,
+      "error": -1.4198015109244086,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-127.32, 0.8, -0.37],
+      "yaw": -0.352,
+      "speed": 4.49,
+      "error": -1.223237008118787,
+      "key": "space+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-126.65, 0.8, -1.89],
+      "yaw": -0.485,
+      "speed": 1.61,
+      "error": -1.1086598556723604,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-126.06, 0.8, -2.78],
+      "yaw": -0.629,
+      "speed": 2.84,
+      "error": -0.9756610258063185,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-124.94, 0.8, -4.03],
+      "yaw": -0.811,
+      "speed": 4.08,
+      "error": -0.8095452119735137,
+      "key": "space+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-123.99, 0.8, -4.85],
+      "yaw": -0.895,
+      "speed": 1.61,
+      "error": -0.7363547679526454,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-123.14, 0.8, -5.4],
+      "yaw": -1.046,
+      "speed": 2.71,
+      "error": -0.5929242377335354,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-121.63, 0.8, -6.05],
+      "yaw": -1.25,
+      "speed": 4.23,
+      "error": -0.39857290627318154,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-118.84, 0.8, -6.55],
+      "yaw": -1.509,
+      "speed": 5.31,
+      "error": -0.1490939301811993,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-116.45, 0.8, -6.41],
+      "yaw": -1.777,
+      "speed": 6.97,
+      "error": 0.11795863890835179,
+      "key": "space+a"
+    },
+    {
+      "target": 2,
+      "xyz": [-113.6, 0.8, -5.84],
+      "yaw": -1.629,
+      "speed": 4.36,
+      "error": -0.025508280584655593,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-111.21, 0.8, -5.76],
+      "yaw": -1.604,
+      "speed": 5.87,
+      "error": -0.05228896026876617,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-108.06, 0.8, -5.66],
+      "yaw": -1.604,
+      "speed": 7.39,
+      "error": -0.05492215026786984,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-105.02, 0.8, -5.56],
+      "yaw": -1.604,
+      "speed": 4.51,
+      "error": -0.057663075897593785,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-99.76, 0.8, -5.38],
+      "yaw": -1.604,
+      "speed": 0,
+      "error": -0.06298351976489003,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-99.19, 0.8, -5.36],
+      "yaw": -1.604,
+      "speed": 1.62,
+      "error": -0.0636117407882595,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-98.26, 0.8, -5.33],
+      "yaw": -1.604,
+      "speed": 3.28,
+      "error": -0.06471293245944577,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-96.25, 0.8, -5.27],
+      "yaw": -1.604,
+      "speed": 4.8,
+      "error": -0.06731762322366364,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-94.12, 0.8, -5.19],
+      "yaw": -1.604,
+      "speed": 6.47,
+      "error": -0.06998004212095865,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-89.19, 0.8, -5.03],
+      "yaw": -1.604,
+      "speed": 7.69,
+      "error": -0.07764784533847524,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-85.98, 0.8, -4.92],
+      "yaw": -1.604,
+      "speed": 5.07,
+      "error": -0.08346277698839066,
+      "key": "w+d"
+    },
+    {
+      "target": 2,
+      "xyz": [-83.2, 0.8, -4.5],
+      "yaw": -1.884,
+      "speed": 6.58,
+      "error": 0.19890806898166535,
+      "key": "space+a"
+    },
+    {
+      "target": 2,
+      "xyz": [-80.26, 0.8, -3.71],
+      "yaw": -1.682,
+      "speed": 3.55,
+      "error": 0.009241885042986064,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-78.28, 0.8, -3.5],
+      "yaw": -1.679,
+      "speed": 5.07,
+      "error": 0.006455901561348344,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-75.62, 0.8, -3.21],
+      "yaw": -1.679,
+      "speed": 6.58,
+      "error": 0.0070322511116454045,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-72.16, 0.8, -2.83],
+      "yaw": -1.679,
+      "speed": 3.4,
+      "error": 0.008042808258525548,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-69.33, 0.8, -2.53],
+      "yaw": -1.679,
+      "speed": 4.34,
+      "error": 0.00865228608493962,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-67.4, 0.8, -2.32],
+      "yaw": -1.679,
+      "speed": 5.72,
+      "error": 0.009381330599903759,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-64.34, 0.8, -1.99],
+      "yaw": -1.679,
+      "speed": 7.24,
+      "error": 0.010677283369883828,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-60.81, 0.8, -1.6],
+      "yaw": -1.679,
+      "speed": 4.47,
+      "error": 0.01330811351735095,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-57.9, 0.8, -1.29],
+      "yaw": -1.679,
+      "speed": 5.55,
+      "error": 0.01566299180205899,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-54.08, 0.8, -0.87],
+      "yaw": -1.679,
+      "speed": 6.92,
+      "error": 0.022107512709528935,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-51.27, 0.8, -0.57],
+      "yaw": -1.679,
+      "speed": 4.3,
+      "error": 0.029959338741988084,
+      "key": "space"
+    },
+    {
+      "target": 2,
+      "xyz": [-49.59, 0.8, -0.38],
+      "yaw": -1.679,
+      "speed": 1.27,
+      "error": 0.04032956217218531,
+      "key": "w"
+    },
+    {
+      "target": 2,
+      "xyz": [-48.63, 0.8, -0.28],
+      "yaw": -1.679,
+      "speed": 2.51,
+      "error": 0.04780207402871262,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-46.54, 0.8, -0.05],
+      "yaw": -1.679,
+      "speed": 3.44,
+      "error": -1.4138321030890715,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-44.06, 0.8, 0.59],
+      "yaw": -1.924,
+      "speed": 4.81,
+      "error": -1.2164255660045349,
+      "key": "space+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-42.71, 0.8, 1.16],
+      "yaw": -2.037,
+      "speed": 2.07,
+      "error": -1.129960931753166,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-41.67, 0.8, 1.85],
+      "yaw": -2.217,
+      "speed": 3.59,
+      "error": -0.9710198851717396,
+      "key": "space+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.68, 0.8, 2.71],
+      "yaw": -2.329,
+      "speed": 0.82,
+      "error": -0.8798475287176741,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.12, 0.8, 3.34],
+      "yaw": -2.44,
+      "speed": 2.19,
+      "error": -0.7811612569218893,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-39.35, 0.8, 4.4],
+      "yaw": -2.587,
+      "speed": 3.7,
+      "error": -0.6519727425116761,
+      "key": "space+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.65, 0.8, 5.73],
+      "yaw": -2.697,
+      "speed": 0.94,
+      "error": -0.5597071452597623,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.46, 0.8, 6.2],
+      "yaw": -2.761,
+      "speed": 2.32,
+      "error": -0.5009685327177567,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.05, 0.8, 7.92],
+      "yaw": -2.999,
+      "speed": 3.97,
+      "error": -0.2767635575210046,
+      "key": "w+d"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.03, 0.8, 10.19],
+      "yaw": 3.022,
+      "speed": 5.49,
+      "error": -0.022237430749268317,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.57, 0.8, 13.8],
+      "yaw": 2.994,
+      "speed": 6.85,
+      "error": 0.006392003227408517,
+      "key": "space"
+    },
+    {
+      "target": 3,
+      "xyz": [-38.98, 0.8, 16.62],
+      "yaw": 2.994,
+      "speed": 4.24,
+      "error": 0.0066454166515610424,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-39.77, 0.8, 21.94],
+      "yaw": 2.994,
+      "speed": 0,
+      "error": 0.00779203197302758,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-39.82, 0.8, 22.26],
+      "yaw": 2.994,
+      "speed": 1.53,
+      "error": 0.007955907812905227,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.01, 0.8, 23.53],
+      "yaw": 2.994,
+      "speed": 2.47,
+      "error": 0.008352027211767421,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.23, 0.8, 25.04],
+      "yaw": 2.994,
+      "speed": 3.98,
+      "error": 0.008656783119676879,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.57, 0.8, 27.33],
+      "yaw": 2.994,
+      "speed": 5.22,
+      "error": 0.009443026367473628,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-40.98, 0.8, 30.11],
+      "yaw": 2.994,
+      "speed": 6.45,
+      "error": 0.010495562122138315,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-41.49, 0.8, 33.49],
+      "yaw": 2.994,
+      "speed": 7.68,
+      "error": 0.012812377680896159,
+      "key": "space"
+    },
+    {
+      "target": 3,
+      "xyz": [-41.95, 0.8, 36.64],
+      "yaw": 2.994,
+      "speed": 4.8,
+      "error": 0.014913189524094152,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-42.33, 0.8, 39.21],
+      "yaw": 2.994,
+      "speed": 6.04,
+      "error": 0.017756417658021384,
+      "key": "w"
+    },
+    {
+      "target": 3,
+      "xyz": [-42.92, 0.8, 43.14],
+      "yaw": 2.994,
+      "speed": 7.4,
+      "error": 0.026294903547918747,
+      "key": "space"
+    },
+    {
+      "target": 3,
+      "xyz": [-43.44, 0.8, 46.7],
+      "yaw": 2.994,
+      "speed": 4.64,
+      "error": 0.042322864752092126,
+      "key": "space"
+    },
+    {
+      "target": 3,
+      "xyz": [-43.68, 0.8, 48.3],
+      "yaw": 2.994,
+      "speed": 2.02,
+      "error": 0.06132084158861595,
+      "key": "w"
+    }
+  ]
+}

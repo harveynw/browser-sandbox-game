@@ -302,11 +302,19 @@ impl World {
                 .clone();
             while self.police.units.len() < desired {
                 let index = self.police.units.len();
-                let home = if index.is_multiple_of(2) {
-                    [-192.0, 0.0, 160.0]
-                } else {
-                    [0.0, 0.0, -160.0]
-                };
+                // Replacing a retired Quay unit must not select Civic merely
+                // because one Civic unit remains. Balance actual home assignments.
+                let homes = [[-192.0, 0.0, 160.0], [0.0, 0.0, -160.0]];
+                let home = *homes
+                    .iter()
+                    .min_by_key(|home| {
+                        self.police
+                            .units
+                            .values()
+                            .filter(|unit| unit.home == **home)
+                            .count()
+                    })
+                    .expect("two patrol homes");
                 let near = assignments
                     .get(index)
                     .and_then(|id| {
@@ -763,6 +771,49 @@ mod tests {
             .unwrap(),
         )
         .unwrap()
+    }
+    #[test]
+    fn retired_patrol_replacement_preserves_both_home_districts() {
+        let mut w = city();
+        for cycle in 0..6 {
+            let home = if cycle % 2 == 0 {
+                [-192.0, 0.0, 160.0]
+            } else {
+                [0.0, 0.0, -160.0]
+            };
+            let id = *w
+                .police
+                .units
+                .iter()
+                .find(|(_, u)| u.home == home)
+                .unwrap()
+                .0;
+            w.police.units.remove(&id);
+            w.vehicles.remove(&id);
+            w.collision
+                .set_vehicle_proxies(&w.vehicles.values().map(Vehicle::proxy).collect::<Vec<_>>())
+                .unwrap();
+            w.direct_police((cycle + 1) * 30, &[]).unwrap();
+            assert_eq!(w.police.units.len(), 2);
+            assert_eq!(
+                w.police
+                    .units
+                    .values()
+                    .filter(|u| u.home == [-192.0, 0.0, 160.0])
+                    .count(),
+                1,
+                "Quay must receive its replacement"
+            );
+            assert_eq!(
+                w.police
+                    .units
+                    .values()
+                    .filter(|u| u.home == [0.0, 0.0, -160.0])
+                    .count(),
+                1,
+                "Civic must receive its replacement"
+            );
+        }
     }
     #[test]
     fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling() {

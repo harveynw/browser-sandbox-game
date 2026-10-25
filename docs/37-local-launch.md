@@ -39,7 +39,7 @@ npm run dev:all -- --config /absolute/path/to/server.toml
 npm run preview:local -- --no-build
 ```
 
-`--temporary` creates a distinct config/database in the operating system's temporary directory. Its location is printed, retained after stopping for inspection, and never merged into normal saves. `config:test` creates the same config for manual Rust-server runs. `--config` chooses an existing persistence config; use it instead of `--temporary`. `--no-build` is an explicit reuse option after setup; it checks required files exist but cannot prove reused files are current. Omit it after changing source or dependencies. Ordinary launch rebuilds first.
+`--temporary` creates a distinct config/database in the operating system's temporary directory. Use a private/separate browser context for that test database: guest cookies belong to a particular database, and joining a different database through the same hostname/context can replace the original guest cookie even though the original save file remains intact. Its location is printed, retained after stopping for inspection, and never merged into normal saves. `config:test` creates the same config for manual Rust-server runs. `--config` chooses an existing persistence config; use it instead of `--temporary`. `--no-build` is an explicit reuse option after setup; it checks required files exist but cannot prove reused files are current. Omit it after changing source or dependencies. Ordinary launch rebuilds first.
 
 ## Startup and ownership
 

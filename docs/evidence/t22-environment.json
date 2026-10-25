@@ -1,0 +1,19 @@
+{
+  "scope": "Functional acceptance in approved in-app Chromium. Native Chrome access was not approved; standalone browser matrix unverified. No performance pass inferred.",
+  "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "viewport": [1280, 720],
+  "pixel_ratio": 2,
+  "logical_cpus": 8,
+  "qualityB": "medium",
+  "source_base_commit": "cfb2159",
+  "network_performance": "deferred by explicit user request",
+  "source_files_sha256": {
+    "apps/client/src/game/diagnostics.ts": "ff13a4f75c5fee2262d3837113799105f98f603696b50a8c3a80aaa13ea42b85",
+    "crates/server/src/police.rs": "01f92c4c32d49a2e6cad312c0b9a30187fff37e4c8ff96305f3f37a81c43d747"
+  },
+  "world_ids": {
+    "t22-preview": ["world-48832a81a05e15a5fec69649d50fb8b3"],
+    "t22-restart": ["world-847f73b245495cd034b429e98e30dab2"],
+    "t22-fixed-restart": ["world-b29548f1f42be3bcf9421b00aebb93eb"]
+  }
+}

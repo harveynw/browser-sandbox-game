@@ -1,0 +1,57 @@
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.39s
+     Running unittests src/lib.rs (target/debug/deps/server-0d5a106716972449)
+
+running 1 test
+test police::tests::retired_patrol_replacement_preserves_both_home_districts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.18s
+
+     Running unittests src/main.rs (target/debug/deps/server-e5fce6563b0f8baf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/actual_transport.rs (target/debug/deps/actual_transport-72135ec97d0bddd3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/capacity.rs (target/debug/deps/capacity-6dd251e586ac4388)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/content_loader.rs (target/debug/deps/content_loader-390b6532a3fdd586)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/control.rs (target/debug/deps/control-44f5f80025a4b19c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/persistence.rs (target/debug/deps/persistence-73ebc9a5baaee19f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/replication.rs (target/debug/deps/replication-b2d081434e10e696)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/world.rs (target/debug/deps/world-c37a0fcdee7f750b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 50 filtered out; finished in 0.00s
+

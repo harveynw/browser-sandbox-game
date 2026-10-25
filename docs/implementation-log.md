@@ -1,6 +1,6 @@
 # Implementation log
 
-Latest checkpoint: **T21 complete, 25 October 2026; T20 performance deferred by user, G4 incomplete**. T01–T19 and T21 are complete. Historical entries retain the scope and measurements of their original checkpoints.
+Latest checkpoint: **T22 local functional handoff complete, 25 October 2026; T20 performance deferred by user, G4 incomplete**. T01–T19, T21 and the scoped T22 handoff are complete. Historical entries retain the scope and measurements of their original checkpoints.
 
 ## Task status
 
@@ -27,7 +27,7 @@ Latest checkpoint: **T21 complete, 25 October 2026; T20 performance deferred by 
 | T19 — Impairment and lifecycle suite | Complete |
 | T20 — Capacity and performance | Deferred by user — G4 incomplete |
 | T21 — One-command local launch | Complete |
-| T22 — Final acceptance and handoff | Not started |
+| T22 — Final acceptance and handoff | Complete locally — G4 deferred |
 
 ## T01 — Workspace and commands
 
@@ -694,3 +694,17 @@ Unexpected child exit, startup/build failure and Ctrl+C/SIGTERM stop owned sibli
 Verification: full setup; real dev startup and induced server-exit/sibling cleanup; full production preview build, Chromium Play/WS/RTC and movement; actual terminal Ctrl+C with persistence drained and no listeners; same-test-database restart with probe profile count 2→2; unchanged normal database hash. Seven process/socket tests and two example tests pass; existing full check passes 111 TypeScript / 137 workspace Rust tests plus drift/WASM/typing/lint/format/Clippy. [37 — Local launch](37-local-launch.md) contains commands, scope and captured evidence. The normal saved production preview was restored afterward.
 
 Next task: **T22 — Final acceptance and handoff**, retaining the user-authorized G4 deferral. No T22 acceptance claim is made here.
+
+## T22 — Local functional acceptance and handoff
+
+Status: **local functional handoff complete, 25 October 2026**, with the user's explicit T20/G4 performance deferral retained. Full multi-browser/performance release qualification is not claimed.
+
+Ran the production build and actual two-guest browser gameplay using distinct localhost/127.0.0.1 cookie scopes and an isolated SQLite save. Verified unique mutual player replicas, >10 m movement replication, exclusive compact possession/occupied feedback and same-car handoff. Through normal WASD/Space controls, A drove Quay → main road → Market and completed courier inside its original 180-second deadline: 150 credits and one completed job, private from B. Reconnect restored the saved reward in a fresh on-foot session; nearby disconnect removed the replica from B. Real process shutdown disconnected both browsers and released all listeners. Two full restarts retained exactly one 150-credit mission ledger event and A's 150/1 balance, with B at zero. Read-only database checks never changed gameplay state.
+
+Live police checking surfaced a real replacement regression: using current unit-count parity could replace a retired Quay patrol with another Civic patrol. Added a six-cycle retirement/replacement regression, reproduced its Quay-count failure before the change, and balanced actual home assignments instead. Repeated the real shot/Pursuit → static-cover Searching → zero-heat/Clear sequence on the corrected release; heat stayed private and credits persisted. Diagnostics now show actor heading/speed separately from look/camera to make vehicle-state inspection readable.
+
+Inspected Medium city map pan/zoom/find/whole-city controls and audio gesture lifecycle (Sound paused → on → paused), plus normal/obstructed walking/driving camera distances. Browser automation was approved only for in-app Chromium (Chrome/156 UA, 1280×720, DPR2); native Chrome access was not approved. Edge/Firefox/Safari, subjective audio mix and prior native-pointer-lock/forced-context-restoration qualifications remain explicitly unverified. Temporary tests should use a separate/private cookie context; the runbook now explains database-specific guest identity. Normal saved production preview was restored after acceptance.
+
+Verification: `npm run check` passes **111 TypeScript / 138 Rust tests**, generation/WASM/type/lint/format/Clippy; `npm run test:local` passes seven lifecycle tests; the native probe example passes two tests; the production build passes with its existing chunk advisory. [38 — Local acceptance and handoff](38-local-acceptance-and-handoff.md) contains the gate/task review, exact scenario scope, reward/steering observations, screenshots, before/after patrol regression logs, full verification logs and known limits.
+
+No further implementation milestone remains in the tested local functional scope. The deferred capacity/network/reference/soak work and broader browser/manual qualifications remain for later review; G4 has not been marked passed and no public-hosting work was added.

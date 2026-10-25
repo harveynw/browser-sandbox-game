@@ -1,0 +1,41 @@
+{
+  "test_database": "/var/folders/jw/m2t9_07x74v07_268plld8yr0000gn/T/port-meridian-nwKUkh/profiles.sqlite",
+  "before_restart": {
+    "profiles": [
+      ["Acceptance A", 150, 1],
+      ["Acceptance B", 0, 0],
+      ["Local Startup Probe", 0, 0]
+    ],
+    "events": [["mission", 150, 1]],
+    "other_guest_count": 0
+  },
+  "after_first_restart": {
+    "profiles": [
+      ["Acceptance A", 150, 1],
+      ["Acceptance B", 0, 0],
+      ["Local Startup Probe", 0, 0]
+    ],
+    "events": [["mission", 150, 1]],
+    "other_guest_count": 0
+  },
+  "after_fixed_restart": {
+    "profiles": [
+      ["Acceptance A", 150, 1],
+      ["Acceptance B", 0, 0],
+      ["Local Startup Probe", 0, 0]
+    ],
+    "events": [["mission", 150, 1]],
+    "other_guest_count": 0
+  },
+  "final_after_clean_shutdown": {
+    "profiles": [
+      ["Acceptance A", 150, 1],
+      ["Acceptance B", 0, 0],
+      ["Local Startup Probe", 0, 0]
+    ],
+    "events": [["mission", 150, 1]],
+    "schema_migrations": [[1]],
+    "other_guest_count": 1
+  },
+  "profile_scope": "Named acceptance guests and startup probe only; unrelated guest names omitted."
+}

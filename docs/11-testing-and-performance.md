@@ -74,7 +74,7 @@ Tests must cover:
 
 ## End-to-end acceptance script
 
-Use separate browser contexts with distinct guest cookies:
+Use separate browser contexts with distinct guest cookies. For manual localhost checks, the documented localhost/127.0.0.1 cookie-scope split is an alternative; record which was used:
 
 1. Start actual server with fixed seed and test content; readiness succeeds only after transport probe.
 2. A and B join; each sees the other exactly once and hashes match.
@@ -128,3 +128,7 @@ Localhost is the required deployment test. LAN, public home-network access, a se
 - **Future only:** transport hardening, public UDP/TLS tests, cross-network operation. This is not a local completion gate.
 
 Do not compensate for a failed gate by claiming the next milestone is complete. Report the failing command/scenario, evidence, and the smallest blocking fix.
+
+## T22 local handoff scope
+
+[38 — Local acceptance and handoff](38-local-acceptance-and-handoff.md) maps the production browser observations and native scenario checks to these gates. The user explicitly deferred T20/network performance and authorized later local handoff work. G4 remains deferred, not passed. The verified in-app Chromium result does not establish the unexercised standalone browser matrix, subjective audio review or reference-hardware/soak targets.

@@ -1,4 +1,4 @@
-%% Frontend module system — current implementation through T21 local launch (G4 deferred by user).
+%% Frontend module system — current implementation through T22 local functional handoff (G4 deferred by user).
 %% Update with module, ownership, transport or data-flow changes.
 %% Purple: orchestration; blue: networking; green: simulation;
 %% orange: graphics; yellow: content; grey: diagnostics/external.
@@ -7,7 +7,7 @@ flowchart TD
     launcher["tools/local.mjs<br/>Owned Vite dev / production preview<br/>Loopback proxy and page checks / Ctrl+C"]:::app
     main["main.ts<br/>Page routing"]:::app
     game["game/<br/>GameApp · frame loop · presentation orchestration<br/>Entry / exit and terminal prompts<br/>Job choices / checkpoints / repair payment feedback<br/>Private heat / pursuit and arrest feedback"]:::app
-    diagnostics["game/diagnostics.ts<br/>Compact telemetry · 12-second graphs<br/>Expandable remote entity table<br/>Bounded performance capture / copyable JSON"]:::app
+    diagnostics["game/diagnostics.ts<br/>Actor heading / speed · compact telemetry<br/>12-second graphs<br/>Expandable remote entity table<br/>Bounded performance capture / copyable JSON"]:::app
     performance["game/performance.ts<br/>Bounded frame / prediction timing histograms"]:::other
     input["input/<br/>Walking / driving controls<br/>Interaction / terminal edges and held handbrake<br/>Aim / fire / reload with focus cleanup"]:::app
     settings["game/settings.ts · ui/settings-panel.ts<br/>Validated local preferences / names / key remaps"]:::app

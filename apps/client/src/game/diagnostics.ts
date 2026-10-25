@@ -132,7 +132,11 @@ export class Diagnostics {
     }
     const pose = document.createElement("div");
     pose.className = "debug-pose";
-    for (const label of ["Position XYZ", "Look / camera"]) {
+    for (const label of [
+      "Position XYZ",
+      "Actor yaw / speed",
+      "Look / camera",
+    ]) {
       const row = document.createElement("div"),
         title = document.createElement("span"),
         value = document.createElement("span");
@@ -327,6 +331,12 @@ export class Diagnostics {
     this.set(
       "Position XYZ",
       s.motor?.position.map((v) => v.toFixed(2)).join("  ") ?? "—",
+    );
+    this.set(
+      "Actor yaw / speed",
+      s.motor
+        ? `${s.motor.yaw.toFixed(3)} rad · ${Math.hypot(...s.motor.velocity).toFixed(2)} m/s`
+        : "—",
     );
     this.set(
       "Look / camera",
