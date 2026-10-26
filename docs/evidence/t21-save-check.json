@@ -1,8 +1,0 @@
-{
-  "database": "/var/folders/jw/m2t9_07x74v07_268plld8yr0000gn/T/port-meridian-GJc5Du/profiles.sqlite",
-  "profiles_before_restart": 2,
-  "profiles_after_restart": 2,
-  "probe_identity_reused": true,
-  "normal_database_unchanged": true,
-  "shutdown_ports_3000_3001_4173_released": true
-}

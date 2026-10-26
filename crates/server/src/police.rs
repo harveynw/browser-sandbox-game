@@ -141,7 +141,7 @@ impl Police {
             units: BTreeMap::new(),
             secured: BTreeSet::new(),
             road: Navigation::new(&manifest.road_graph, false),
-            // The small T01–T11 map remains a regression fixture without police.
+            // The regression map has no police population.
             enabled: manifest.districts.len() == 6,
             initialized: false,
             cursor: 0,

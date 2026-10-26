@@ -11,14 +11,14 @@ import type {
 /** Standalone baked-content viewer. No networking, world entities or player movement. */
 export function mountMapInspector(root: HTMLElement): () => void {
   const previousTitle = document.title;
-  document.title = "Port Meridian — greybox inspector";
+  document.title = "Port Meridian — map inspector";
   document.body.classList.add("map-mode");
   root.className = "map-inspector";
   const header = document.createElement("aside");
   header.className = "map-hud";
   const eyebrow = document.createElement("p");
-  eyebrow.className = "stage";
-  eyebrow.textContent = "T12 · 768 m city";
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "768 m city";
   const title = document.createElement("h1");
   title.textContent = "Port Meridian / Six districts";
   const status = document.createElement("p");
@@ -95,7 +95,7 @@ export function mountMapInspector(root: HTMLElement): () => void {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.setAttribute(
       "aria-label",
-      "3D greybox map, inspect with orbit controls",
+      "3D city map, inspect with orbit controls",
     );
     root.prepend(renderer.domElement);
     const scene = new THREE.Scene();

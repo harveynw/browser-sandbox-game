@@ -109,7 +109,7 @@ export class GameApp {
     const title = document.createElement("h1");
     title.textContent = "Port Meridian";
     const kicker = document.createElement("p");
-    kicker.className = "stage";
+    kicker.className = "eyebrow";
     kicker.textContent = "Port Meridian / Six districts";
     this.status.setAttribute("role", "status");
     const instructions = this.instructions;

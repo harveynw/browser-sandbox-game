@@ -11,7 +11,8 @@ use std::{
 struct Database(PathBuf);
 impl Database {
     fn new() -> Self {
-        let dir = std::env::temp_dir().join(server::admission::random_id("pm-t17-", 16).unwrap());
+        let dir =
+            std::env::temp_dir().join(server::admission::random_id("pm-persistence-", 16).unwrap());
         std::fs::create_dir(&dir).unwrap();
         Self(dir.join("profiles.sqlite"))
     }

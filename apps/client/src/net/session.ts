@@ -865,7 +865,7 @@ export class GameSession {
       ...this.rates,
     };
   }
-  /** Bounded scripted input test; gameplay keyboard/mouse controls are T08. */
+  /** Bounded scripted input test for connection diagnostics. */
   probeMovement(): void {
     if (
       this.phase !== "playing" ||

@@ -1,4 +1,4 @@
-# Preserve the design documents; this command formats source/configuration.
+# Documentation is maintained separately; this command formats source/configuration.
 **/*.md
 Cargo.lock
 package-lock.json

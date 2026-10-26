@@ -1,0 +1,12 @@
+   Compiling content v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/content)
+   Compiling sim-core v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/sim-core)
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.93s
+     Running unittests examples/local_probe.rs (target/debug/examples/local_probe-17211530dff739d7)
+
+running 2 tests
+test proxy_chunks_are_decoded_without_accepting_truncated_bodies ... ok
+test rtc::independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

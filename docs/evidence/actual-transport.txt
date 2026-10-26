@@ -1,0 +1,52 @@
+   Compiling server v0.1.0 (/Users/harvey/Documents/ChatGPT/gta-multiplayer-game/crates/server)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/actual_transport.rs (target/debug/deps/actual_transport-72135ec97d0bddd3)
+
+running 3 tests
+Actual RTC: loss_profile=Off; unique_receipts=None; dropped=11, forwarded=32; UDP blackout retained WS and RTC recovered
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=0, peer=PeerKey { id: 0, generation: 1 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=1, peer=PeerKey { id: 0, generation: 2 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=2, peer=PeerKey { id: 0, generation: 3 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=3, peer=PeerKey { id: 0, generation: 4 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=4, peer=PeerKey { id: 0, generation: 5 }
+Actual RTC backpressure: 655 queued packets, outstanding=65500 bytes; next send rejected
+Local peer 0 closed: remote closed
+test real_rtc_backpressure_and_rapid_kill_reconnect ... ok
+RTC loss progress unique_receipts=44/50; server_ingress=50; replaced_probe_records=0; client_outstanding=0; relay=RelayStats { received: [74, 65], dropped: [18, 2], forwarded: [56, 63], unknown: 0, received_bytes: [13366, 15815], forwarded_bytes: [9079, 14385], reordered: 0, duplicated: 0, overflow: 0, peak_queue: 0 }
+RTC loss progress unique_receipts=48/50; server_ingress=50; replaced_probe_records=0; client_outstanding=0; relay=RelayStats { received: [81, 72], dropped: [15, 9], forwarded: [66, 63], unknown: 0, received_bytes: [11749, 16553], forwarded_bytes: [9822, 15371], reordered: 0, duplicated: 0, overflow: 0, peak_queue: 0 }
+Actual RTC: loss_profile=Independent; unique_receipts=Some(48); dropped=35, forwarded=187; UDP blackout retained WS and RTC recovered
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=0, peer=PeerKey { id: 0, generation: 1 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=1, peer=PeerKey { id: 0, generation: 2 }
+Actual RTC: loss_profile=Periodic; unique_receipts=Some(44); dropped=31, forwarded=163; UDP blackout retained WS and RTC recovered
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=0, peer=PeerKey { id: 0, generation: 1 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=2, peer=PeerKey { id: 0, generation: 3 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=1, peer=PeerKey { id: 0, generation: 2 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=3, peer=PeerKey { id: 0, generation: 4 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=2, peer=PeerKey { id: 0, generation: 3 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=4, peer=PeerKey { id: 0, generation: 5 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=3, peer=PeerKey { id: 0, generation: 4 }
+Local peer 0 closed: test kill
+Actual kill/reconnect cycle=4, peer=PeerKey { id: 0, generation: 5 }
+Actual RTC backpressure: 655 queued packets, outstanding=65500 bytes; next send rejected
+Local peer 0 closed: remote closed
+test real_rtc_loss_and_blackout_recovery ... ok
+Actual RTC backpressure: 655 queued packets, outstanding=65500 bytes; next send rejected
+Local peer 0 closed: remote closed
+test real_rtc_periodic_loss_recovers_without_unbounded_sends ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 20.30s
+

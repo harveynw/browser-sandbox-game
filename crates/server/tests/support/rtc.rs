@@ -433,7 +433,7 @@ impl Peer {
         assert!(rejected, "RTC outstanding send buffer did not backpressure");
         assert!(c.outstanding_bytes().await? <= 65536);
         println!(
-            "T19 actual RTC backpressure: {accepted} queued packets, outstanding={} bytes; next send rejected",
+            "Actual RTC backpressure: {accepted} queued packets, outstanding={} bytes; next send rejected",
             c.outstanding_bytes().await?
         );
         self.relay.blocked.store(false, Ordering::Relaxed);

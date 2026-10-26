@@ -311,7 +311,7 @@ async fn populated_actual_rtc_capacity() -> Result {
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
     println!(
-        "T20 synthetic RTC peers dispatched; join one browser at http://localhost:4173/ (16 total required)"
+        "Capacity synthetic RTC peers dispatched; join one browser at http://localhost:4173/ (16 total required)"
     );
     let profile = std::env::var("PM_CAPACITY_PROFILE").unwrap_or_else(|_| "loopback".into());
     if profile != "loopback" && profile != "target" {
@@ -337,7 +337,7 @@ async fn populated_actual_rtc_capacity() -> Result {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
     let started = Instant::now();
-    println!("T20 measurement started: 15 real RTC bots plus browser, duration={seconds}s");
+    println!("Capacity measurement started: 15 real RTC bots plus browser, duration={seconds}s");
     let result:Result=async {
       loop {
         let response=http("/api/metrics",false,None).await?;
@@ -353,7 +353,7 @@ async fn populated_actual_rtc_capacity() -> Result {
         std::fs::write(&out,serde_json::to_vec(&report)?)?;
         if response.body["population"]["players"].as_u64()!=Some(16){return Err("population fell below 16 during measurement; report is incomplete".into());}
         if bots.iter().any(|s|s["closed"].is_string()){return Err("synthetic peer closed during measurement; report is incomplete".into());}
-        println!("T20 sample t={elapsed:.0}s players={} tick_p95={}ms traffic={} peds={} police={}",response.body["population"]["players"],response.body["populated_tick_work"]["p95_ms"],response.body["population"]["traffic"],response.body["population"]["pedestrians"],response.body["population"]["police"]);
+        println!("Capacity sample t={elapsed:.0}s players={} tick_p95={}ms traffic={} peds={} police={}",response.body["population"]["players"],response.body["populated_tick_work"]["p95_ms"],response.body["population"]["traffic"],response.body["population"]["pedestrians"],response.body["population"]["police"]);
         if elapsed>=seconds as f64 {break;}
         tokio::time::sleep(Duration::from_secs_f64((seconds as f64-elapsed).min(10.0))).await;
       }
@@ -381,6 +381,6 @@ async fn populated_actual_rtc_capacity() -> Result {
         report["completed"] = json!(true);
         std::fs::write(&out, serde_json::to_vec(&report)?)?;
     }
-    println!("T20 measurement saved: {out}");
+    println!("Capacity measurement saved: {out}");
     Ok(())
 }

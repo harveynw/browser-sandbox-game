@@ -1,0 +1,26 @@
+
+> port-meridian@0.1.0 test:local
+> node --test tools/local.test.mjs
+
+✔ CLI rejects incomplete/ambiguous options and unsupported Node before launch (0.936542ms)
+✔ temporary configurations have independent databases and preserve existing files (3.982292ms)
+✔ occupied port check does not terminate its owner (6.982833ms)
+[fixture] starting (pid 61653)
+✔ missing toolchain gives an install hint and fails without installing anything (38.255458ms)
+[fixture] READY 63787
+[fixture] starting (pid 61655)
+✔ shutdown terminates process groups including a listening grandchild (92.848ms)
+[fixture] READY 63788
+[crash] starting (pid 61656)
+[failed-build] starting (pid 61657)
+✔ unexpected child failure stops a live sibling and releases its listener (97.841417ms)
+[failed-build] READY 63789
+✔ failed build wrapper retains ownership of its surviving descendants (259.274167ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 554.141459

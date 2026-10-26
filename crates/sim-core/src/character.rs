@@ -50,7 +50,7 @@ pub fn spawn_character(position: [f32; 3], yaw: f32) -> Result<CharacterMotor> {
         jump_cooldown_ticks: 0,
     })
 }
-/// Exactly one fixed 1/30s tick. Tick/session deduplication is owned by T07/T09.
+/// Exactly one fixed 1/30s tick. Tick/session deduplication belongs to the session and prediction layers.
 /// Errors return no partial motor; caller retains the original authoritative state.
 pub fn step_character(
     state: &CharacterMotor,

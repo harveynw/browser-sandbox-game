@@ -1,9 +1,9 @@
 import { DiagnosticSession } from "./net/diagnostic";
 
 export function mountDiagnosticPage(root: HTMLElement): () => void {
-  const stage = document.createElement("p");
-  stage.className = "stage";
-  stage.textContent = "T07 · Admission and server authority";
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "Connection diagnostics";
   const title = document.createElement("h1");
   title.textContent = "Port Meridian";
   const description = document.createElement("p");
@@ -56,9 +56,9 @@ export function mountDiagnosticPage(root: HTMLElement): () => void {
   game.textContent = "Back to game";
   const map = document.createElement("a");
   map.href = "/map";
-  map.textContent = "Inspect the T04 greybox map";
+  map.textContent = "Inspect the city map";
   root.replaceChildren(
-    stage,
+    eyebrow,
     title,
     description,
     status,

@@ -278,7 +278,7 @@ it.each([
       const fullP95 =
         sortedCorrections[Math.ceil(sortedCorrections.length * 0.95) - 1] ?? 0;
       console.info(
-        `T09 ${profile.label} seeded static impairment: ${serverTick} ticks; correction p95=${fullP95.toFixed(6)} m; max=${Math.max(...observedCorrections).toFixed(6)} m; late redundant frames=${late}; packets=${packets}; conflicts=${conflicts}; resync=${failures.length}`,
+        `Prediction ${profile.label} seeded static impairment: ${serverTick} ticks; correction p95=${fullP95.toFixed(6)} m; max=${Math.max(...observedCorrections).toFixed(6)} m; late redundant frames=${late}; packets=${packets}; conflicts=${conflicts}; resync=${failures.length}`,
       );
       expect(serverTick).toBe(1800);
       expect(p.corrections.length).toBe(256);

@@ -1,4 +1,4 @@
-//! Bake-time geometry/reference checks. T04 boxes are deliberately axis-aligned.
+//! Bake-time geometry/reference checks for axis-aligned collision boxes.
 use crate::{Result, canonical, types::*};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 const EPS: f64 = 0.000001;
@@ -288,7 +288,7 @@ pub fn authoring(a: &Authoring) -> Result<()> {
         )?;
     }
     for p in &a.parking {
-        require(p.yaw == 0.0, "rotated parking not supported in T04")?;
+        require(p.yaw == 0.0, "parking must be axis-aligned")?;
         anchor(p.position, &p.reservation_id, &p.access_id, 0.0, a)?;
         require(
             a.vehicle_templates.iter().any(|v| v.id == p.template_id),
@@ -479,7 +479,7 @@ pub fn package(
             .filter(|c| c.role == ColliderRole::Boundary)
             .count()
             == 4,
-        "need four temporary boundary walls",
+        "need four world boundary walls",
     )?;
     for r in m.reservations.iter().filter(|r| r.clear) {
         clear(

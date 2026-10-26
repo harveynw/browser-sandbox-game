@@ -1,7 +1,7 @@
 import { runCharacterTrace } from "./trace";
 
 export function mountSimulationPage(root: HTMLElement): () => void {
-  root.innerHTML = `<main><span class="stage">T06 · shared Rust simulation</span><h1>Browser motor check</h1><p>Replay the frozen native trace through the WASM byte bridge: 1,800 ticks, 60 simulated seconds, 13 checkpoints. Position and velocity must agree within 1 cm.</p><div class="actions"><button type="button">Run trace</button></div><p class="status" role="status">Ready to load WASM</p><pre aria-label="Trace results">Static collision is loaded once per run. Play with keyboard and mouse at the game page.</pre><p class="tools"><a href="/map">Map inspector</a> · <a href="/">Back to game</a> · <a href="/diagnostic">Connection diagnostic</a></p></main>`;
+  root.innerHTML = `<main><span class="eyebrow">Shared Rust simulation</span><h1>Browser motor check</h1><p>Replay the frozen native trace through the WASM byte bridge: 1,800 ticks, 60 simulated seconds, 13 checkpoints. Position and velocity must agree within 1 cm.</p><div class="actions"><button type="button">Run trace</button></div><p class="status" role="status">Ready to load WASM</p><pre aria-label="Trace results">Static collision is loaded once per run. Play with keyboard and mouse at the game page.</pre><p class="tools"><a href="/map">Map inspector</a> · <a href="/">Back to game</a> · <a href="/diagnostic">Connection diagnostic</a></p></main>`;
   const button = root.querySelector("button");
   const status = root.querySelector("[role=status]");
   const output = root.querySelector("pre");

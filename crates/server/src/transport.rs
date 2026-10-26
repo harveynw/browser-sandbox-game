@@ -1,5 +1,5 @@
 //! Bounded application boundary. Only the pump thread touches net::Server.
-//! Dependency-internal queues remain unbounded/opaque; see docs/04.
+//! Dependency-internal queues remain unbounded/opaque; see docs/networking.md.
 use crate::replication::{Budget, LIFECYCLE_RESERVE, SnapshotBuffer};
 use protocol::{ClientEnvelope, Delivery, ServerEnvelope, decode_client, encode_server};
 use std::{

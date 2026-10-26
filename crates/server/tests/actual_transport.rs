@@ -241,7 +241,7 @@ async fn run_transport(profile: LossProfile) -> Result {
                 let count = receipts.len();
                 rtc_receipts = Some(count);
                 println!(
-                    "T19 loss progress unique_receipts={count}/50; server_ingress={}; replaced_probe_records={}; client_outstanding={}; relay={:?}",
+                    "RTC loss progress unique_receipts={count}/50; server_ingress={}; replaced_probe_records={}; client_outstanding={}; relay={:?}",
                     ingress.load(Ordering::Relaxed),
                     replaced.load(Ordering::Relaxed),
                     client.outstanding().await?,
@@ -276,7 +276,7 @@ async fn run_transport(profile: LossProfile) -> Result {
             client.send(false, ping(200)).await?;
             receipt(&mut client, false, 200).await?;
             println!(
-                "T19 actual RTC: loss_profile={profile:?}; unique_receipts={rtc_receipts:?}; dropped={}, forwarded={}; UDP blackout retained WS and RTC recovered",
+                "Actual RTC: loss_profile={profile:?}; unique_receipts={rtc_receipts:?}; dropped={}, forwarded={}; UDP blackout retained WS and RTC recovered",
                 client.relay.dropped.load(Ordering::Relaxed),
                 client.relay.forwarded.load(Ordering::Relaxed)
             );
@@ -287,7 +287,7 @@ async fn run_transport(profile: LossProfile) -> Result {
         assert!(client.receive(true).await.is_err());
         let _ = client.close().await;
         previous = Some(key);
-        println!("T19 actual kill/reconnect cycle={cycle}, peer={key:?}");
+        println!("Actual kill/reconnect cycle={cycle}, peer={key:?}");
     }
     Ok(())
 }

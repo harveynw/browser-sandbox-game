@@ -99,7 +99,7 @@ const summary = {
   final_queues: last.server.queues,
   scope:
     run.scope ??
-    "Cumulative histograms since server startup; game bytes before transport. No G4 claim.",
+    "Cumulative histograms since server startup; game bytes before transport. Not a performance qualification.",
 };
 const text = JSON.stringify(summary, null, 2) + "\n";
 if (process.argv[3]) await writeFile(process.argv[3], text);

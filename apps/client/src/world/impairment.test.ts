@@ -165,7 +165,7 @@ it.each(profiles)(
       store.sampleAll(701, 23000).find((a) => a.id === 1)?.motor.position[0],
     ).toBeCloseTo(701 / 30);
     console.info(
-      `T19 ${profile.name} seed=0x19c0ffee ${JSON.stringify(net.stats)}`,
+      `Impairment ${profile.name} seed=0x19c0ffee ${JSON.stringify(net.stats)}`,
     );
   },
 );

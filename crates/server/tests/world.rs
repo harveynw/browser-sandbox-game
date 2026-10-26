@@ -1775,14 +1775,14 @@ fn arrest_safely_releases_a_stationary_driver_and_rejects_old_epoch_inputs() {
     assert!(w.metrics.stale_epochs > 0);
 }
 
-#[path = "scenarios/t16.rs"]
-mod t16;
+#[path = "scenarios/jobs_and_repairs.rs"]
+mod jobs_and_repairs;
 
-#[path = "scenarios/t17.rs"]
-mod t17;
+#[path = "scenarios/durable_profiles.rs"]
+mod durable_profiles;
 
-#[path = "scenarios/t19.rs"]
-mod t19;
+#[path = "scenarios/session_lifecycle.rs"]
+mod session_lifecycle;
 
 #[test]
 fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {

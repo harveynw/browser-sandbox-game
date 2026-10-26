@@ -1,2 +1,2 @@
-/** Scripted diagnostic retained alongside the T08 game scene. */
+/** Scripted transport diagnostic using ordinary guest admission. */
 export { GameSession as DiagnosticSession } from "./session";

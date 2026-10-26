@@ -1,21 +1,14 @@
 # Asset provenance
 
-| Asset | Source | Provenance / licensing |
+| Asset | Authoring source | Provenance |
 |---|---|---|
-| Four slice primitive chunks | `source/slice.json`, `crates/content/src/bake.rs` | Original procedural boxes, roads and markings created in this repository; project-controlled content |
-| Quay water tower, market canopy, garage beacon | Landmark dimensions/colors in `source/slice.json` | Original colored greybox primitives; project-controlled content |
-| `compact_greybox` | Compact dimensions in `source/slice.json`, generated body/windows | Original procedural primitives; project-controlled content |
-| Collision, debug overlay and graphs | Same authored source and baker | Original project data; no third-party models/textures involved |
-| 36 city chunks, district palettes, backdrop and minimap | `source/city.json`, the same Rust baker | Original procedural geometry/data; no imported media |
-| Civic clock, Ironworks chimney, dock cranes, Heights pavilion, distant hill and ocean | City source and baker | Original colored greybox boxes; project-controlled content |
-| Van and sport greyboxes | City vehicle templates and baker | Original procedural bodies/windows; project-controlled content |
+| City, regression map, roads, markings, district palettes, backdrop and minimap | `source/city.json`, `source/slice.json`, `crates/content/src/bake.rs` | Original procedural geometry and data |
+| Water tower, market canopy, garage beacon, Civic clock, Ironworks chimney, dock cranes and Heights pavilion | Authored map dimensions and colours | Original procedural landmark silhouettes |
+| Compact, van and sport bodies/windows; police beacon | Authored vehicle templates and runtime renderer | Original procedural primitives |
+| Articulated characters and four clothing palettes | `apps/client/src/render/character.ts` | Original box rig and animation |
+| Eight facade patterns | `apps/client/src/render/facades.ts` | Original runtime patterns |
+| Tires, rims, spokes, lights, cosmetic lean, signs, sky, pistol, tracers, impacts, smoke, muzzle flash and tire dust | `apps/client/src/render/renderer.ts` | Original procedural runtime geometry and effects |
+| Garage/repair rings, poles, map/UI drawings, collision overlays, diagnostic graphs and styling | Renderer, `ui/`, `style.css` | Original primitives, drawings and system-font styling |
+| Footsteps, engine, skid, doors, shots, impacts, reload, siren and mission cues | `apps/client/src/audio/sound.ts` | Original oscillator/noise synthesis |
 
-No downloaded models, textures, fonts or audio have been added. These records do not assign a new public license to the repository. Three.js and other software dependencies retain their own package licenses; their source is not copied into authored asset files. Add a provenance entry before introducing externally sourced media.
-
-T14 pistol boxes, tracer lines, impact markers and disabled-car smoke blocks are original procedural runtime geometry in `apps/client/src/render/renderer.ts`; no external asset files were added.
-
-T15 police cars reuse the original procedural compact and add an original blue roof beacon. The second Quay compact is marked secured in city authoring; the visual assets retain their original provenance.
-
-T16 adds original procedural blue garage and green repair rings/poles, using the existing shared primitives. No third-party assets were added.
-
-T18 adds original runtime assets authored in this repository: the articulated box character and four clothing palettes (`render/character.ts`); eight facade patterns (`render/facades.ts`); car tires, rims, spokes, lights, cosmetic lean, signs, sky gradient, muzzle flash and tire dust (`render/renderer.ts`); map/UI drawings and system-font styling (`ui/`, `style.css`); and oscillator/noise-based footsteps, engine, skid, doors, shots, impact, reload, siren and mission cues (`audio/sound.ts`). No external models, textures, font files, recorded sound or music were imported. The existing six landmark silhouettes remain original authored city primitives. These assets remain project-controlled under the repository's existing licensing position.
+All authored media is project-controlled. No external models, textures, font files, recorded sound or music are imported. This record does not assign a new public license to the repository. Three.js and other software dependencies retain their own package licenses. Add a provenance entry before introducing externally sourced media.

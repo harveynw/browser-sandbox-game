@@ -54,7 +54,7 @@ pub struct Profiles {
     economic_events: BTreeMap<String, (String, i64, bool)>,
     pending_economic: BTreeMap<String, PendingEconomic>,
     reserved_refunds: BTreeSet<String>,
-    /// The memory worker uses the same delayed completion boundary as a future disk worker.
+    /// The memory adapter exposes delayed completion like the SQLite worker.
     pub repair_delay_ticks: u32,
     pub probe_until_ms: u64,
 }
