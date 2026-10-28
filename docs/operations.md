@@ -68,7 +68,7 @@ For frontend-only work, `npm run dev` plus `cargo run -p server --locked` remain
 
 ## Health and diagnostics
 
-- `/health/live`: ticking world and healthy transport worker.
+- `/health/live`: ticking world and no observed transport boundary failure.
 - `/health/ready`: live/available world and storage with recent actual WS/RTC receipts.
 - `/api/build`: protocol, build, content and simulation hashes.
 - `/api/metrics`: cached read-only timing, queue, population and encoded-byte counters.

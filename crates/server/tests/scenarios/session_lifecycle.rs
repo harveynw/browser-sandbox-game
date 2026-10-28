@@ -8,7 +8,7 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
         let p = PeerKey { id: 0, generation };
         let saved = join(&mut w, &mut a, &mut t, p, cookie.as_deref());
         ready(&mut w, &mut a, &mut t, p);
-        let player = w.sessions[&p].player.unwrap();
+        let player = w.sessions.peers[&p].player.unwrap();
         if let Some(previous) = old {
             t.events.push_back(TransportEvent::Closed {
                 peer: previous,
@@ -24,7 +24,7 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
                 },
             });
             step(&mut w, &mut a, &mut t);
-            assert_eq!(w.sessions[&p].player, Some(player));
+            assert_eq!(w.sessions.peers[&p].player, Some(player));
             assert_eq!(w.players.len(), 1);
         }
         let origin = w.players[&player.0].state.motor.clone();
@@ -50,12 +50,12 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
                     < 0.0001
             );
         }
-        assert_eq!(w.sessions[&p].epoch, 2);
-        assert!(w.sessions[&p].inputs.is_empty());
+        assert_eq!(w.sessions.peers[&p].epoch, 2);
+        assert!(w.sessions.peers[&p].inputs.is_empty());
         send(&w, &mut t, p, ClientMessage::Leave(Empty {}));
         step(&mut w, &mut a, &mut t);
         assert!(w.players.is_empty());
-        assert!(w.sessions.is_empty());
+        assert!(w.sessions.peers.is_empty());
         assert!(w.vehicles.values().all(|v| v.state.driver_id.is_none()));
         t.sent.clear();
         old = Some(p);

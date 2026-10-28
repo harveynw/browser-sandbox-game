@@ -1,0 +1,3 @@
+ALTER TABLE profiles ADD COLUMN tshirt_colour INTEGER NOT NULL DEFAULT 14983771 CHECK(tshirt_colour BETWEEN 0 AND 16777215);
+INSERT INTO schema_migrations VALUES(2);
+PRAGMA user_version=2;

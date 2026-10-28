@@ -92,3 +92,7 @@ Arrest requires an assigned live unit's front anchor within **3 m**, static sigh
 ## Scope
 
 This is a localhost, single-world game with original procedural art and synthesized effects. Public hosting, PvP/rewind shooting, explosions, additional weapons, on-foot police, distributed worlds and realistic suspension dynamics are outside the implemented rules. Browser compatibility and performance qualifications are listed in [testing](testing.md) and [performance](performance.md).
+
+### Player T-shirt colour
+
+The join menu offers an RGB colour picker. The selected colour is committed with the guest display name before admission and stored in the profile (SQLite migration 002; existing guests default to amber). Player entity descriptors distribute that committed colour reliably in baselines and visibility updates, so local and remote shirts use the same RGB value. While connected, menu changes are saved through `/api/appearance` and broadcast on the next tick after the profile commit. Reliable descriptor refreshes update both the owner and observers without changing control epochs; the world continues running while the local menu is open. Skin palettes remain independent.

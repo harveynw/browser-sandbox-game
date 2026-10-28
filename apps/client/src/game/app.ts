@@ -1,6 +1,7 @@
 import { GameAudio } from "../audio/sound";
 import { CityMap } from "../ui/city-map";
 import { GameHud, Tutorial, friendlyProblem } from "../ui/hud";
+import { ControlsPanel } from "../ui/controls-panel";
 import { SettingsPanel } from "../ui/settings-panel";
 import { readSettings, saveSettings, controlText } from "./settings";
 import { Diagnostics } from "./diagnostics";
@@ -54,6 +55,7 @@ export class GameApp {
   private readonly hud = new GameHud();
   private readonly audio = new GameAudio();
   private readonly tutorial = new Tutorial();
+  private readonly controls = new ControlsPanel();
   private cityMap: CityMap | undefined;
   private readonly mapButton = document.createElement("button");
   private readonly instructions = document.createElement("p");
@@ -170,6 +172,7 @@ export class GameApp {
       this.status,
       this.menuSummary,
       this.preferences.name,
+      this.preferences.colour,
       instructions,
       this.courierInfo,
       this.jobChoices,
@@ -188,7 +191,11 @@ export class GameApp {
       signal: this.abort.signal,
     });
     debugPanel.append(debugSummary, this.debug.element, resync);
-    this.cross.className = "game-debug-cross";
+    const panels = document.createElement("aside");
+    panels.className = "game-panels";
+    panels.setAttribute("aria-label", "Game panels");
+    panels.append(debugPanel, this.controls.element);
+    this.cross.className = "game-crosshair";
     this.cross.setAttribute("aria-hidden", "true");
     this.cross.hidden = true;
     this.minimap.hidden = true;
@@ -202,7 +209,7 @@ export class GameApp {
       this.minimap,
       this.cross,
       this.hud.element,
-      debugPanel,
+      panels,
       this.overlay,
     );
     const options = { signal: this.abort.signal };
@@ -323,6 +330,7 @@ export class GameApp {
   }
   private applySettings(): void {
     this.input.bindings = { ...this.settings.bindings };
+    this.controls.update(this.settings.bindings);
     this.input.sensitivity = this.settings.sensitivity;
     this.input.invert = this.settings.invert;
     this.reduced = this.settings.reduced;
@@ -348,6 +356,9 @@ export class GameApp {
       this.settings.bindings,
     );
     saveSettings(this.settings);
+    this.session?.updateTshirtColour(
+      Number.parseInt(this.settings.tshirtColour.slice(1), 16),
+    );
   }
   private openMap(): void {
     this.preferences.cancelRemap();
@@ -476,6 +487,14 @@ export class GameApp {
           this.carHealth =
             owner.state.kind === "vehicle" ? owner.state.data.health : null;
         },
+        appearanceError: () => {
+          if (this.session === session)
+            this.status.textContent =
+              "Could not save T-shirt colour. Try selecting it again.";
+        },
+        tshirtColour: (colour) => {
+          if (this.session === session) this.renderer?.tshirtColour(colour);
+        },
         worldEvent: (event, own) => {
           this.renderer?.effect(event, own);
           this.audio.cue(
@@ -522,6 +541,7 @@ export class GameApp {
         },
       },
       this.settings.name,
+      Number.parseInt(this.settings.tshirtColour.slice(1), 16),
     );
     this.session = session;
     void session.connect();
@@ -810,6 +830,20 @@ export class GameApp {
             localMotor.position[2] >= d.rect.min[1] &&
             localMotor.position[2] < d.rect.max[1],
         );
+        this.controls.setContext(
+          controlText(prompt, this.settings.bindings),
+          localMotor && this.completedJobs === 0
+            ? controlText(
+                this.tutorial.update(
+                  localMotor.position,
+                  this.session?.isDriving ?? false,
+                  !!mission,
+                  prompt.includes("Car health"),
+                ),
+                this.settings.bindings,
+              )
+            : "",
+        );
         this.hud.update({
           guidance: repair ? repairGuidance(repair) : guidance,
           credits: this.credits,
@@ -825,22 +859,6 @@ export class GameApp {
                   : "Pursuit · break sight",
           ammo: controlText(combat, this.settings.bindings),
           vehicle: drivingStatus.replace(/^ · /, ""),
-          prompt: controlText(
-            `${prompt} · M map · Esc menu`,
-            this.settings.bindings,
-          ),
-          tutorial:
-            localMotor && this.completedJobs === 0
-              ? controlText(
-                  this.tutorial.update(
-                    localMotor.position,
-                    this.session?.isDriving ?? false,
-                    !!mission,
-                    prompt.includes("Car health"),
-                  ),
-                  this.settings.bindings,
-                )
-              : "",
           warning: net?.stale
             ? "Connection delayed — waiting for the server"
             : (this.session?.actionMessage ?? ""),

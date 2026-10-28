@@ -31,6 +31,7 @@ pub fn typescript() -> String {
         EventId,
         Revision,
         Credits,
+        TshirtColour,
         InputAxis,
         Buttons,
         Heat,

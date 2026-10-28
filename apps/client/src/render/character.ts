@@ -65,8 +65,16 @@ export class AnimationStateMachine {
   }
 }
 export const clothing = ["#e4a25b", "#4a9d9a", "#b16f5b", "#7f83a9"];
-/** One original in-place articulated rig, reused with four clothing palettes. */
+/** One articulated rig with independently configurable shirt and skin colours. */
 export class CharacterRig {
+  private readonly shirtParts: THREE.Mesh[] = [];
+  private shirtColour: number | undefined;
+  setShirtColour(colour: number): void {
+    if (this.shirtColour === colour) return;
+    this.shirtColour = colour;
+    const material = this.material(`#${colour.toString(16).padStart(6, "0")}`);
+    for (const part of this.shirtParts) part.material = material;
+  }
   readonly root = new THREE.Group();
   private pendingFire = false;
   fire(): void {
@@ -85,7 +93,7 @@ export class CharacterRig {
   ];
   constructor(
     cube: THREE.BoxGeometry,
-    material: (color: string) => THREE.MeshStandardMaterial,
+    private readonly material: (color: string) => THREE.MeshStandardMaterial,
     palette = 0,
   ) {
     const shirt = clothing[palette % 4] ?? "#e4a25b",
@@ -98,6 +106,7 @@ export class CharacterRig {
       at: [number, number, number],
     ) => {
       const mesh = new THREE.Mesh(cube, material(color));
+      if (color === shirt) this.shirtParts.push(mesh);
       mesh.scale.set(...size);
       mesh.position.set(...at);
       parent.add(mesh);

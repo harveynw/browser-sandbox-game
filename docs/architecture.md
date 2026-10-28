@@ -38,11 +38,10 @@ Exact versions are in [Cargo.toml](../Cargo.toml), crate manifests, [package.jso
 
 ## Threads and state
 
-1. The simulation main thread is the sole owner of mutable gameplay state and advances fixed 1/30 s ticks. It never awaits sockets or a database result.
-2. The application transport pump alone calls the net-crate server handle. It exchanges bounded queues with the world and isolates dependency blocking sends from simulation.
-3. net-crate owns its internal actors/runtime. Their queues and numeric event identity limitations are separate from our application bounds.
-4. The HTTP thread serves guest/session/ticket/health/metrics operations through shared control state.
-5. The persistence worker owns the SQLite connection and transactions. The world submits nonblocking work and polls committed results.
+1. The simulation main thread owns gameplay and transport state, polls network events, advances fixed 1/30 s ticks, and flushes outgoing messages. The net crate's blocking sends can stall this thread.
+2. net-crate owns its internal actors/runtime. Their queues and numeric event identity limitations are separate from our application bounds.
+3. The HTTP thread serves guest/session/ticket/health/metrics operations through shared control state.
+4. The persistence worker owns the SQLite connection and transactions. The world submits nonblocking work and polls committed results.
 
 The scheduler permits at most five fixed steps per poll, discards excess wall-time backlog rather than changing physics DT/skipping simulation ticks, and reports sustained overload. The launcher supervises a release server and Vite in owned POSIX process groups; the native startup probe is a short-lived separate process.
 
@@ -50,11 +49,11 @@ The scheduler permits at most five fixed steps per poll, discards excess wall-ti
 flowchart LR
   Input[Browser input] --> Prediction[Shared Rust WASM prediction]
   Input --> Client[Session / MessagePack / WS + RTC]
-  Client <--> Pump[net-crate + application pump]
-  Pump <--> World[30 Hz authoritative world]
+  Client <--> Transport[net-crate + application transport]
+  Transport <--> World[30 Hz authoritative world]
   World --> Storage[Bounded SQLite worker]
   World --> Replication[Visibility / 10 Hz independent state]
-  Replication --> Pump
+  Replication --> Transport
   Client --> Replicas[Remote replicas / interpolation]
   Replicas --> Render[Three.js / camera / HUD / audio]
   Prediction --> Render
@@ -65,9 +64,9 @@ flowchart LR
 
 ## Server module boundaries
 
-`main/config/scheduler` handle startup, persistence selection and timing. `world` owns sessions, stable event ordering and authoritative transitions. `transport/replication` own connection generations, queue bounds, budgets, spatial relevance and packet packing. `admission/control` own local guests, tickets and cached control-plane status. `population/vehicles/combat/police/missions/jobs/repairs` implement the rules in [gameplay](gameplay.md). `persistence` implements saves; `performance` holds bounded histograms.
+`main/config` handle startup, persistence selection and fixed-step scheduling. `world` owns sessions, stable event ordering and authoritative transitions. `transport/replication` own connection generations, queue bounds, budgets, spatial relevance and packet packing. `admission/control` own local guests, tickets and cached control-plane status. `population/vehicles/combat/police/missions/jobs/repairs` implement the rules in [gameplay](gameplay.md). `persistence` implements saves; `performance` holds bounded histograms.
 
-Each tick polls storage and drains transport events, removes closed/expired sessions, handles peer-ordered messages and completes committed admission. It selects the next tick's owner inputs, runs police/population directors, advances shared motors in stable entity order, resolves impacts/combat/police, then advances repairs and missions. Visibility changes are synchronized before owner/snapshot replication and bounded output flushing. Unsafe motor state retires the affected session rather than committing a partial step.
+The outer loop polls transport events before its scheduled ticks and flushes bounded output after them. Each tick polls storage and drains transport events, removes closed/expired sessions, handles peer-ordered messages and completes committed admission. It selects the next tick's owner inputs, runs police/population directors, advances shared motors in stable entity order, resolves impacts/combat/police, then advances repairs and missions. Visibility changes are synchronized before owner/snapshot replication. Unsafe motor state retires the affected session rather than committing a partial step.
 
 Protocol and shared simulation do not depend on server storage or graphics. Meshes never define collision, health, ownership or mission completion. NPCs feed the same motors as players. Visible chunk removal never changes physics. A client cannot set position, money, damage or heat.
 

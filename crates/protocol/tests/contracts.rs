@@ -120,3 +120,20 @@ fn frame_depth_and_truncation_limits_use_the_decoder() {
         assert!(std::panic::catch_unwind(|| decode_client(&bytes)).is_ok());
     }
 }
+
+#[test]
+fn tshirt_colour_is_a_bounded_rgb_integer() {
+    for value in [0, 0x123abc, 0xffffff] {
+        let colour: protocol::TshirtColour =
+            serde_json::from_value(serde_json::json!(value)).unwrap();
+        assert_eq!(colour.0, value);
+    }
+    for value in [
+        serde_json::json!(-1),
+        serde_json::json!(16777216),
+        serde_json::json!(1.5),
+        serde_json::json!("#123abc"),
+    ] {
+        assert!(serde_json::from_value::<protocol::TshirtColour>(value).is_err());
+    }
+}

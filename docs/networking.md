@@ -6,7 +6,7 @@
 
 The server uses `harveynw/net-crate` at **77b401b1376b5c8bcb98da2884efcb1e63082ba4**, with its pinned WebRTC dependency retained in Cargo.lock. The browser uses standard WebSocket/RTCPeerConnection signalling against that server. WS carries signalling and reliable binary messages; the `game` RTC channel is unordered with zero retransmits. The application does not replace RTC with WebSocket-only gameplay.
 
-`NetCrateTransport` isolates the dependency behind `GameTransport`: drain lifecycle/messages, queue outgoing envelopes and disconnect. Its pump alone touches `net::Server`; simulation exchanges bounded application data. Peer keys combine the crate's numeric ID and an application generation. Stale queued sends, closes and kills are ignored after generation replacement. The dependency's own untagged numeric events cannot be retroactively disambiguated by the application; see the limitations below.
+`Network` owns the net crate handles, peer state and bounded application queues. The world drains lifecycle/messages, queues outgoing envelopes and requests disconnects directly. The game loop polls the net crate's events and flushes bounded application output directly; the net crate runs its own networking thread. Peer keys combine the crate's numeric ID and an application generation. Stale queued sends, closes and kills are ignored after generation replacement. The dependency's own untagged numeric events cannot be retroactively disambiguated by the application; see the limitations below.
 
 ## Local guest and session lifecycle
 
@@ -26,7 +26,7 @@ Owner state is sent at **10 Hz**. Moving/occupied actors replicate at 10 Hz; uno
 
 Snapshots are packed by actual MessagePack byte size, including envelope scope. Each record is complete and never split across the **1,100-byte** application packet cap. Source ticks are independent per record, preserving same-tick packet splits. Omission never means deletion. Reliable visibility generations prevent stale packets from resurrecting hidden actors.
 
-Egress uses **60 KiB/s** with a **120 KiB** burst per peer. Snapshot admission reserves **64 KiB** of that burst for baseline/lifecycle work. The pump also meters encoded bytes submitted after coalescing/repacking. Reliable exhaustion retires a session instead of emitting an incomplete baseline. Unreliable data can be dropped/coalesced safely.
+Egress uses **60 KiB/s** with a **120 KiB** burst per peer. Snapshot admission reserves **64 KiB** of that burst for baseline/lifecycle work. The transport also meters encoded bytes submitted after coalescing/repacking. Reliable exhaustion retires a session instead of emitting an incomplete baseline. Unreliable data can be dropped/coalesced safely.
 
 ## Application queues
 
@@ -54,6 +54,6 @@ At 500 ms without authenticated traffic the HUD reports delay; at two seconds pr
 
 All listeners are loopback. Startup readiness requires actual admission, complete baseline, WS and RTC nonce receipts; a successful TCP bind alone is insufficient. [Operations](operations.md) describes the native probe and five-second readiness expiry.
 
-Application bounds do not bound every dependency-internal queue or guarantee socket freshness. The crate's internal actor buffering, blocking sends, untagged numeric event reuse and limited shutdown/health APIs remain integration constraints. Measured target impairment produces excessive RTC delay and memory growth; supported-network performance is **not qualified**. [Performance](performance.md) records the measurements for transport review.
+Application bounds do not bound every dependency-internal queue or guarantee socket freshness. The crate's internal actor buffering, blocking sends, untagged numeric event reuse and limited shutdown/health APIs remain integration constraints. Its send and kill calls can block the game loop; transport health reports observed boundary failures and cannot detect an idle actor failure. Measured target impairment produces excessive RTC delay and memory growth; supported-network performance is **not qualified**. [Performance](performance.md) records the measurements for transport review.
 
 Public/LAN serving, TLS, TURN/STUN, cross-network reachability and public authentication/abuse hardening are outside supported operation. Loopback success does not establish internet deployability. The authoritative gameplay and local protocol remain unchanged by that deployment boundary.

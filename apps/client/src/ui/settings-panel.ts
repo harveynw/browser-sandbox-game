@@ -10,6 +10,9 @@ export class SettingsPanel {
   readonly element = document.createElement("details");
   readonly name = document.createElement("label");
   readonly nameInput = document.createElement("input");
+  readonly colour = document.createElement("label");
+  readonly colourInput = document.createElement("input");
+  private colourChanged = false;
   readonly soundStatus = document.createElement("output");
   private abort = new AbortController();
   private waiting: Control | undefined;
@@ -22,6 +25,22 @@ export class SettingsPanel {
     const summary = document.createElement("summary");
     summary.textContent = "Settings & controls";
     this.element.append(summary);
+    this.colour.textContent = "T-shirt";
+    this.colourInput.type = "color";
+    this.colourInput.value = settings.tshirtColour;
+    this.colourInput.setAttribute("aria-label", "T-shirt");
+    this.colour.append(this.colourInput);
+    this.colour.className = "player-name";
+    this.colourInput.addEventListener(
+      "input",
+      () => {
+        this.colourChanged = true;
+        settings.tshirtColour = this.colourInput.value;
+        changed();
+      },
+      { signal: this.abort.signal },
+    );
+    void this.loadProfileColour(changed);
     this.name.textContent = "Player name";
     this.nameInput.value = settings.name;
     this.nameInput.maxLength = 24;
@@ -204,6 +223,43 @@ export class SettingsPanel {
       { signal: this.abort.signal },
     );
     this.refresh();
+  }
+  private async loadProfileColour(changed: () => void): Promise<void> {
+    try {
+      for (
+        let attempt = 0;
+        attempt < 30 && !this.abort.signal.aborted;
+        attempt++
+      ) {
+        const response = await fetch("/api/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+          signal: this.abort.signal,
+        });
+        if (response.status === 202) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          continue;
+        }
+        if (!response.ok) return;
+        const data = await response.json();
+        const colour: unknown = data?.profile?.tshirt_colour;
+        if (
+          !this.colourChanged &&
+          typeof colour === "number" &&
+          Number.isInteger(colour) &&
+          colour >= 0 &&
+          colour <= 0xffffff
+        ) {
+          this.settings.tshirtColour = `#${colour.toString(16).padStart(6, "0")}`;
+          this.colourInput.value = this.settings.tshirtColour;
+          changed();
+        }
+        return;
+      }
+    } catch {
+      /* Offline menus retain the last local choice. */
+    }
   }
   private refresh(): void {
     for (const [action, button] of this.buttons)

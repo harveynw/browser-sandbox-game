@@ -39,3 +39,12 @@ it("swaps bindings atomically, updates prompts and never leaves old movement or 
   );
   expect(rebind(input.bindings, "job", "Escape")).toBe(input.bindings);
 });
+
+it("restores valid shirt colours and rejects malformed saved colours", () => {
+  const saved = (colour: unknown) => ({
+    getItem: () => JSON.stringify({ version: 1, tshirtColour: colour }),
+  });
+  expect(readSettings(saved("#123ABC")).tshirtColour).toBe("#123abc");
+  for (const value of ["red", "#12345", "#1234567", 123])
+    expect(readSettings(saved(value)).tshirtColour).toBe("#e4a25b");
+});

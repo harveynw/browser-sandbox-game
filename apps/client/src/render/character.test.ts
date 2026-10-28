@@ -59,3 +59,41 @@ it("fits seated heads inside all three authored car heights", async () => {
     material.dispose();
   }
 });
+
+it("applies the same shirt RGB to local and remote rigs without recolouring skin or shared materials", async () => {
+  const { BoxGeometry, Mesh, MeshStandardMaterial } = await import("three");
+  const { CharacterRig } = await import("./character");
+  const cube = new BoxGeometry();
+  const materials = new Map<
+    string,
+    InstanceType<typeof MeshStandardMaterial>
+  >();
+  const material = (colour: string) => {
+    let value = materials.get(colour);
+    if (!value) {
+      value = new MeshStandardMaterial({ color: colour });
+      materials.set(colour, value);
+    }
+    return value;
+  };
+  const local = new CharacterRig(cube, material, 0);
+  const remote = new CharacterRig(cube, material, 2);
+  const untouched = new CharacterRig(cube, material, 0);
+  local.setShirtColour(0x123abc);
+  remote.setShirtColour(0x123abc);
+  const colours = (rig: InstanceType<typeof CharacterRig>) => {
+    const values: string[] = [];
+    rig.root.traverse((part) => {
+      if (part instanceof Mesh && part.material instanceof MeshStandardMaterial)
+        values.push(part.material.color.getHexString());
+    });
+    return values;
+  };
+  expect(colours(local)).toContain("123abc");
+  expect(colours(remote)).toContain("123abc");
+  expect(colours(local)).toContain("c79370");
+  expect(colours(remote)).toContain("dbb18a");
+  expect(colours(untouched)).not.toContain("123abc");
+  cube.dispose();
+  for (const value of materials.values()) value.dispose();
+});

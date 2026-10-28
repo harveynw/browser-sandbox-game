@@ -144,6 +144,7 @@ async fn run(port: u16, cookie_path: &Path) -> Result {
                     &world,
                     &None,
                     ClientMessage::ClientHello(ClientHello {
+                        tshirt_colour: Default::default(),
                         protocol_version: hello.protocol_version,
                         build_id: hello.build_id,
                         content_hash: hello.content_hash,

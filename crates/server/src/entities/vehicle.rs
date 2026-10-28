@@ -1,3 +1,4 @@
+//! Vehicle entities and local geometry helpers.
 //! Vehicle state and safe possession geometry. Transactions are owned by World.
 use protocol::{EntityId, VehicleState};
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};

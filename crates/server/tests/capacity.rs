@@ -239,32 +239,33 @@ async fn bot(
             break;
         }
         tokio::select! {
-        packet=peer.receive_any()=>{
-        let(reliable,bytes)=packet?;{let mut s=stats.lock().unwrap();s.down+=bytes.len() as u64;if reliable{s.ws+=1}else{s.rtc+=1}}
-        let envelope=decode_server(&bytes,if reliable{Delivery::Reliable}else{Delivery::Unreliable})?;
-        match envelope.message{
-        ServerMessage::ServerHello(info)=>{world=envelope.world_id;send(&mut peer,&world,&None,ClientMessage::ClientHello(ClientHello{protocol_version:ProtocolVersion(3),build_id:info.build_id,content_hash:info.content_hash,sim_config_hash:info.sim_config_hash,join_ticket:OpaqueId(ticket.clone()),display_name:DisplayName(format!("Load Peer {index:02}"))}),true,&stats).await?;},
-        ServerMessage::Welcome(w)=>{session=envelope.session_id;player=w.player_id.0;},
-        ServerMessage::BaselineBegin(b)=>{baseline=b.baseline_id.0;playing=false;visible.clear();history.clear();},
-        ServerMessage::EntityShow(s)=>{visible.insert(s.descriptor.id.0);},
-        ServerMessage::EntityHide(h)=>{visible.remove(&h.entity_id.0);},
-        ServerMessage::BaselineEnd(b)=>{if b.baseline_id.0!=baseline||visible.len()!=b.entity_count.0 as usize||!visible.contains(&player){return Err("incomplete load baseline".into());}send(&mut peer,&world,&session,ClientMessage::ClientReady(ClientReady{baseline_id:b.baseline_id}),true,&stats).await?;},
-        ServerMessage::StartPlay(start)=>{if impaired{peer.relay.loss_one_in.store(50,std::sync::atomic::Ordering::Relaxed);peer.relay.target_profile.store(true,std::sync::atomic::Ordering::Relaxed);}playing=true;let o=start.owner;epoch=o.control_epoch.0;owner_tick=o.server_tick;last_input=owner_tick;anchor=(owner_tick,Instant::now());position=o.player_state.motor.position.0.map(|v|v.0);mode=o.player_state.mode;history.clear();let mut s=stats.lock().unwrap();s.joins_ms=started.elapsed().as_secs_f64()*1000.0;s.playing=true;s.player=player;},
-        ServerMessage::OwnerState(o) if o.control_epoch.0==epoch&&o.server_tick>owner_tick=>{let next=o.player_state.motor.position.0.map(|v|v.0);let mut s=stats.lock().unwrap();s.distance+=((next[0]-position[0]).hypot(next[2]-position[2])) as f64;position=next;mode=o.player_state.mode;owner_tick=o.server_tick;if !clock_synced{anchor=(owner_tick,Instant::now());}s.position=position;s.epoch=epoch;s.tick=owner_tick;s.visible=visible.len();},
-        ServerMessage::ControlChanged(o)=>{epoch=o.control_epoch.0;owner_tick=o.server_tick;last_input=owner_tick;anchor=(owner_tick,Instant::now());position=o.player_state.motor.position.0.map(|v|v.0);mode=o.player_state.mode;history.clear();},
-        ServerMessage::PlayerStatus(p)=>{magazine=p.magazine.0;},
-        ServerMessage::Pong(p)=>{let rtt=started.elapsed().as_secs_f64()*1000.0-p.client_time_ms.0;if p.nonce & 0x80000000 !=0{stats.lock().unwrap().rtt_ms=rtt;}else if (0.0..10000.0).contains(&rtt){anchor=(p.server_tick+(rtt*0.015) as u32,Instant::now());clock_synced=true;}},
-        ServerMessage::Reject(r)=>return Err(format!("join rejected {:?}",r.code).into()),
-        ServerMessage::Disconnect(d)=>return Err(format!("disconnected {}",d.detail.0).into()),_=>{}
-        }
-        },
-        _=frame.tick(),if playing=>{
-        let estimated=anchor.0+(anchor.1.elapsed().as_secs_f64()*30.0) as u32;let tick=estimated+if impaired{7}else{3};
-        if tick>last_input{last_input=tick;let(x,z,yaw)=if mode==CharacterMode::OnFoot{walker.controls(position,tick)}else{(0,0,0.0)};history.push_back(InputFrame{tick,move_x:InputAxis(x),move_z:InputAxis(z),look_yaw:Yaw(yaw),look_pitch:Pitch(0.0),buttons:Buttons(1)});while history.len()>3{history.pop_front();}send(&mut peer,&world,&session,ClientMessage::InputBatch(InputBatch{control_epoch:ControlEpoch(epoch),frames:history.iter().cloned().collect()}),false,&stats).await?;stats.lock().unwrap().frames+=1;}
-        },
-        _=heartbeat.tick(),if session.is_some()=>{stats.lock().unwrap().relay=peer.relay.stats.lock().unwrap().report();ping_id+=1;for reliable in [true,false]{send(&mut peer,&world,&session,ClientMessage::Ping(Ping{nonce:if reliable{ping_id}else{ping_id|0x80000000},client_time_ms:Milliseconds(started.elapsed().as_secs_f64()*1000.0)}),reliable,&stats).await?;}},
-        _=action.tick(),if playing=>{if mode==CharacterMode::OnFoot{request+=1;let a=if magazine==0{Action::Reload(Empty{})}else{Action::Fire(Fire{aim_yaw:Yaw(0.0),aim_pitch:Pitch(0.0)})};send(&mut peer,&world,&session,ClientMessage::Action(ActionRequest{request_id:RequestId(request),control_epoch:ControlEpoch(epoch),action:a}),true,&stats).await?;stats.lock().unwrap().actions+=1;}},
-        }
+               packet=peer.receive_any()=>{
+               let(reliable,bytes)=packet?;{let mut s=stats.lock().unwrap();s.down+=bytes.len() as u64;if reliable{s.ws+=1}else{s.rtc+=1}}
+               let envelope=decode_server(&bytes,if reliable{Delivery::Reliable}else{Delivery::Unreliable})?;
+               match envelope.message{
+               ServerMessage::ServerHello(info)=>{world=envelope.world_id;send(&mut peer,&world,&None,ClientMessage::ClientHello(ClientHello{
+        tshirt_colour: Default::default(),protocol_version:ProtocolVersion(3),build_id:info.build_id,content_hash:info.content_hash,sim_config_hash:info.sim_config_hash,join_ticket:OpaqueId(ticket.clone()),display_name:DisplayName(format!("Load Peer {index:02}"))}),true,&stats).await?;},
+               ServerMessage::Welcome(w)=>{session=envelope.session_id;player=w.player_id.0;},
+               ServerMessage::BaselineBegin(b)=>{baseline=b.baseline_id.0;playing=false;visible.clear();history.clear();},
+               ServerMessage::EntityShow(s)=>{visible.insert(s.descriptor.id.0);},
+               ServerMessage::EntityHide(h)=>{visible.remove(&h.entity_id.0);},
+               ServerMessage::BaselineEnd(b)=>{if b.baseline_id.0!=baseline||visible.len()!=b.entity_count.0 as usize||!visible.contains(&player){return Err("incomplete load baseline".into());}send(&mut peer,&world,&session,ClientMessage::ClientReady(ClientReady{baseline_id:b.baseline_id}),true,&stats).await?;},
+               ServerMessage::StartPlay(start)=>{if impaired{peer.relay.loss_one_in.store(50,std::sync::atomic::Ordering::Relaxed);peer.relay.target_profile.store(true,std::sync::atomic::Ordering::Relaxed);}playing=true;let o=start.owner;epoch=o.control_epoch.0;owner_tick=o.server_tick;last_input=owner_tick;anchor=(owner_tick,Instant::now());position=o.player_state.motor.position.0.map(|v|v.0);mode=o.player_state.mode;history.clear();let mut s=stats.lock().unwrap();s.joins_ms=started.elapsed().as_secs_f64()*1000.0;s.playing=true;s.player=player;},
+               ServerMessage::OwnerState(o) if o.control_epoch.0==epoch&&o.server_tick>owner_tick=>{let next=o.player_state.motor.position.0.map(|v|v.0);let mut s=stats.lock().unwrap();s.distance+=((next[0]-position[0]).hypot(next[2]-position[2])) as f64;position=next;mode=o.player_state.mode;owner_tick=o.server_tick;if !clock_synced{anchor=(owner_tick,Instant::now());}s.position=position;s.epoch=epoch;s.tick=owner_tick;s.visible=visible.len();},
+               ServerMessage::ControlChanged(o)=>{epoch=o.control_epoch.0;owner_tick=o.server_tick;last_input=owner_tick;anchor=(owner_tick,Instant::now());position=o.player_state.motor.position.0.map(|v|v.0);mode=o.player_state.mode;history.clear();},
+               ServerMessage::PlayerStatus(p)=>{magazine=p.magazine.0;},
+               ServerMessage::Pong(p)=>{let rtt=started.elapsed().as_secs_f64()*1000.0-p.client_time_ms.0;if p.nonce & 0x80000000 !=0{stats.lock().unwrap().rtt_ms=rtt;}else if (0.0..10000.0).contains(&rtt){anchor=(p.server_tick+(rtt*0.015) as u32,Instant::now());clock_synced=true;}},
+               ServerMessage::Reject(r)=>return Err(format!("join rejected {:?}",r.code).into()),
+               ServerMessage::Disconnect(d)=>return Err(format!("disconnected {}",d.detail.0).into()),_=>{}
+               }
+               },
+               _=frame.tick(),if playing=>{
+               let estimated=anchor.0+(anchor.1.elapsed().as_secs_f64()*30.0) as u32;let tick=estimated+if impaired{7}else{3};
+               if tick>last_input{last_input=tick;let(x,z,yaw)=if mode==CharacterMode::OnFoot{walker.controls(position,tick)}else{(0,0,0.0)};history.push_back(InputFrame{tick,move_x:InputAxis(x),move_z:InputAxis(z),look_yaw:Yaw(yaw),look_pitch:Pitch(0.0),buttons:Buttons(1)});while history.len()>3{history.pop_front();}send(&mut peer,&world,&session,ClientMessage::InputBatch(InputBatch{control_epoch:ControlEpoch(epoch),frames:history.iter().cloned().collect()}),false,&stats).await?;stats.lock().unwrap().frames+=1;}
+               },
+               _=heartbeat.tick(),if session.is_some()=>{stats.lock().unwrap().relay=peer.relay.stats.lock().unwrap().report();ping_id+=1;for reliable in [true,false]{send(&mut peer,&world,&session,ClientMessage::Ping(Ping{nonce:if reliable{ping_id}else{ping_id|0x80000000},client_time_ms:Milliseconds(started.elapsed().as_secs_f64()*1000.0)}),reliable,&stats).await?;}},
+               _=action.tick(),if playing=>{if mode==CharacterMode::OnFoot{request+=1;let a=if magazine==0{Action::Reload(Empty{})}else{Action::Fire(Fire{aim_yaw:Yaw(0.0),aim_pitch:Pitch(0.0)})};send(&mut peer,&world,&session,ClientMessage::Action(ActionRequest{request_id:RequestId(request),control_epoch:ControlEpoch(epoch),action:a}),true,&stats).await?;stats.lock().unwrap().actions+=1;}},
+               }
     }
     send(
         &mut peer,

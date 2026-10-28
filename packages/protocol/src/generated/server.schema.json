@@ -251,6 +251,17 @@
         },
         "template_id": {
           "$ref": "#/$defs/TemplateId"
+        },
+        "tshirt_colour": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TshirtColour"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -668,6 +679,10 @@
         },
         "profile_id": {
           "$ref": "#/$defs/OpaqueId"
+        },
+        "tshirt_colour": {
+          "$ref": "#/$defs/TshirtColour",
+          "default": 14983771
         }
       },
       "required": [
@@ -1198,6 +1213,11 @@
     "TickRate": {
       "maximum": 30,
       "minimum": 30,
+      "type": "integer"
+    },
+    "TshirtColour": {
+      "maximum": 16777215,
+      "minimum": 0,
       "type": "integer"
     },
     "VehicleHealth": {

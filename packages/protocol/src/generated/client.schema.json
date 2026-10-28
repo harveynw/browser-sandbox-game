@@ -181,6 +181,10 @@
         },
         "sim_config_hash": {
           "$ref": "#/$defs/ContentHash"
+        },
+        "tshirt_colour": {
+          "$ref": "#/$defs/TshirtColour",
+          "default": 14983771
         }
       },
       "required": [
@@ -507,6 +511,11 @@
       "minLength": 1,
       "pattern": "^[A-Za-z0-9_.:-]+$",
       "type": "string"
+    },
+    "TshirtColour": {
+      "maximum": 16777215,
+      "minimum": 0,
+      "type": "integer"
     },
     "Yaw": {
       "maximum": 3.1415927410125732,

@@ -24,6 +24,7 @@ export interface Settings {
   effects: number;
   muted: boolean;
   name: string;
+  tshirtColour: string;
   bindings: Bindings;
 }
 const key = "port-meridian.settings.v1";
@@ -85,6 +86,7 @@ export function readSettings(
     effects: 0.8,
     muted: false,
     name: "Local Player",
+    tshirtColour: "#e4a25b",
     bindings: { ...defaults },
   };
   try {
@@ -97,6 +99,11 @@ export function readSettings(
     )
       return base;
     const v = value as Partial<Settings>;
+    if (
+      typeof v.tshirtColour === "string" &&
+      /^#[0-9a-f]{6}$/i.test(v.tshirtColour)
+    )
+      base.tshirtColour = v.tshirtColour.toLowerCase();
     for (const field of ["sensitivity", "master", "effects"] as const) {
       const n = v[field];
       if (typeof n === "number" && Number.isFinite(n))

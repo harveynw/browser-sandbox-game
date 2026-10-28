@@ -1,5 +1,5 @@
 //! Bounded, deterministic ambient population. Only World commits motor results.
-use crate::vehicles::Vehicle;
+use crate::entities::vehicle::Vehicle;
 use content::{EdgeKind, RoadGraph, WorldManifest};
 use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter, SimConfig, StepContext};
@@ -49,20 +49,7 @@ pub struct Traffic {
     parking: Option<usize>,
     born: u32,
 }
-pub struct Pedestrian {
-    pub id: EntityId,
-    pub state: CharacterState,
-    pub phase: PedestrianPhase,
-    from: u32,
-    to: u32,
-    input: InputFrame,
-    wait_until: u32,
-    far_since: Option<u32>,
-    progress_at: u32,
-    progress_position: [f32; 3],
-    flee_until: u32,
-    threat: [f32; 3],
-}
+use crate::entities::pedestrian::Pedestrian;
 #[derive(Default, Debug)]
 pub struct PopulationMetrics {
     pub spawned: u64,
@@ -177,7 +164,7 @@ impl Intersections {
         self.reservations.retain(|_, (owner, _)| *owner != id);
     }
 }
-pub struct Population {
+pub struct PopulationSystem {
     pub traffic: BTreeMap<u32, Traffic>,
     pub pedestrians: BTreeMap<u32, Pedestrian>,
     pub pools: BTreeMap<u32, VehiclePool>,
@@ -191,7 +178,7 @@ pub struct Population {
     pedestrian_cursor: usize,
     walk_axis: f32,
 }
-impl Population {
+impl PopulationSystem {
     pub fn new(
         manifest: &WorldManifest,
         config: &content::SimConfig,
@@ -840,8 +827,8 @@ mod tests {
         )
         .unwrap()
     }
-    fn population(content: &WorldContent) -> Population {
-        Population::new(
+    fn population(content: &WorldContent) -> PopulationSystem {
+        PopulationSystem::new(
             &content.manifest,
             &content.config,
             std::iter::empty(),
@@ -855,7 +842,7 @@ mod tests {
         (config, collision)
     }
     fn advance(
-        pop: &mut Population,
+        pop: &mut PopulationSystem,
         cars: &mut BTreeMap<u32, Vehicle>,
         collision: &mut CollisionWorld,
         setup: (&SimConfig, &WorldContent),
@@ -1046,8 +1033,8 @@ mod tests {
     #[test]
     fn parked_budget_includes_eight_reserved_and_tags_survive_possession() {
         let c = content();
-        assert!(Population::new(&c.manifest, &c.config, 1..=16, 1).is_ok());
-        assert!(Population::new(&c.manifest, &c.config, 1..=17, 1).is_err());
+        assert!(PopulationSystem::new(&c.manifest, &c.config, 1..=16, 1).is_ok());
+        assert!(PopulationSystem::new(&c.manifest, &c.config, 1..=17, 1).is_err());
         let mut invalid = c.manifest.clone();
         let slot = invalid
             .parking
@@ -1056,7 +1043,7 @@ mod tests {
             .unwrap()
             .clone();
         invalid.parking.push(slot);
-        assert!(Population::new(&invalid, &c.config, 1..=4, 1).is_err());
+        assert!(PopulationSystem::new(&invalid, &c.config, 1..=4, 1).is_err());
         let mut p = population(&c);
         let (_, mut collision) = collision(&c);
         let mut cars = BTreeMap::new();

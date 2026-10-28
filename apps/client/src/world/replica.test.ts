@@ -11,6 +11,7 @@ function show(id = 1, visibility = 1, tick = 0, x = 0): EntityShow {
       entity_kind: "player",
       template_id: "player_greybox",
       display_name: "Test Player",
+      tshirt_colour: 0xe4a25b,
     },
     state: {
       kind: "character",
@@ -200,6 +201,7 @@ it("interpolates vehicle poses and rejects old occupancy snapshots after a relia
       entity_kind: "vehicle",
       template_id: "compact",
       display_name: null,
+      tshirt_colour: 0xe4a25b,
     },
     state: {
       kind: "vehicle",

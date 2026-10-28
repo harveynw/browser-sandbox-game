@@ -71,6 +71,7 @@ const show = (baseline_id: number | null = 1): EntityShow => ({
     entity_kind: "player",
     template_id: "player_greybox",
     display_name: "Test",
+    tshirt_colour: 0xe4a25b,
   },
   state,
 });
@@ -103,10 +104,12 @@ function sent() {
 async function connect() {
   const phases = vi.fn(),
     owners = vi.fn(),
-    status = vi.fn();
+    status = vi.fn(),
+    colours = vi.fn();
   const game = new GameSession(() => {}, status, {
     phase: phases,
     owner: owners,
+    tshirtColour: colours,
   });
   live.push(game);
   await game.connect();
@@ -133,12 +136,13 @@ async function connect() {
       profile: {
         profile_id: "profile",
         display_name: "Test",
+        tshirt_colour: 0xe4a25b,
         credits: 0,
         completed_jobs: 0,
       },
     },
   });
-  return { game, phases, owners, status };
+  return { game, phases, owners, status, colours };
 }
 function baseline(id = 1, visibility = 1, tick = 10) {
   receive({
@@ -391,6 +395,7 @@ it("cancels asynchronous asset work before opening transport and ignores capture
             profile: {
               profile_id: "profile",
               display_name: "Test",
+              tshirt_colour: 0xe4a25b,
               credits: 0,
               completed_jobs: 0,
             },
@@ -402,4 +407,62 @@ it("cancels asynchronous asset work before opening transport and ignores capture
   );
   expect(game.replicas.size).toBe(0);
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it("saves paused-menu colour changes in order and coalesces drag updates to the latest selection", async () => {
+  const { game } = await connect();
+  baseline();
+  start();
+  let finish: ((response: Response) => void) | undefined;
+  const requests: number[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((_url: string, init: RequestInit) => {
+      const colour = (
+        JSON.parse(String(init.body)) as { tshirt_colour: number }
+      ).tshirt_colour;
+      requests.push(colour);
+      if (requests.length === 1)
+        return new Promise<Response>((resolve) => {
+          finish = resolve;
+        });
+      return Promise.resolve(
+        new Response(JSON.stringify({ profile: { tshirt_colour: colour } }), {
+          status: 200,
+        }),
+      );
+    }),
+  );
+  game.updateTshirtColour(0x112233);
+  game.updateTshirtColour(0x445566);
+  game.updateTshirtColour(0x778899);
+  expect(requests).toEqual([0x112233]);
+  finish?.(
+    new Response(JSON.stringify({ profile: { tshirt_colour: 0x112233 } }), {
+      status: 200,
+    }),
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toEqual([0x112233, 0x778899]);
+  game.updateTshirtColour(0x778899);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(requests).toHaveLength(2);
+});
+
+it("updates the owner render colour from a reliable descriptor refresh without resyncing", async () => {
+  const { game, colours } = await connect();
+  baseline();
+  start();
+  const messages = sent().length;
+  const changed = {
+    ...show(null),
+    visibility_id: 2,
+    descriptor: { ...show().descriptor, tshirt_colour: 0x22cc66 },
+  };
+  receive({ kind: "entity_show", data: changed });
+  expect(colours).toHaveBeenLastCalledWith(0x22cc66);
+  expect(
+    game.replicas.sampleAll(10, performance.now())[0]?.descriptor.tshirt_colour,
+  ).toBe(0x22cc66);
+  expect(sent()).toHaveLength(messages);
 });

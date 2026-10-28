@@ -20,6 +20,9 @@ export class GameRenderer {
   private readonly lods = new Map<number, THREE.Mesh>();
   private readonly rigs = new Map<number, CharacterRig>();
   private localRig: CharacterRig;
+  tshirtColour(colour: number): void {
+    this.localRig.setShirtColour(colour);
+  }
   private readonly textures = new Set<THREE.Texture>();
   private readonly signs: THREE.Sprite[] = [];
   private readonly wheelGeometry = new THREE.CylinderGeometry(
@@ -246,12 +249,13 @@ export class GameRenderer {
     const terminalMaterial = new THREE.MeshBasicMaterial({
       color: "#56e5e1",
       side: THREE.DoubleSide,
-      depthWrite: false,
+      // Opaque beacons must occlude geometry behind them, regardless of draw order.
+      depthWrite: true,
     });
     const targetMaterial = new THREE.MeshBasicMaterial({
       color: "#ffcf4a",
       side: THREE.DoubleSide,
-      depthWrite: false,
+      depthWrite: true,
     });
     this.geometry.add(ringGeometry);
     this.materials.add(terminalMaterial);
@@ -265,7 +269,7 @@ export class GameRenderer {
         material = new THREE.MeshBasicMaterial({
           color: zone.kind === "repair" ? "#82ef8f" : "#99c4ff",
           side: THREE.DoubleSide,
-          depthWrite: false,
+          depthWrite: true,
         });
         this.materials.add(material);
       }
@@ -709,6 +713,8 @@ export class GameRenderer {
         }
         this.remoteActors.set(actor.id, group);
       }
+      if (actor.descriptor.tshirt_colour != null)
+        this.rigs.get(actor.id)?.setShirtColour(actor.descriptor.tshirt_colour);
       group.position.set(...actor.motor.position);
       group.rotation.y = actor.motor.yaw;
       group.scale.setScalar(

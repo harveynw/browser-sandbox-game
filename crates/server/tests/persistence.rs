@@ -74,6 +74,7 @@ fn migrations_hash_only_cookie_and_committed_rewards_survive_reopen_once() {
         &w,
         "name",
         Command::Name {
+            tshirt_colour: 0xe4a25b,
             profile: p.profile_id.0.clone(),
             name: "Persistent Guest".into(),
         },
@@ -119,7 +120,7 @@ fn migrations_hash_only_cookie_and_committed_rewards_survive_reopen_once() {
         c.query_row("SELECT COUNT(*) FROM schema_migrations", [], |r| r
             .get::<_, u32>(0))
             .unwrap(),
-        1
+        2
     );
 }
 #[test]
@@ -217,7 +218,7 @@ fn interrupted_repairs_refund_once_on_restart_but_acknowledged_repairs_stay_paid
 fn schema_mismatch_and_invalid_database_fail_startup_explicitly() {
     let db = Database::new();
     let c = rusqlite::Connection::open(&db.0).unwrap();
-    c.pragma_update(None, "user_version", 2).unwrap();
+    c.pragma_update(None, "user_version", 3).unwrap();
     drop(c);
     assert!(SqliteWorker::open(&db.0).is_err());
     std::fs::write(&db.0, b"not a SQLite database").unwrap();
@@ -407,4 +408,80 @@ fn local_config_selects_sqlite_or_disposable_memory_and_rejects_bad_modes_or_pat
             .unwrap()
             .durable()
     );
+}
+
+// Version-one profiles acquire a default colour; committed selections survive reopening.
+#[test]
+fn tshirt_colour_migrates_old_profiles_and_persists_committed_selection() {
+    let db = Database::new();
+    let hash = "a".repeat(64);
+    {
+        let c = rusqlite::Connection::open(&db.0).unwrap();
+        c.execute_batch(include_str!("../migrations/001_profiles.sql"))
+            .unwrap();
+        c.execute(
+            "INSERT INTO profiles VALUES('profile-old',?1,'Old Guest',150,1,0)",
+            [hash.as_bytes()],
+        )
+        .unwrap();
+    }
+    let worker = SqliteWorker::open(&db.0).unwrap();
+    let old = load(&worker, &hash);
+    assert_eq!(old.tshirt_colour, protocol::TshirtColour::default());
+    let updated = run(
+        &worker,
+        "appearance",
+        Command::Name {
+            profile: old.profile_id.0.clone(),
+            name: "Old Guest".into(),
+            tshirt_colour: 0x123abc,
+        },
+    )
+    .unwrap();
+    assert_eq!(updated.tshirt_colour, protocol::TshirtColour(0x123abc));
+    assert_eq!((updated.credits.0, updated.completed_jobs), (150, 1));
+    drop(worker);
+    let worker = SqliteWorker::open(&db.0).unwrap();
+    assert_eq!(load(&worker, &hash), updated);
+}
+
+// Appearance writes become visible only after commit and survive reopening independently of names.
+#[test]
+fn live_tshirt_updates_wait_for_commit_preserve_profile_and_survive_restart() {
+    let db = Database::new();
+    let mut profiles = Profiles::sqlite(&db.0).unwrap();
+    let (old, cookie) = prepare(&mut profiles, None);
+    let lock = rusqlite::Connection::open(&db.0).unwrap();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    assert!(
+        profiles
+            .update_tshirt_colour(Some(&cookie), protocol::TshirtColour(0x22cc66))
+            .unwrap()
+            .is_none()
+    );
+    profiles.poll_store(0);
+    assert_eq!(profiles.profile(Some(&cookie)).unwrap(), old);
+    lock.execute_batch("ROLLBACK").unwrap();
+    let until = Instant::now() + Duration::from_secs(3);
+    let mut tick = 1;
+    let saved = loop {
+        profiles.poll_store(tick);
+        tick += 1;
+        if let Ok(Some(view)) =
+            profiles.update_tshirt_colour(Some(&cookie), protocol::TshirtColour(0x22cc66))
+        {
+            break view;
+        }
+        assert!(Instant::now() < until);
+        thread::sleep(Duration::from_millis(1));
+    };
+    assert_eq!(saved.tshirt_colour, protocol::TshirtColour(0x22cc66));
+    assert_eq!(
+        (&saved.display_name, saved.credits, saved.completed_jobs),
+        (&old.display_name, old.credits, old.completed_jobs)
+    );
+    assert!(profiles.shutdown(Duration::from_secs(1)));
+    drop(profiles);
+    let mut profiles = Profiles::sqlite(&db.0).unwrap();
+    assert_eq!(prepare(&mut profiles, Some(&cookie)).0, saved);
 }

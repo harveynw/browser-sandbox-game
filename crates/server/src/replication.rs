@@ -1,6 +1,612 @@
-//! Full independent records, bounded bytes and spatial relevance; no delta dependencies.
+use crate::admission::Profiles;
+use crate::transport::*;
+use crate::{
+    sessions::{Session, SessionPhase, Sessions},
+    systems::{
+        Systems, missions::MissionSystem, police::PoliceSystem, population::PopulationSystem,
+    },
+    world::World,
+};
+
+use crate::world::entity_position;
 use protocol::*;
 use std::collections::{BTreeMap, BTreeSet};
+
+pub struct Replication;
+impl Replication {
+    pub(crate) fn send(
+        peer: PeerKey,
+        sid: Option<&str>,
+        delivery: Delivery,
+        message: ServerMessage,
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        sessions.output.push_back((
+            peer,
+            delivery,
+            ServerEnvelope {
+                v: ProtocolVersion(3),
+                world_id: Some(OpaqueId(world.id.clone())),
+                session_id: sid.map(|s| OpaqueId(s.into())),
+                message,
+            },
+        ));
+    }
+    pub(crate) fn reliable(
+        peer: PeerKey,
+        sid: Option<&str>,
+        message: ServerMessage,
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        Replication::send(peer, sid, Delivery::Reliable, message, world, sessions);
+    }
+    pub(crate) fn owner(session: &Session, world: &World) -> Result<OwnerState, String> {
+        let id = session.player.ok_or("missing owner")?;
+        let player = world.players.get(&id.0).ok_or("missing player")?;
+        Ok(OwnerState {
+            server_tick: world.tick,
+            consumed_through_tick: world.tick,
+            control_epoch: ControlEpoch(session.epoch),
+            player_id: id,
+            controlled_entity_id: player.state.vehicle_id.unwrap_or(id),
+            state: player
+                .state
+                .vehicle_id
+                .map(|car| EntityState::Vehicle(world.vehicles[&car.0].state.clone()))
+                .unwrap_or_else(|| EntityState::Character(player.state.clone())),
+            player_state: player.state.clone(),
+        })
+    }
+    pub(crate) fn entities(
+        world: &World,
+        population: &PopulationSystem,
+        police: &PoliceSystem,
+    ) -> BTreeMap<u32, (EntityDescriptor, EntityState)> {
+        world
+            .players
+            .iter()
+            .map(|(&id, p)| {
+                (
+                    id,
+                    (
+                        EntityDescriptor {
+                            tshirt_colour: Some(p.tshirt_colour),
+                            id: p.id,
+                            entity_kind: EntityKind::Player,
+                            template_id: TemplateId("player_greybox".into()),
+                            display_name: Some(p.display_name.clone()),
+                        },
+                        EntityState::Character(p.state.clone()),
+                    ),
+                )
+            })
+            .chain(world.vehicles.iter().map(|(&id, v)| {
+                (
+                    id,
+                    (
+                        EntityDescriptor {
+                            tshirt_colour: None,
+                            id: v.id,
+                            entity_kind: if police.units.contains_key(&id) {
+                                EntityKind::Police
+                            } else {
+                                EntityKind::Vehicle
+                            },
+                            template_id: TemplateId(v.template.id.clone()),
+                            display_name: if police.secured.contains(&id) {
+                                Some(DisplayName(format!("Secured {}", v.template.id)))
+                            } else if police.units.contains_key(&id) {
+                                Some(DisplayName("PoliceSystem patrol".into()))
+                            } else {
+                                None
+                            },
+                        },
+                        EntityState::Vehicle(v.state.clone()),
+                    ),
+                )
+            }))
+            .chain(population.pedestrians.iter().map(|(&id, p)| {
+                (
+                    id,
+                    (
+                        EntityDescriptor {
+                            tshirt_colour: None,
+                            id: p.id,
+                            entity_kind: EntityKind::Pedestrian,
+                            template_id: TemplateId("pedestrian_greybox".into()),
+                            display_name: None,
+                        },
+                        EntityState::Character(p.state.clone()),
+                    ),
+                )
+            }))
+            .collect()
+    }
+    pub(crate) fn show(
+        id: u32,
+        visibility: u32,
+        baseline: Option<u32>,
+        world: &World,
+        population: &PopulationSystem,
+        police: &PoliceSystem,
+    ) -> EntityShow {
+        let (descriptor, state) = Replication::entities(world, population, police)
+            .remove(&id)
+            .expect("visible entity exists");
+        EntityShow {
+            baseline_id: baseline.map(BaselineId),
+            visibility_id: VisibilityId(visibility),
+            descriptor,
+            state,
+            state_tick: world.tick,
+        }
+    }
+    pub(crate) fn controlled(s: &Session, world: &World) -> u32 {
+        let player = s.player.expect("authenticated player");
+        world.players[&player.0]
+            .state
+            .vehicle_id
+            .unwrap_or(player)
+            .0
+    }
+    pub(crate) fn transition(
+        peer: PeerKey,
+        s: &mut Session,
+        ids: &[u32],
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        police: &mut PoliceSystem,
+    ) -> Result<(), String> {
+        s.epoch = s.epoch.checked_add(1).ok_or("epoch exhausted")?;
+        s.inputs.clear();
+        // Refresh both replicas reliably with a fresh visibility generation. Older RTC
+        // packets cannot restore a previous occupancy mode, even at the same tick.
+        let entities = Replication::entities(world, population, police);
+        let mut messages = Vec::new();
+        for (target, session) in
+            std::iter::once((peer, s)).chain(sessions.peers.iter_mut().map(|(p, s)| (*p, s)))
+        {
+            for id in ids {
+                if !session.visible.contains_key(id) {
+                    continue;
+                }
+                session.visibility_counter = session
+                    .visibility_counter
+                    .checked_add(1)
+                    .ok_or("visibility exhausted")?;
+                session.visible.insert(*id, session.visibility_counter);
+                let (descriptor, state) = entities[id].clone();
+                messages.push((
+                    target,
+                    session.id.clone(),
+                    ServerMessage::EntityShow(EntityShow {
+                        baseline_id: None,
+                        visibility_id: VisibilityId(session.visibility_counter),
+                        descriptor,
+                        state,
+                        state_tick: world.tick,
+                    }),
+                ));
+            }
+        }
+        for (target, sid, message) in messages {
+            Replication::reliable(target, sid.as_deref(), message, world, sessions);
+        }
+        Ok(())
+    }
+    /// Refresh descriptors reliably without changing control epochs or discarding player inputs.
+    pub(crate) fn refresh_appearance(
+        ids: &[u32],
+        world: &mut World,
+        sessions: &mut Sessions,
+        systems: &Systems,
+    ) -> Result<(), String> {
+        let entities = Self::entities(world, &systems.population, &systems.police);
+        let mut messages = Vec::new();
+        for (&peer, session) in &mut sessions.peers {
+            for id in ids {
+                if !session.visible.contains_key(id) {
+                    continue;
+                }
+                session.visibility_counter = session
+                    .visibility_counter
+                    .checked_add(1)
+                    .ok_or("visibility exhausted")?;
+                session.visible.insert(*id, session.visibility_counter);
+                let (descriptor, state) = entities[id].clone();
+                messages.push((
+                    peer,
+                    session.id.clone(),
+                    ServerMessage::EntityShow(EntityShow {
+                        baseline_id: None,
+                        visibility_id: VisibilityId(session.visibility_counter),
+                        descriptor,
+                        state,
+                        state_tick: world.tick,
+                    }),
+                ));
+            }
+        }
+        for (peer, sid, message) in messages {
+            Self::reliable(peer, sid.as_deref(), message, world, sessions);
+        }
+        Ok(())
+    }
+    pub(crate) fn status(
+        tick: u32,
+        s: &Session,
+        world: &World,
+        police: &PoliceSystem,
+        missions: &MissionSystem,
+    ) -> Result<PlayerStatus, String> {
+        let p = s.profile.as_ref().ok_or("profile missing")?;
+        Ok(PlayerStatus {
+            revision: Revision(s.status_revision),
+            server_tick: tick,
+            credits: p.credits,
+            repair: s.repair_view.clone(),
+            completed_jobs: p.completed_jobs,
+            heat: Heat(police.wanted(s.player_id()).heat),
+            pursuit: police.wanted(s.player_id()).pursuit,
+            magazine: Magazine(world.players[&s.player_id()].weapon.magazine),
+            reload_end_tick: world.players[&s.player_id()].weapon.reload_end,
+            mission: missions.mission(s.player_id()).as_ref().map(|m| m.view()),
+            respawn_tick: world.players[&s.player_id()].weapon.respawn,
+            protected_until_tick: world.players[&s.player_id()].weapon.protected_until,
+        })
+    }
+    pub(crate) fn baseline(
+        peer: PeerKey,
+        s: &mut Session,
+        now: u64,
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        police: &mut PoliceSystem,
+    ) -> Result<(), String> {
+        s.baseline = s.baseline.checked_add(1).ok_or("baseline exhausted")?;
+        s.phase = SessionPhase::Loading;
+        s.inputs.clear();
+        s.visible.clear();
+        s.deadline = now.saturating_add(30_000);
+        Replication::reliable(
+            peer,
+            s.id.as_deref(),
+            ServerMessage::BaselineBegin(BaselineBegin {
+                baseline_id: BaselineId(s.baseline),
+                server_tick: world.tick,
+            }),
+            world,
+            sessions,
+        );
+        s.last_replicated.clear();
+        let entities = Replication::entities(world, population, police);
+        let spatial = SpatialIndex::new(entities.iter().map(|(&id, (_, state))| {
+            let p = entity_position(state);
+            (id, [p[0], p[2]])
+        }));
+        let owned = Replication::controlled(s, world);
+        let origin = entity_position(&entities[&owned].1);
+        let mut visible = spatial.relevant([origin[0], origin[2]], owned, &s.visible);
+        visible.insert(s.player.ok_or("missing player")?.0);
+        for id in visible {
+            s.visibility_counter = s
+                .visibility_counter
+                .checked_add(1)
+                .ok_or("visibility exhausted")?;
+            s.visible.insert(id, s.visibility_counter);
+            Replication::reliable(
+                peer,
+                s.id.as_deref(),
+                ServerMessage::EntityShow(Replication::show(
+                    id,
+                    s.visibility_counter,
+                    Some(s.baseline),
+                    world,
+                    population,
+                    police,
+                )),
+                world,
+                sessions,
+            );
+        }
+        Replication::reliable(
+            peer,
+            s.id.as_deref(),
+            ServerMessage::BaselineEnd(BaselineEnd {
+                baseline_id: BaselineId(s.baseline),
+                entity_count: EntityCount(s.visible.len() as u16),
+            }),
+            world,
+            sessions,
+        );
+        Ok(())
+    }
+    pub(crate) fn sync_visible(
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        police: &mut PoliceSystem,
+    ) -> Result<(), String> {
+        let entities = Replication::entities(world, population, police);
+        let spatial = SpatialIndex::new(entities.iter().map(|(&id, (_, state))| {
+            let p = entity_position(state);
+            (id, [p[0], p[2]])
+        }));
+        let mut messages = Vec::new();
+        for (&peer, s) in &mut sessions.peers {
+            if s.phase == SessionPhase::AwaitHello {
+                continue;
+            }
+            let player = s.player.ok_or("missing observer")?.0;
+            let owner = world.players[&player]
+                .state
+                .vehicle_id
+                .map_or(player, |v| v.0);
+            let origin = entity_position(&entities[&owner].1);
+            let mut present = spatial.relevant([origin[0], origin[2]], owner, &s.visible);
+            present.insert(player);
+            for id in s.visible.keys().copied().collect::<Vec<_>>() {
+                if !present.contains(&id) {
+                    let visibility = s.visible.remove(&id).ok_or("visibility missing")?;
+                    s.last_replicated.remove(&id);
+                    messages.push((
+                        peer,
+                        s.id.clone(),
+                        ServerMessage::EntityHide(EntityHide {
+                            entity_id: EntityId(id),
+                            visibility_id: VisibilityId(visibility),
+                            server_tick: world.tick,
+                            reason: if entities.contains_key(&id) {
+                                HideReason::OutOfRange
+                            } else {
+                                HideReason::Disconnected
+                            },
+                        }),
+                    ));
+                }
+            }
+            for id in &present {
+                if !s.visible.contains_key(id) {
+                    s.visibility_counter = s
+                        .visibility_counter
+                        .checked_add(1)
+                        .ok_or("visibility exhausted")?;
+                    s.visible.insert(*id, s.visibility_counter);
+                    // Build after releasing the mutable session borrow.
+                    messages.push((
+                        peer,
+                        s.id.clone(),
+                        ServerMessage::EntityShow(EntityShow {
+                            baseline_id: None,
+                            visibility_id: VisibilityId(s.visibility_counter),
+                            descriptor: entities[id].0.clone(),
+                            state: entities[id].1.clone(),
+                            state_tick: world.tick,
+                        }),
+                    ));
+                }
+            }
+        }
+        for (peer, sid, message) in messages {
+            Replication::reliable(peer, sid.as_deref(), message, world, sessions);
+        }
+        Ok(())
+    }
+    pub(crate) fn publish(
+        world: &mut World,
+        sessions: &mut Sessions,
+        systems: &mut Systems,
+    ) -> Result<(), String> {
+        Replication::sync_visible(
+            world,
+            sessions,
+            &mut systems.population,
+            &mut systems.police,
+        )?;
+        if world.tick.is_multiple_of(3) {
+            let updates: Result<Vec<_>, String> = sessions
+                .peers
+                .iter()
+                .filter(|(_, s)| s.phase == SessionPhase::Playing)
+                .map(|(peer, s)| Ok((*peer, s.id.clone(), Replication::owner(s, world)?)))
+                .collect();
+            for (peer, sid, owner) in updates? {
+                Replication::send(
+                    peer,
+                    sid.as_deref(),
+                    Delivery::Unreliable,
+                    ServerMessage::OwnerState(owner),
+                    world,
+                    sessions,
+                );
+            }
+        }
+        if world.tick.is_multiple_of(3) {
+            let mut batches = Vec::new();
+            let entities =
+                Replication::entities(world, &mut systems.population, &mut systems.police);
+            for (&peer, session) in &mut sessions.peers {
+                if session.phase != SessionPhase::Playing {
+                    continue;
+                }
+                let player = session.player.ok_or("missing owner")?.0;
+                let owned = world.players[&player]
+                    .state
+                    .vehicle_id
+                    .map_or(player, |v| v.0);
+                let position = entity_position(&entities[&owned].1);
+                let mut ids: Vec<_> = session
+                    .visible
+                    .keys()
+                    .copied()
+                    .filter(|id| *id != owned)
+                    .filter(|id| {
+                        world.vehicles.get(id).is_none_or(|v| {
+                            v.idle_ticks < 30
+                                || v.state.driver_id.is_some()
+                                || world.tick.is_multiple_of(15)
+                        })
+                    })
+                    .collect();
+                ids.sort_by(|a, b| {
+                    let age_a = world
+                        .tick
+                        .saturating_sub(*session.last_replicated.get(a).unwrap_or(&world.tick));
+                    let age_b = world
+                        .tick
+                        .saturating_sub(*session.last_replicated.get(b).unwrap_or(&world.tick));
+                    let dist = |id: &u32| {
+                        let p = entity_position(&entities[id].1);
+                        (p[0] - position[0]).hypot(p[2] - position[2])
+                    };
+                    (age_b >= 9)
+                        .cmp(&(age_a >= 9))
+                        .then_with(|| {
+                            if age_a >= 9 && age_b >= 9 {
+                                age_b.cmp(&age_a)
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        })
+                        .then(dist(a).total_cmp(&dist(b)))
+                        .then(a.cmp(b))
+                });
+                let records = ids.into_iter().map(|id| StateRecord {
+                    entity_id: EntityId(id),
+                    visibility_id: VisibilityId(session.visible[&id]),
+                    state: entities[&id].1.clone(),
+                });
+                for envelope in packets(
+                    &world.id,
+                    session.id.as_deref().ok_or("missing session")?,
+                    world.tick,
+                    records,
+                )? {
+                    batches.push((peer, Delivery::Unreliable, envelope));
+                }
+                if world.tick.is_multiple_of(30) {
+                    batches.push((
+                        peer,
+                        Delivery::Reliable,
+                        ServerEnvelope {
+                            v: ProtocolVersion(3),
+                            world_id: Some(OpaqueId(world.id.clone())),
+                            session_id: session.id.clone().map(OpaqueId),
+                            message: ServerMessage::PlayerStatus(Replication::status(
+                                world.tick,
+                                session,
+                                world,
+                                &mut systems.police,
+                                &mut systems.missions,
+                            )?),
+                        },
+                    ));
+                }
+            }
+            sessions.output.extend(batches);
+        }
+        Ok(())
+    }
+    pub(crate) fn flush(
+        network: &mut Network,
+        profiles: &mut Profiles,
+        now: u64,
+        previous_cars: &BTreeMap<u32, VehicleMotor>,
+        world: &mut World,
+        sessions: &mut Sessions,
+        systems: &mut Systems,
+    ) -> Result<(), String> {
+        let mut flushed = 0;
+        while let Some((peer, delivery, message)) = sessions.output.pop_front() {
+            // A failed reliable send retires this session immediately. Never send the
+            // tail of its baseline after dropping an earlier show record.
+            if !sessions.peers.contains_key(&peer)
+                && !matches!(
+                    message.message,
+                    ServerMessage::Reject(_) | ServerMessage::Disconnect(_)
+                )
+            {
+                continue;
+            }
+            flushed += 1;
+            if flushed > 4096 {
+                return Err("tick output budget exhausted".into());
+            }
+            let bytes = encode_server(&message, delivery)
+                .map_err(|e| e.to_string())?
+                .len();
+            let is_snapshot = matches!(message.message, ServerMessage::Snapshot(_));
+            if let Some(session) = sessions.peers.get_mut(&peer) {
+                if !session.egress_budget.allow(
+                    bytes,
+                    now,
+                    if is_snapshot { LIFECYCLE_RESERVE } else { 0 },
+                ) {
+                    world.metrics.budget_drops += 1;
+                    if delivery == Delivery::Reliable {
+                        sessions.disconnect(peer, profiles, world, systems);
+                        sessions
+                            .closing
+                            .insert(peer, "reliable byte budget exhausted");
+                    }
+                    continue;
+                }
+                session.traffic.down_bytes += bytes as u64;
+                if let ServerMessage::Snapshot(data) = &message.message {
+                    world.metrics.snapshot_packets += 1;
+                    world.metrics.max_snapshot_bytes = world.metrics.max_snapshot_bytes.max(bytes);
+                    for record in &data.records {
+                        let previous = session
+                            .last_replicated
+                            .insert(record.entity_id.0, world.tick)
+                            .unwrap_or(world.tick);
+                        world.metrics.max_refresh_age_ticks = world
+                            .metrics
+                            .max_refresh_age_ticks
+                            .max(world.tick - previous);
+                    }
+                }
+            }
+            world.metrics.egress_bytes += bytes as u64;
+            if matches!(
+                network.send(peer, delivery, message),
+                SendOutcome::Full | SendOutcome::Closed
+            ) {
+                sessions.disconnect(peer, profiles, world, systems);
+                sessions.closing.insert(peer, "output unavailable");
+                systems
+                    .repairs
+                    .update(profiles, world, sessions, &mut systems.police)?;
+                systems.missions.update(
+                    profiles,
+                    previous_cars,
+                    world,
+                    sessions,
+                    &mut systems.population,
+                    &mut systems.police,
+                    &mut systems.combat,
+                    &mut systems.repairs,
+                )?;
+                Replication::sync_visible(
+                    world,
+                    sessions,
+                    &mut systems.population,
+                    &mut systems.police,
+                )?;
+            }
+        }
+        for (peer, reason) in std::mem::take(&mut sessions.closing) {
+            network.disconnect(peer, reason);
+        }
+        Ok(())
+    }
+}
+// Full independent records, bounded bytes and spatial relevance; no delta dependencies.
+
 use std::result::Result;
 /// Keep a bounded baseline/lifecycle burst available while snapshots saturate the link.
 /// This reserves tokens inside the existing 60 KiB/s, 120 KiB burst budget.

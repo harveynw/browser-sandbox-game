@@ -20,6 +20,7 @@ function show(id: number, visibility: number, tick: number): EntityShow {
       entity_kind: "player",
       template_id: "player_greybox",
       display_name: "Test",
+      tshirt_colour: 0xe4a25b,
     },
     state: {
       kind: "character",

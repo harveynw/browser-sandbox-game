@@ -1,5 +1,5 @@
 //! Explicit localhost development issuer; not a public authentication service.
-use crate::{admission::Profiles, world::World};
+use crate::{admission::Profiles, sessions::Sessions, systems::Systems, world::World};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -57,6 +57,12 @@ struct EmptyBody {}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct Appearance {
+    tshirt_colour: protocol::TshirtColour,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Probe {
     session_id: String,
     ws: bool,
@@ -75,20 +81,27 @@ impl Control {
             build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
         }
     }
-    pub fn update(&mut self, world: &World, now: u64, healthy: bool, overloaded: bool) {
-        use crate::world::SessionPhase;
+    pub fn update(
+        &mut self,
+        world: &World,
+        sessions: &Sessions,
+        now: u64,
+        healthy: bool,
+        overloaded: bool,
+    ) {
+        use crate::sessions::SessionPhase;
         self.status = Status {
             last_tick_ms: now,
             tick: world.tick,
-            sessions: world.sessions.len(),
+            sessions: sessions.peers.len(),
             players: world.players.len(),
-            loading: world
-                .sessions
+            loading: sessions
+                .peers
                 .values()
                 .filter(|s| s.phase == SessionPhase::Loading)
                 .count(),
-            playing: world
-                .sessions
+            playing: sessions
+                .peers
                 .values()
                 .filter(|s| s.phase == SessionPhase::Playing)
                 .count(),
@@ -102,19 +115,27 @@ impl Control {
             self.populated_tick_work.observe(elapsed);
         }
     }
-    pub fn record_performance(&mut self, world: &World, queues: Value, gap: Duration, now: u64) {
+    pub fn record_performance(
+        &mut self,
+        world: &World,
+        sessions: &Sessions,
+        systems: &Systems,
+        queues: Value,
+        gap: Duration,
+        now: u64,
+    ) {
         self.scheduler_poll_gap.observe(gap);
         if !world.tick.is_multiple_of(30) {
             return;
         }
-        let peers:Vec<_>=world.sessions.values().map(|s|json!({"player_id":s.player.map(|id|id.0),"phase":format!("{:?}",s.phase),"epoch":s.epoch,"traffic":s.traffic,"input_ring":s.inputs.len()})).collect();
-        let parked = world
+        let peers:Vec<_>=sessions.peers.values().map(|s|json!({"player_id":s.player.map(|id|id.0),"phase":format!("{:?}",s.phase),"epoch":s.epoch,"traffic":s.traffic,"input_ring":s.inputs.len()})).collect();
+        let parked = systems
             .population
             .pools
             .values()
-            .filter(|p| **p == crate::population::VehiclePool::Parked)
+            .filter(|p| **p == crate::systems::population::VehiclePool::Parked)
             .count();
-        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":world.sessions.len(),"traffic":world.population.traffic.len(),"parked":parked,"pedestrians":world.population.pedestrians.len(),"police":world.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":world.population.metrics.path_jobs,"max_path_jobs_per_tick":world.population.metrics.max_path_jobs_per_tick,"blocked_spawns":world.population.metrics.blocked_spawns},"queues":queues,"peers":peers});
+        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":sessions.peers.len(),"traffic":systems.population.traffic.len(),"parked":parked,"pedestrians":systems.population.pedestrians.len(),"police":systems.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":systems.population.metrics.path_jobs,"max_path_jobs_per_tick":systems.population.metrics.max_path_jobs_per_tick,"blocked_spawns":systems.population.metrics.blocked_spawns},"queues":queues,"peers":peers});
     }
     pub fn route(
         &mut self,
@@ -193,6 +214,24 @@ impl Control {
                         }),
                     },
                     Err(_) => Reply::error(503, "profile storage temporarily unavailable"),
+                }
+            }
+            "/api/appearance" => {
+                let Ok(request) = serde_json::from_slice::<Appearance>(body) else {
+                    return Reply::error(400, "expected an RGB T-shirt colour");
+                };
+                if self.profiles.profile(cookie).is_none() {
+                    return Reply::error(401, "guest session required");
+                }
+                match self
+                    .profiles
+                    .update_tshirt_colour(cookie, request.tshirt_colour)
+                {
+                    Ok(profile) => Reply::new(
+                        if profile.is_some() { 200 } else { 202 },
+                        json!({"pending":profile.is_none(), "profile":profile}),
+                    ),
+                    Err(_) => Reply::error(503, "appearance storage unavailable"),
                 }
             }
             "/api/join-ticket" => {

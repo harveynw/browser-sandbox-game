@@ -435,7 +435,7 @@ select {
   accent-color: #bce8da;
 }
 
-.game-debug-cross {
+.game-crosshair {
   position: fixed;
   z-index: 1;
   left: 50%;
@@ -444,24 +444,6 @@ select {
   height: 20px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-}
-.game-debug-cross::before,
-.game-debug-cross::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  background: #32ff72;
-  box-shadow: 0 0 2px #071e12;
-}
-.game-debug-cross::before {
-  width: 20px;
-  height: 2px;
-}
-.game-debug-cross::after {
-  width: 2px;
-  height: 20px;
 }
 
 .city-minimap {
@@ -560,13 +542,40 @@ select {
   font-size: 14px;
 }
 .game-menu input[type="text"],
-.player-name input {
+.player-name input:not([type="color"]) {
   width: 170px;
   padding: 8px;
   border: 1px solid #719c96;
   background: #1e3a44;
   border-radius: 4px;
   color: var(--paper);
+}
+.player-name input[type="color"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--sea);
+  border-radius: 0.3rem;
+  background: transparent;
+  overflow: hidden;
+  cursor: pointer;
+}
+.player-name input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.player-name input[type="color"]::-webkit-color-swatch {
+  border: 0;
+}
+.player-name input[type="color"]::-moz-color-swatch {
+  border: 0;
+}
+.player-name input[type="color"]:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
 }
 .game-menu select {
   max-width: 215px;
@@ -647,20 +656,6 @@ select {
   left: 204px;
   min-width: 220px;
 }
-.hud-prompt {
-  position: absolute;
-  bottom: 124px;
-  left: 204px;
-  max-width: min(520px, calc(100vw - 240px));
-  color: var(--sea);
-}
-.hud-tutorial {
-  position: absolute;
-  bottom: 212px;
-  left: 204px;
-  max-width: 420px;
-  border-left: 3px solid var(--sea);
-}
 .hud-warning {
   position: absolute;
   top: 180px;
@@ -683,7 +678,7 @@ select {
   left: auto;
   right: 12px;
 }
-.game-debug-cross {
+.game-crosshair {
   width: 16px;
   height: 16px;
   color: #fff1d3;
@@ -691,19 +686,6 @@ select {
   text-align: center;
   line-height: 14px;
   text-shadow: 0 1px 3px #102831;
-}
-.game-debug-cross::before,
-.game-debug-cross::after {
-  background: #fff1d3;
-  box-shadow: 0 1px 3px #102831;
-}
-.game-debug-cross::before {
-  width: 12px;
-  height: 1px;
-}
-.game-debug-cross::after {
-  width: 1px;
-  height: 12px;
 }
 .city-map-panel {
   position: fixed;
@@ -794,20 +776,6 @@ select {
     width: 132px !important;
     height: 132px !important;
   }
-  .hud-prompt {
-    left: 18px;
-    bottom: 116px;
-    max-width: calc(100vw - 176px);
-    font-size: 16px;
-    padding: 8px 10px;
-  }
-  .hud-tutorial {
-    left: 18px;
-    right: 18px;
-    bottom: 266px;
-    max-width: none;
-    font-size: 15px;
-  }
   .hud-warning {
     top: 230px;
     left: 18px;
@@ -827,9 +795,6 @@ select {
   }
 }
 @media (max-height: 550px) {
-  .hud-tutorial {
-    display: none;
-  }
   .hud-objective {
     max-height: 110px;
     overflow: hidden;
@@ -845,9 +810,6 @@ select {
 .city-map-panel canvas {
   box-sizing: border-box;
 }
-.hud-tutorial {
-  font-size: 16px;
-}
 
 @media (max-width: 420px) {
   .game-menu label,
@@ -857,4 +819,65 @@ select {
   .game-menu select {
     max-width: 100%;
   }
+}
+
+/* Stack the two native disclosure panels so expanded diagnostics never overlap controls. */
+.game-panels {
+  position: fixed;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+}
+.game-panels > .game-metrics {
+  position: relative;
+  inset: auto;
+  flex-shrink: 0;
+  max-width: 100%;
+  max-height: calc(100dvh - 100px);
+}
+.control-groups {
+  padding: 0 12px 12px;
+}
+.control-groups h3 {
+  margin: 12px 0 6px;
+  color: #a8d9df;
+  font: inherit;
+  font-weight: 600;
+}
+.control-groups dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 8px 12px;
+  margin: 0;
+  align-items: baseline;
+}
+.control-groups dt,
+.control-groups dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.control-groups kbd {
+  font: inherit;
+  color: #edf5fa;
+  background: #1e333e;
+  border: 1px solid #506779;
+  border-radius: 3px;
+  padding: 2px 5px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.control-context {
+  margin: 0 12px 12px;
+  padding-top: 10px;
+  border-top: 1px solid #506779;
+  color: #bce8da;
+  white-space: pre-line;
+  font: inherit;
 }

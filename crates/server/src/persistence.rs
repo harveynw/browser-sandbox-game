@@ -26,6 +26,11 @@ pub enum Command {
     Name {
         profile: String,
         name: String,
+        tshirt_colour: u32,
+    },
+    TshirtColour {
+        profile: String,
+        colour: u32,
     },
     Economic {
         profile: String,
@@ -196,7 +201,7 @@ fn open(path: &Path) -> Result<Connection, String> {
     let version: i64 = c
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .map_err(|e| e.to_string())?;
-    if version > 1 {
+    if version > 2 {
         return Err("profile database schema is newer than this server".into());
     }
     let tx = c
@@ -205,6 +210,10 @@ fn open(path: &Path) -> Result<Connection, String> {
     if version == 0 {
         tx.execute_batch(include_str!("../migrations/001_profiles.sql"))
             .map_err(|e| format!("profile migration: {e}"))?;
+    }
+    if version < 2 {
+        tx.execute_batch(include_str!("../migrations/002_tshirt_colour.sql"))
+            .map_err(|e| format!("profile appearance migration: {e}"))?;
     }
     let migrations: i64 = tx
         .query_row(
@@ -246,10 +255,11 @@ impl From<rusqlite::Error> for DbError {
 }
 fn profile(c: &Connection, id: &str) -> Result<ProfileView, DbError> {
     Ok(c.query_row(
-        "SELECT profile_id,display_name,credits,completed_jobs FROM profiles WHERE profile_id=?1",
+        "SELECT profile_id,display_name,credits,completed_jobs,tshirt_colour FROM profiles WHERE profile_id=?1",
         [id],
         |r| {
             Ok(ProfileView {
+ tshirt_colour: protocol::TshirtColour(r.get(4)?),
                 profile_id: OpaqueId(r.get(0)?),
                 display_name: DisplayName(r.get(1)?),
                 credits: Credits(r.get(2)?),
@@ -270,10 +280,24 @@ fn execute(c: &mut Connection, cmd: &Command) -> Result<ProfileView, DbError> {
             )?;
             profile(&tx, &id)?
         }
-        Command::Name { profile: id, name } => {
+        Command::Name {
+            profile: id,
+            name,
+            tshirt_colour,
+        } => {
             tx.execute(
-                "UPDATE profiles SET display_name=?1,updated_at_unix_ms=?2 WHERE profile_id=?3",
-                params![name, now(), id],
+                "UPDATE profiles SET display_name=?1,updated_at_unix_ms=?2,tshirt_colour=?4 WHERE profile_id=?3",
+                params![name, now(), id, tshirt_colour],
+            )?;
+            profile(&tx, id)?
+        }
+        Command::TshirtColour {
+            profile: id,
+            colour,
+        } => {
+            tx.execute(
+                "UPDATE profiles SET tshirt_colour=?1,updated_at_unix_ms=?2 WHERE profile_id=?3",
+                params![colour, now(), id],
             )?;
             profile(&tx, id)?
         }

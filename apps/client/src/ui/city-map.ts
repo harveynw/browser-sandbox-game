@@ -1,4 +1,8 @@
-import { findRoute, type LoadedPackage } from "@port-meridian/content";
+import {
+  findRoute,
+  type LoadedPackage,
+  type Primitive,
+} from "@port-meridian/content";
 import type { CharacterMotor } from "@port-meridian/protocol";
 import type { RenderActor } from "../world/replica";
 export interface MapView {
@@ -18,6 +22,24 @@ export function mapPoint(
 }
 export function zoomMap(view: MapView, factor: number): MapView {
   return { ...view, zoom: Math.max(1, Math.min(8, view.zoom * factor)) };
+}
+/** Match the world's surface priority independently of street authoring order. */
+export function mapDrawOrder(primitives: readonly Primitive[]): Primitive[] {
+  const layer = (p: Primitive) => {
+    switch (p.role) {
+      case "ground":
+        return 0;
+      case "sidewalk":
+        return 1;
+      case "road":
+        return 2;
+      case "marking":
+        return 3;
+      default:
+        return 4;
+    }
+  };
+  return [...primitives].sort((a, b) => layer(a) - layer(b));
 }
 /** Local presentation only. Markers come from authored zones or current public replicas. */
 export class CityMap {
@@ -203,7 +225,7 @@ export class CityMap {
     if (ctx) {
       ctx.fillStyle = "#18343c";
       ctx.fillRect(0, 0, 1024, 1024);
-      for (const p of assets.minimap.primitives) {
+      for (const p of mapDrawOrder(assets.minimap.primitives)) {
         ctx.fillStyle =
           p.role === "building"
             ? "#b9a38d"

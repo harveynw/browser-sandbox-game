@@ -103,7 +103,6 @@ async fn run_transport(profile: LossProfile) -> Result {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let address = listener.local_addr()?;
     drop(listener);
-    let mut transport = NetCrateTransport::start(&address.to_string())?;
     let stop = Arc::new(AtomicBool::new(false));
     let stopping = stop.clone();
     let (tx, rx) = std::sync::mpsc::sync_channel(16);
@@ -114,7 +113,9 @@ async fn run_transport(profile: LossProfile) -> Result {
     let replaced = Arc::new(AtomicUsize::new(0));
     let coalesced = replaced.clone();
     let worker = thread::spawn(move || {
+        let mut transport = Network::start(&address.to_string()).expect("transport start");
         while !stopping.load(Ordering::Relaxed) {
+            transport.poll();
             while let Ok((old, ack)) = command_rx.try_recv() {
                 let message = ServerEnvelope {
                     v: ProtocolVersion(3),
@@ -173,6 +174,7 @@ async fn run_transport(profile: LossProfile) -> Result {
                     _ => {}
                 }
             }
+            transport.flush();
             thread::sleep(Duration::from_millis(2));
         }
     });

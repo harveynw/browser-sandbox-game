@@ -48,6 +48,13 @@ integer!(BaselineId, u32, 1, u32::MAX, "number");
 integer!(RequestId, u32, 1, u32::MAX, "number");
 integer!(EventId, u32, 1, u32::MAX, "number");
 integer!(Revision, u32, 1, u32::MAX, "number");
+// Packed RGB colour, shared by profile storage and player appearance.
+integer!(TshirtColour, u32, 0, 0xffffff, "number");
+impl Default for TshirtColour {
+    fn default() -> Self {
+        Self(0xe4a25b)
+    }
+}
 integer!(Credits, u32, 0, 1_000_000_000, "number");
 integer!(InputAxis, i16, -32767, 32767, "number");
 integer!(Buttons, u8, 0, 15, "number");
@@ -198,6 +205,8 @@ wire_struct!(ClientHello {
     sim_config_hash: ContentHash,
     join_ticket: OpaqueId,
     display_name: DisplayName,
+    #[serde(default)]
+    tshirt_colour: TshirtColour,
 });
 wire_struct!(ClientReady {
     baseline_id: BaselineId
@@ -292,6 +301,8 @@ wire_struct!(ProfileView {
     display_name: DisplayName,
     credits: Credits,
     completed_jobs: u32,
+    #[serde(default)]
+    tshirt_colour: TshirtColour,
 });
 wire_struct!(BaselineBegin {
     baseline_id: BaselineId,
@@ -329,6 +340,8 @@ wire_struct!(Snapshot {
 wire_struct!(EntityDescriptor {
     id: EntityId, entity_kind: EntityKind, template_id: TemplateId,
     display_name: Option<DisplayName>,
+    #[serde(default)]
+    tshirt_colour: Option<TshirtColour>,
 });
 string_enum!(EntityKind {
     Player,

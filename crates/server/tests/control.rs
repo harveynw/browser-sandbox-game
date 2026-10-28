@@ -1,12 +1,6 @@
 use protocol::DisplayName;
-use server::{
-    admission::Profiles,
-    content_loader::WorldContent,
-    control::Control,
-    scheduler::{STEP, Scheduler},
-    world::World,
-};
-use std::{path::Path, time::Duration};
+use server::{admission::Profiles, content_loader::WorldContent, control::Control, world::World};
+use std::path::Path;
 #[test]
 fn tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret() {
     let mut a = Profiles::default();
@@ -186,14 +180,70 @@ fn localhost_origin_cookie_json_and_expiring_readiness_gates_are_explicit() {
         503
     );
 }
+
 #[test]
-fn scheduler_caps_catchup_drops_wall_time_and_keeps_contiguous_fixed_steps() {
-    let mut s = Scheduler::default();
-    assert_eq!(s.advance(Duration::ZERO), (0, false));
-    assert_eq!(s.advance(STEP), (1, false));
-    assert_eq!(s.advance(Duration::from_secs(10)), (5, false));
-    assert_eq!(s.advance(Duration::ZERO), (0, false));
-    assert_eq!(s.advance(Duration::from_secs(10)), (5, false));
-    assert_eq!(s.advance(Duration::from_secs(10)), (5, true));
-    assert_eq!(s.advance(STEP), (1, false));
+fn appearance_requires_guest_cookie_origin_and_valid_rgb_without_touching_other_profiles() {
+    let content = WorldContent::load(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
+    )
+    .unwrap();
+    let mut control = Control::new(&World::new(content).unwrap());
+    let (old, cookie) = control.profiles.session(None).unwrap();
+    let cookie = cookie.unwrap();
+    let (other, other_cookie) = control.profiles.session(None).unwrap();
+    let request = br#"{"tshirt_colour":2272358}"#;
+    assert_eq!(
+        control
+            .route("POST", "/api/appearance", None, Some(&cookie), request, 0)
+            .code,
+        403
+    );
+    assert_eq!(
+        control
+            .route(
+                "POST",
+                "/api/appearance",
+                Some("http://localhost:4173"),
+                None,
+                request,
+                0
+            )
+            .code,
+        401
+    );
+    for invalid in [
+        br#"{"tshirt_colour":-1}"#.as_slice(),
+        br#"{"tshirt_colour":16777216}"#,
+        br#"{"tshirt_colour":1,"profile_id":"other"}"#,
+    ] {
+        assert_eq!(
+            control
+                .route(
+                    "POST",
+                    "/api/appearance",
+                    Some("http://localhost:4173"),
+                    Some(&cookie),
+                    invalid,
+                    0
+                )
+                .code,
+            400
+        );
+    }
+    let reply = control.route(
+        "POST",
+        "/api/appearance",
+        Some("http://localhost:4173"),
+        Some(&cookie),
+        request,
+        0,
+    );
+    assert_eq!(reply.code, 200);
+    assert_eq!(reply.body["profile"]["tshirt_colour"], 2272358);
+    let updated = control.profiles.profile(Some(&cookie)).unwrap();
+    assert_eq!(updated.display_name, old.display_name);
+    assert_eq!(
+        control.profiles.profile(other_cookie.as_deref()).unwrap(),
+        other
+    );
 }

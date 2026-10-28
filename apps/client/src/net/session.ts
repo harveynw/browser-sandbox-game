@@ -19,6 +19,8 @@ import { ReplicaStore } from "../world/replica";
 import type { PredictionWorld } from "../simulation/bridge";
 
 export interface SessionEvents {
+  tshirtColour?: (colour: number) => void;
+  appearanceError?: () => void;
   worldEvent?: (event: WorldEvent, own: boolean) => void;
   assets?: (assets: LoadedPackage, queries: PredictionWorld) => void;
   owner?: (owner: OwnerState) => void;
@@ -95,6 +97,9 @@ export class GameSession {
   private player = 0;
   private controlled = 0;
   private driving = false;
+  private requestedColour: number | undefined;
+  private savedColour: number;
+  private savingColour = false;
   private requestId = 0;
   private actionAt = -Infinity;
   actionMessage = "";
@@ -106,7 +111,9 @@ export class GameSession {
     private readonly status: (text: string) => void,
     private readonly events: SessionEvents = {},
     private readonly displayName = "Local Player",
+    private readonly tshirtColour = 0xe4a25b,
   ) {
+    this.savedColour = tshirtColour;
     this.transport.onBytes((channel, bytes) => this.receive(channel, bytes));
     this.transport.onClose((reason) => {
       this.phase = "closed";
@@ -125,6 +132,50 @@ export class GameSession {
       this.status(`Closed: ${reason}`);
       this.log(`Closed: ${reason}`);
     });
+  }
+  /** Pausing only releases input; the live session can still save cosmetic changes. */
+  updateTshirtColour(colour: number): void {
+    if (
+      this.phase !== "playing" ||
+      !Number.isInteger(colour) ||
+      colour < 0 ||
+      colour > 0xffffff
+    )
+      return;
+    this.requestedColour = colour;
+    if (!this.savingColour) void this.saveTshirtColour();
+  }
+  private async saveTshirtColour(): Promise<void> {
+    this.savingColour = true;
+    try {
+      // Coalesce colour-picker drags; serialize writes so the last selection wins.
+      while (this.requestedColour !== undefined && this.phase === "playing") {
+        const colour = this.requestedColour;
+        this.requestedColour = undefined;
+        if (colour === this.savedColour) continue;
+        const result = await this.api("/api/appearance", {
+          tshirt_colour: colour,
+        });
+        if (
+          !result ||
+          typeof result !== "object" ||
+          !("profile" in result) ||
+          !result.profile ||
+          typeof result.profile !== "object" ||
+          !("tshirt_colour" in result.profile) ||
+          result.profile.tshirt_colour !== colour
+        )
+          throw new Error("Appearance save was not confirmed");
+        this.savedColour = colour;
+      }
+    } catch (error) {
+      if (!this.abort.signal.aborted) {
+        this.log(`T-shirt colour save failed: ${String(error)}`);
+        this.events.appearanceError?.();
+      }
+    } finally {
+      this.savingColour = false;
+    }
   }
   private async api(path: string, body: unknown = {}): Promise<unknown> {
     const deadline = performance.now() + 5000;
@@ -307,6 +358,7 @@ export class GameSession {
         sim_config_hash: info.sim_config_hash,
         join_ticket: this.ticket,
         display_name: this.displayName,
+        tshirt_colour: this.tshirtColour,
       },
     });
     this.ticket = undefined;
@@ -340,6 +392,8 @@ export class GameSession {
       this.session = envelope.session_id;
       this.lastMessageAt = performance.now();
       this.player = message.data.player_id;
+      this.savedColour = message.data.profile.tshirt_colour;
+      this.events.tshirtColour?.(message.data.profile.tshirt_colour);
       this.phase = "loading";
       this.events.phase?.("loading");
       this.observeTick(message.data.server_tick);
@@ -381,6 +435,13 @@ export class GameSession {
           throw new Error("Duplicate visible entity");
         this.shown.add(message.data.descriptor.id);
         this.replicas.show(message.data, performance.now());
+        if (
+          message.data.descriptor.id === this.player &&
+          message.data.descriptor.tshirt_colour != null
+        ) {
+          this.savedColour = message.data.descriptor.tshirt_colour;
+          this.events.tshirtColour?.(message.data.descriptor.tshirt_colour);
+        }
         break;
       case "entity_hide":
         this.shown.delete(message.data.entity_id);

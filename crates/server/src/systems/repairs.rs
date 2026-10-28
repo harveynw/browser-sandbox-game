@@ -1,7 +1,8 @@
-//! Repair reservation, authoritative dwell and queued debit/refund completion.
+use crate::admission::{EconomicError, Profiles};
 use crate::{
-    admission::{EconomicError, Profiles},
-    world::{Session, SessionPhase, World},
+    sessions::{Session, SessionPhase, Sessions},
+    systems::{missions::MissionSystem, police::PoliceSystem},
+    world::World,
 };
 use protocol::*;
 use std::collections::BTreeMap;
@@ -38,15 +39,28 @@ impl PendingRepair {
         }
     }
 }
-impl World {
-    fn repair_eligible(&self, s: &Session, car: u32, zone: &str, epoch: u32) -> bool {
+
+#[derive(Default)]
+pub struct RepairSystem {
+    pub(crate) pending: BTreeMap<String, PendingRepair>,
+}
+
+impl RepairSystem {
+    pub(crate) fn repair_eligible(
+        s: &Session,
+        car: u32,
+        zone: &str,
+        epoch: u32,
+        world: &World,
+        police: &PoliceSystem,
+    ) -> bool {
         let Some(id) = s.player else {
             return false;
         };
-        let Some(player) = self.players.get(&id.0) else {
+        let Some(player) = world.players.get(&id.0) else {
             return false;
         };
-        let Some(v) = self.vehicles.get(&car) else {
+        let Some(v) = world.vehicles.get(&car) else {
             return false;
         };
         s.phase == SessionPhase::Playing
@@ -58,10 +72,10 @@ impl World {
             && v.state.health.0 > 0
             && v.state.health.0 < v.template.health
             && !v.state.disabled
-            && s.wanted.heat == 0
-            && s.wanted.pursuit == Pursuit::Clear
+            && police.wanted(s.player_id()).heat == 0
+            && police.wanted(s.player_id()).pursuit == Pursuit::Clear
             && v.state.motor.speed.0.abs() < 0.5
-            && self.content.manifest.zones.iter().any(|z| {
+            && world.content.manifest.zones.iter().any(|z| {
                 z.id == zone
                     && z.kind == content::ZoneKind::Repair
                     && distance(
@@ -75,29 +89,33 @@ impl World {
         s: &mut Session,
         request: &Repair,
         request_id: u32,
+        world: &mut World,
+        police: &mut PoliceSystem,
+        missions: &mut MissionSystem,
     ) -> ActionCode {
         let Some(profile) = &s.profile else {
             return ActionCode::NotReady;
         };
         let profile = profile.profile_id.0.clone();
-        if self.repairs.len() >= 32 {
+        if self.pending.len() >= 32 {
             return ActionCode::Unavailable;
         }
-        if self.repairs.contains_key(&profile)
-            || s.mission
+        if self.pending.contains_key(&profile)
+            || missions
+                .mission(s.player_id())
                 .as_ref()
-                .is_some_and(|m| m.phase == crate::missions::Phase::RewardPending)
+                .is_some_and(|m| m.phase == crate::systems::missions::Phase::RewardPending)
         {
             return ActionCode::AlreadyActive;
         }
         let id = s.player.expect("repair player");
-        let Some(car) = self.players[&id.0].state.vehicle_id.map(|id| id.0) else {
+        let Some(car) = world.players[&id.0].state.vehicle_id.map(|id| id.0) else {
             return ActionCode::InvalidTarget;
         };
-        if self.repairs.values().any(|r| r.car == car) {
+        if self.pending.values().any(|r| r.car == car) {
             return ActionCode::AlreadyActive;
         }
-        let Some(zone) = self
+        let Some(zone) = world
             .content
             .manifest
             .zones
@@ -107,19 +125,21 @@ impl World {
             return ActionCode::InvalidTarget;
         };
         if distance(
-            self.vehicles[&car].state.motor.position.0.map(|v| v.0),
+            world.vehicles[&car].state.motor.position.0.map(|v| v.0),
             zone.center.map(|v| v as f32),
         ) > zone.radius as f32
         {
             return ActionCode::OutOfRange;
         }
-        if self.vehicles[&car].state.motor.speed.0.abs() >= 0.5 {
+        if world.vehicles[&car].state.motor.speed.0.abs() >= 0.5 {
             return ActionCode::TooFast;
         }
-        if s.wanted.heat > 0 || s.wanted.pursuit != Pursuit::Clear {
+        if police.wanted(s.player_id()).heat > 0
+            || police.wanted(s.player_id()).pursuit != Pursuit::Clear
+        {
             return ActionCode::PursuitActive;
         }
-        if !self.repair_eligible(s, car, &request.zone_id.0, s.epoch) {
+        if !RepairSystem::repair_eligible(s, car, &request.zone_id.0, s.epoch, world, police) {
             return ActionCode::Unavailable;
         }
         if s.profile.as_ref().expect("repair profile").credits.0 < 50 {
@@ -143,31 +163,39 @@ impl World {
         s.repair_view = Some(pending.view());
         s.repair_clear = None;
         s.status_dirty = true;
-        self.repairs.insert(profile, pending);
+        self.pending.insert(profile, pending);
         ActionCode::Ok
     }
-    pub(crate) fn advance_repairs(&mut self, profiles: &mut Profiles) -> Result<(), String> {
+    pub(crate) fn update(
+        &mut self,
+        profiles: &mut Profiles,
+        world: &mut World,
+        sessions: &mut Sessions,
+        police: &mut PoliceSystem,
+    ) -> Result<(), String> {
         let mut results: BTreeMap<_, _> = profiles
-            .poll_economic(self.tick)
+            .poll_economic(world.tick)
             .into_iter()
             .map(|r| (r.event, r.result))
             .collect();
-        for s in self.sessions.values_mut() {
-            if s.repair_clear.is_some_and(|end| self.tick >= end) {
+        for s in sessions.peers.values_mut() {
+            if s.repair_clear.is_some_and(|end| world.tick >= end) {
                 s.repair_view = None;
                 s.repair_clear = None;
                 s.status_dirty = true;
             }
         }
-        for profile in self.repairs.keys().cloned().collect::<Vec<_>>() {
-            let mut r = self.repairs.remove(&profile).expect("pending repair");
-            let eligible = self
-                .sessions
+        for profile in self.pending.keys().cloned().collect::<Vec<_>>() {
+            let mut r = self.pending.remove(&profile).expect("pending repair");
+            let eligible = sessions
+                .peers
                 .values()
                 .find(|s| {
                     s.id.as_deref() == Some(&r.session) && s.player == Some(EntityId(r.player))
                 })
-                .is_some_and(|s| self.repair_eligible(s, r.car, &r.zone, r.epoch));
+                .is_some_and(|s| {
+                    RepairSystem::repair_eligible(s, r.car, &r.zone, r.epoch, world, police)
+                });
             if !eligible {
                 r.invalidated = true;
             }
@@ -188,7 +216,8 @@ impl World {
                         r.queued = false;
                         match result {
                             Ok(_) if eligible && !r.invalidated => {
-                                let v = self.vehicles.get_mut(&r.car).expect("eligible repair car");
+                                let v =
+                                    world.vehicles.get_mut(&r.car).expect("eligible repair car");
                                 v.state.health = VehicleHealth(v.template.health);
                                 v.idle_ticks = 0;
                                 profiles.finish_repair_debit(&profile, &r.event);
@@ -235,14 +264,14 @@ impl World {
                         &profile,
                         &r.operation(),
                         r.phase == RepairPhase::RefundPending,
-                        self.tick,
+                        world.tick,
                     )
                     .is_ok();
                 if !r.queued {
                     r.code = ActionCode::Unavailable;
                 }
             }
-            for s in self.sessions.values_mut().filter(|s| {
+            for s in sessions.peers.values_mut().filter(|s| {
                 s.profile
                     .as_ref()
                     .is_some_and(|p| p.profile_id.0 == profile)
@@ -254,23 +283,24 @@ impl World {
                     s.status_dirty = true;
                 }
                 let view = r.view();
-                if (!pending || r.phase != RepairPhase::Dwell || self.tick.is_multiple_of(6))
+                if (!pending || r.phase != RepairPhase::Dwell || world.tick.is_multiple_of(6))
                     && s.repair_view.as_ref() != Some(&view)
                 {
                     s.repair_view = Some(view);
                     s.status_dirty = true;
                 }
                 if !pending {
-                    s.repair_clear = Some(self.tick.saturating_add(150));
+                    s.repair_clear = Some(world.tick.saturating_add(150));
                 }
             }
             if pending {
-                self.repairs.insert(profile, r);
+                self.pending.insert(profile, r);
             }
         }
         Ok(())
     }
 }
+
 fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
     (0..3).map(|i| (a[i] - b[i]).powi(2)).sum::<f32>().sqrt()
 }

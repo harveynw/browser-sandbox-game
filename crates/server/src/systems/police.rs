@@ -1,14 +1,16 @@
-//! Server observations, private wanted state and bounded road-following police.
+use crate::entities::vehicle::Vehicle;
+use crate::systems::population::{Navigation, Observer, hidden};
 use crate::{
-    population::{Navigation, Observer, hidden},
-    vehicles::Vehicle,
-    world::{SessionPhase, World},
+    replication::Replication,
+    sessions::{SessionPhase, Sessions},
+    systems::{combat::CombatSystem, missions::MissionSystem, population::PopulationSystem},
+    world::World,
 };
 use protocol::*;
-use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
+use sim_core::CollisionWorld;
+use sim_core::{CollisionQueries, QueryFilter};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::result::Result;
-
 pub const POLICE_CAP: usize = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum CrimeId {
@@ -126,7 +128,8 @@ pub struct Unit {
     wreck_until: Option<u32>,
     patrol_leg: usize,
 }
-pub struct Police {
+pub struct PoliceSystem {
+    pub(crate) wanted: BTreeMap<u32, Wanted>,
     pub units: BTreeMap<u32, Unit>,
     pub(crate) secured: BTreeSet<u32>,
     road: Navigation,
@@ -135,10 +138,11 @@ pub struct Police {
     cursor: usize,
     crimes: BTreeMap<(u32, CrimeId), [f32; 3]>,
 }
-impl Police {
+impl PoliceSystem {
     pub fn new(manifest: &content::WorldManifest) -> Self {
         Self {
             units: BTreeMap::new(),
+            wanted: BTreeMap::new(),
             secured: BTreeSet::new(),
             road: Navigation::new(&manifest.road_graph, false),
             // The regression map has no police population.
@@ -191,18 +195,18 @@ fn sight(collision: &CollisionWorld, from: [f32; 3], to: [f32; 3], limit: f32) -
             .raycast(a, delta, length, QueryFilter::VISION)
             .is_ok_and(|hit| hit.is_none_or(|h| h.distance >= length - 0.1))
 }
-impl World {
-    /// Called only by successful authoritative actions/damage. Multiple stimuli from
-    /// one causal event share an ID and produce at most one wanted observation.
+
+impl PoliceSystem {
     pub(crate) fn report_crime(
         &mut self,
         actor: u32,
         cause: CrimeId,
         kind: CrimeKind,
         at: [f32; 3],
+        world: &mut World,
     ) {
-        let witnessed = self.police.units.keys().any(|id| {
-            let car = &self.vehicles[id];
+        let witnessed = self.units.keys().any(|id| {
+            let car = &world.vehicles[id];
             // A police car struck by a fatal hit still reports that causal hit.
             if matches!(kind, CrimeKind::PoliceCar(target) if target == *id) {
                 return true;
@@ -213,40 +217,42 @@ impl World {
             let p = car.state.motor.position.0.map(|v| v.0);
             match kind {
                 CrimeKind::Shot => distance(p, at) <= 80.0,
-                CrimeKind::Theft => sight(&self.collision, p, at, 50.0),
-                CrimeKind::Harm => sight(&self.collision, p, at, 60.0),
+                CrimeKind::Theft => sight(&world.collision, p, at, 50.0),
+                CrimeKind::Harm => sight(&world.collision, p, at, 60.0),
                 CrimeKind::PoliceCar(_) => false,
             }
         });
         if witnessed
-            && self.police.crimes.len() < 256
-            && let Some(player) = self.players.get(&actor)
+            && self.crimes.len() < 256
+            && let Some(player) = world.players.get(&actor)
         {
-            self.police
-                .crimes
+            self.crimes
                 .entry((actor, cause))
                 .or_insert(player.state.motor.position.0.map(|v| v.0));
         }
     }
-    pub(crate) fn direct_police(
+    pub(crate) fn spawn_patrols(
         &mut self,
         tick: u32,
         observers: &[Observer],
+        world: &mut World,
+        sessions: &mut Sessions,
+        combat: &mut CombatSystem,
     ) -> Result<(), String> {
-        if !self.police.enabled {
+        if !self.enabled {
             return Ok(());
         }
-        let initializing = !self.police.initialized;
-        self.police.initialized = true;
-        let wanted: Vec<_> = self
-            .sessions
+        let initializing = !self.initialized;
+        self.initialized = true;
+        let wanted: Vec<_> = sessions
+            .peers
             .values()
             .filter(|s| s.phase == SessionPhase::Playing)
-            .filter_map(|s| s.player.map(|id| (id.0, s.wanted.heat)))
+            .filter_map(|s| s.player.map(|id| (id.0, self.wanted(s.player_id()).heat)))
             .filter(|(id, heat)| {
                 *heat > 0
                     && matches!(
-                        self.players[id].state.mode,
+                        world.players[id].state.mode,
                         CharacterMode::OnFoot | CharacterMode::Driving
                     )
             })
@@ -254,12 +260,12 @@ impl World {
         // Rotate the first recipient every five seconds only when demand exceeds
         // supply. Allocate one unit per player before assigning second/third units.
         if tick.is_multiple_of(150) && !wanted.is_empty() {
-            self.police.cursor = (self.police.cursor + 1) % wanted.len();
+            self.cursor = (self.cursor + 1) % wanted.len();
         }
         let mut assignments = Vec::new();
         for level in 0..3 {
             for offset in 0..wanted.len() {
-                let (id, heat) = wanted[(offset + self.police.cursor) % wanted.len()];
+                let (id, heat) = wanted[(offset + self.cursor) % wanted.len()];
                 if heat > level && assignments.len() < POLICE_CAP {
                     assignments.push(id);
                 }
@@ -267,8 +273,8 @@ impl World {
         }
         let desired = assignments.len().max(2);
         let mut remove = Vec::new();
-        for (&id, u) in &mut self.police.units {
-            let car = &self.vehicles[&id];
+        for (&id, u) in &mut self.units {
+            let car = &world.vehicles[&id];
             let p = car.state.motor.position.0.map(|v| v.0);
             if distance(p, u.progress_position) >= 2.0 {
                 u.progress_position = p;
@@ -276,23 +282,23 @@ impl World {
             }
             if car.state.health.0 == 0 {
                 let until = *u.wreck_until.get_or_insert(tick.saturating_add(90));
-                if tick >= until && hidden(p, observers, &self.collision) {
+                if tick >= until && hidden(p, observers, &world.collision) {
                     remove.push(id);
                 }
             } else if tick.saturating_sub(u.progress_at) >= 450
-                && hidden(p, observers, &self.collision)
+                && hidden(p, observers, &world.collision)
             {
                 remove.push(id);
             }
         }
         for id in remove {
-            self.police.units.remove(&id);
-            self.vehicles.remove(&id);
-            self.combat.disabled.remove(&id);
-            self.combat.homes.remove(&id);
+            self.units.remove(&id);
+            world.vehicles.remove(&id);
+            combat.disabled.remove(&id);
+            combat.homes.remove(&id);
         }
         if initializing || tick.is_multiple_of(30) {
-            let template = self
+            let template = world
                 .content
                 .manifest
                 .vehicle_templates
@@ -300,16 +306,15 @@ impl World {
                 .find(|t| t.id == "compact")
                 .ok_or("police compact template missing")?
                 .clone();
-            while self.police.units.len() < desired {
-                let index = self.police.units.len();
+            while self.units.len() < desired {
+                let index = self.units.len();
                 // Replacing a retired Quay unit must not select Civic merely
                 // because one Civic unit remains. Balance actual home assignments.
                 let homes = [[-192.0, 0.0, 160.0], [0.0, 0.0, -160.0]];
                 let home = *homes
                     .iter()
                     .min_by_key(|home| {
-                        self.police
-                            .units
+                        self.units
                             .values()
                             .filter(|unit| unit.home == **home)
                             .count()
@@ -318,23 +323,24 @@ impl World {
                 let near = assignments
                     .get(index)
                     .and_then(|id| {
-                        self.sessions
+                        sessions
+                            .peers
                             .values()
                             .find(|s| s.player == Some(EntityId(*id)))
                     })
-                    .map_or(home, |s| s.wanted.last_known);
-                let mut candidates = self.police.road.candidates.clone();
+                    .map_or(home, |s| self.wanted(s.player_id()).last_known);
+                let mut candidates = self.road.candidates.clone();
                 candidates.sort_by(|a, b| distance(a.2, near).total_cmp(&distance(b.2, near)));
                 let spot = candidates.into_iter().find(|(_, _, p, yaw)| {
                     (initializing
                         || (observers.iter().all(|o| distance(*p, o.position) >= 40.0)
-                            && hidden(*p, observers, &self.collision)))
+                            && hidden(*p, observers, &world.collision)))
                         && distance(*p, near) < 180.0
-                        && self
+                        && world
                             .vehicles
                             .values()
                             .all(|v| distance(*p, v.state.motor.position.0.map(|v| v.0)) > 12.0)
-                        && !self
+                        && !world
                             .collision
                             .overlaps_vehicle(*p, *yaw, template.dimensions.map(|v| v as f32))
                             .unwrap_or(true)
@@ -342,9 +348,9 @@ impl World {
                 let Some((_, to, p, yaw)) = spot else {
                     break;
                 };
-                let id = self.next_entity;
-                self.next_entity = id.checked_add(1).ok_or("police entity IDs exhausted")?;
-                self.vehicles.insert(
+                let id = world.next_entity;
+                world.next_entity = id.checked_add(1).ok_or("police entity IDs exhausted")?;
+                world.vehicles.insert(
                     id,
                     Vehicle {
                         id: EntityId(id),
@@ -358,7 +364,7 @@ impl World {
                         },
                     },
                 );
-                self.police.units.insert(
+                self.units.insert(
                     id,
                     Unit {
                         target: None,
@@ -377,26 +383,25 @@ impl World {
         }
         // Retire surplus units only outside every player's static clear view.
         let surplus: Vec<_> = self
-            .police
             .units
             .keys()
             .copied()
             .skip(desired)
             .filter(|id| {
                 hidden(
-                    self.vehicles[id].state.motor.position.0.map(|v| v.0),
+                    world.vehicles[id].state.motor.position.0.map(|v| v.0),
                     observers,
-                    &self.collision,
+                    &world.collision,
                 )
             })
             .collect();
         for id in surplus {
-            self.police.units.remove(&id);
-            self.vehicles.remove(&id);
-            self.combat.disabled.remove(&id);
-            self.combat.homes.remove(&id);
+            self.units.remove(&id);
+            world.vehicles.remove(&id);
+            combat.disabled.remove(&id);
+            combat.homes.remove(&id);
         }
-        for (index, unit) in self.police.units.values_mut().enumerate() {
+        for (index, unit) in self.units.values_mut().enumerate() {
             let target = assignments.get(index).copied();
             if target != unit.target {
                 unit.target = target;
@@ -407,18 +412,24 @@ impl World {
         }
         Ok(())
     }
-    pub(crate) fn decide_police(
+    pub(crate) fn prepare_tick(
         &mut self,
         tick: u32,
         observers: &[Observer],
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
     ) -> Result<(), String> {
-        let targets: BTreeMap<_, _> = self
-            .sessions
+        let targets: BTreeMap<_, _> = sessions
+            .peers
             .values()
-            .filter_map(|s| s.player.map(|id| (id.0, s.wanted.last_known)))
+            .filter_map(|s| {
+                s.player
+                    .map(|id| (id.0, self.wanted(s.player_id()).last_known))
+            })
             .collect();
-        for (&id, unit) in &mut self.police.units {
-            let car = &self.vehicles[&id];
+        for (&id, unit) in &mut self.units {
+            let car = &world.vehicles[&id];
             let p = car.state.motor.position.0.map(|v| v.0);
             let planning = tick >= unit.next_plan;
             if car.state.health.0 == 0 || (!planning && !tick.is_multiple_of(6)) {
@@ -427,12 +438,12 @@ impl World {
             while unit
                 .route
                 .front()
-                .is_some_and(|n| distance(p, self.police.road.points[n]) < 5.0)
+                .is_some_and(|n| distance(p, self.road.points[n]) < 5.0)
             {
                 unit.route.pop_front();
             }
             let known = unit.target.and_then(|id| targets.get(&id)).copied();
-            self.collision.exclude_vehicle(Some(id));
+            world.collision.exclude_vehicle(Some(id));
             let direct = known
                 .filter(|target| distance(p, *target) <= 15.0)
                 .filter(|target| {
@@ -443,7 +454,8 @@ impl World {
                         0.0,
                         (target[2] - p[2]) * (1.0 - stop / d.max(stop)),
                     ];
-                    self.collision
+                    world
+                        .collision
                         .cast_vehicle(
                             p,
                             yaw_to(p, *target),
@@ -474,15 +486,11 @@ impl World {
                     }
                     Some([unit.home[0] + delta[0], 0.0, unit.home[2] + delta[2]])
                 });
-                let start = unit
-                    .route
-                    .front()
-                    .copied()
-                    .or_else(|| self.police.road.nearest(p));
-                let end = goal.and_then(|g| self.police.road.nearest(g));
+                let start = unit.route.front().copied().or_else(|| self.road.nearest(p));
+                let end = goal.and_then(|g| self.road.nearest(g));
                 unit.route = start
                     .zip(end)
-                    .map_or_else(VecDeque::new, |(a, b)| self.police.road.path(a, b));
+                    .map_or_else(VecDeque::new, |(a, b)| self.road.path(a, b));
             }
             if planning {
                 unit.next_plan = tick.saturating_add(15);
@@ -490,7 +498,7 @@ impl World {
             if !tick.is_multiple_of(6) {
                 continue;
             }
-            let target = direct.or_else(|| unit.route.front().map(|n| self.police.road.points[n]));
+            let target = direct.or_else(|| unit.route.front().map(|n| self.road.points[n]));
             let mut input = sim_core::neutral_input(tick, car.state.motor.yaw);
             let mut speed = 0.0;
             if let Some(target) = target {
@@ -518,7 +526,7 @@ impl World {
                 let sensor = (car.state.motor.speed.0.powi(2) / (2.0 * car.template.brake as f32)
                     + 0.1)
                     .max(0.2);
-                let cast = self.collision.cast_vehicle(
+                let cast = world.collision.cast_vehicle(
                     p,
                     car.state.motor.yaw.0,
                     car.template.dimensions.map(|v| v as f32),
@@ -528,7 +536,7 @@ impl World {
                     speed = 0.0;
                 }
                 for actor in observers.iter().map(|o| o.position).chain(
-                    self.population
+                    population
                         .pedestrians
                         .values()
                         .map(|p| p.state.motor.position.0.map(|v| v.0)),
@@ -550,43 +558,53 @@ impl World {
             unit.target_speed = speed;
             unit.input = input;
         }
-        self.collision.exclude_vehicle(None);
+        world.collision.exclude_vehicle(None);
         Ok(())
     }
-    pub(crate) fn advance_police(&mut self) -> Result<(), String> {
-        let crimes = std::mem::take(&mut self.police.crimes);
-        for peer in self.sessions.keys().copied().collect::<Vec<_>>() {
-            let mut s = self.sessions.remove(&peer).expect("police session");
+    pub(crate) fn finish_tick(
+        &mut self,
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        missions: &mut MissionSystem,
+    ) -> Result<(), String> {
+        let crimes = std::mem::take(&mut self.crimes);
+        for peer in sessions.peers.keys().copied().collect::<Vec<_>>() {
+            let mut s = sessions.peers.remove(&peer).expect("police session");
             if let Some(id) = s.player {
-                let player = &self.players[&id.0];
+                let player = &world.players[&id.0];
                 if matches!(
                     player.state.mode,
                     CharacterMode::Downed | CharacterMode::Arrested
                 ) || player.state.health.0 == 0
                 {
-                    if s.wanted.heat > 0 {
-                        s.wanted = Wanted::default();
+                    if self.wanted(s.player_id()).heat > 0 {
+                        *self.wanted_mut(s.player_id()) = Wanted::default();
                         s.status_dirty = true;
                     }
-                    self.police.release(id.0);
+                    self.release(id.0);
                 } else {
-                    let before = (s.wanted.heat, s.wanted.pursuit);
+                    let before = (
+                        self.wanted(s.player_id()).heat,
+                        self.wanted(s.player_id()).pursuit,
+                    );
                     for (&(actor, cause), &at) in &crimes {
                         if actor == id.0 {
-                            s.wanted.observe(cause, self.tick, at);
+                            self.wanted_mut(s.player_id())
+                                .observe(cause, world.tick, at);
                         }
                     }
                     let p = player
                         .state
                         .vehicle_id
-                        .map(|id| self.vehicles[&id.0].state.motor.position.0.map(|v| v.0))
+                        .map(|id| world.vehicles[&id.0].state.motor.position.0.map(|v| v.0))
                         .unwrap_or_else(|| player.state.motor.position.0.map(|v| v.0));
-                    let seen = self.tick.is_multiple_of(6)
-                        && self.police.units.keys().any(|unit| {
-                            let car = &self.vehicles[unit];
+                    let seen = world.tick.is_multiple_of(6)
+                        && self.units.keys().any(|unit| {
+                            let car = &world.vehicles[unit];
                             car.state.health.0 > 0
                                 && sight(
-                                    &self.collision,
+                                    &world.collision,
                                     car.state.motor.position.0.map(|v| v.0),
                                     p,
                                     70.0,
@@ -595,7 +613,7 @@ impl World {
                     let speed = player
                         .state
                         .vehicle_id
-                        .map(|id| self.vehicles[&id.0].state.motor.speed.0.abs())
+                        .map(|id| world.vehicles[&id.0].state.motor.speed.0.abs())
                         .unwrap_or_else(|| {
                             player
                                 .state
@@ -609,8 +627,8 @@ impl World {
                         });
                     let arrest = s.phase == SessionPhase::Playing
                         && speed < 0.5
-                        && self.police.units.iter().any(|(unit, u)| {
-                            let car = &self.vehicles[unit];
+                        && self.units.iter().any(|(unit, u)| {
+                            let car = &world.vehicles[unit];
                             let front = sim_core::anchor(
                                 &car.state.motor,
                                 [0.0, 0.0, -car.template.dimensions[2] / 2.0],
@@ -618,95 +636,138 @@ impl World {
                             u.target == Some(id.0)
                                 && car.state.health.0 > 0
                                 && distance(front, p) <= 3.0
-                                && sight(&self.collision, front, p, 3.0)
+                                && sight(&world.collision, front, p, 3.0)
                         });
-                    if s.wanted.advance(self.tick, seen.then_some(p), arrest) {
-                        self.arrest_player(peer, &mut s)?;
+                    if self
+                        .wanted_mut(s.player_id())
+                        .advance(world.tick, seen.then_some(p), arrest)
+                    {
+                        self.arrest_player(peer, &mut s, world, sessions, population, missions)?;
                     }
-                    s.status_dirty |= before != (s.wanted.heat, s.wanted.pursuit);
+                    s.status_dirty |= before
+                        != (
+                            self.wanted(s.player_id()).heat,
+                            self.wanted(s.player_id()).pursuit,
+                        );
                 }
             }
-            self.sessions.insert(peer, s);
+            sessions.peers.insert(peer, s);
         }
         Ok(())
     }
-    fn arrest_player(
+    pub(crate) fn arrest_player(
         &mut self,
         peer: crate::transport::PeerKey,
-        s: &mut crate::world::Session,
+        s: &mut crate::sessions::Session,
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        missions: &mut MissionSystem,
     ) -> Result<(), String> {
         let id = s.player.ok_or("arrest owner missing")?;
-        let car_id = self.players[&id.0].state.vehicle_id;
-        let mut position = Some(self.players[&id.0].state.motor.position.0.map(|v| v.0));
+        let car_id = world.players[&id.0].state.vehicle_id;
+        let mut position = Some(world.players[&id.0].state.motor.position.0.map(|v| v.0));
         if let Some(car) = car_id {
-            self.collision.exclude_vehicle(Some(car.0));
-            position =
-                crate::vehicles::safe_exit_with(&self.vehicles[&car.0], &self.collision, |p| {
-                    self.clear_spawn(p, Some(id.0))
-                });
-            self.collision.exclude_vehicle(None);
+            world.collision.exclude_vehicle(Some(car.0));
+            position = crate::entities::vehicle::safe_exit_with(
+                &world.vehicles[&car.0],
+                &world.collision,
+                |p| CombatSystem::clear_spawn(p, Some(id.0), world, population),
+            );
+            world.collision.exclude_vehicle(None);
             position = position.or_else(|| {
-                self.safe_spawn(
-                    self.vehicles[&car.0].state.motor.position.0.map(|v| v.0),
+                CombatSystem::safe_spawn(
+                    world.vehicles[&car.0].state.motor.position.0.map(|v| v.0),
                     Some(id.0),
+                    world,
+                    population,
                 )
             });
         }
         let Some(position) = position else {
             // Freeze pending arrest and retry safe ejection; never materialize in a wall.
             if let Some(car) = car_id {
-                self.vehicles.get_mut(&car.0).expect("arrest car").stop();
+                world.vehicles.get_mut(&car.0).expect("arrest car").stop();
             }
             s.inputs.clear();
-            if !s.wanted.arrest_pending {
-                s.wanted.arrest_pending = true;
-                s.weapon.reload_end = None;
-                s.weapon.protected_until = None;
-                if let Some(m) = &mut s.mission
-                    && m.phase == crate::missions::Phase::Active
+            if !self.wanted(s.player_id()).arrest_pending {
+                self.wanted_mut(s.player_id()).arrest_pending = true;
+                world
+                    .players
+                    .get_mut(&s.player_id())
+                    .expect("player equipment")
+                    .weapon
+                    .reload_end = None;
+                world
+                    .players
+                    .get_mut(&s.player_id())
+                    .expect("player equipment")
+                    .weapon
+                    .protected_until = None;
+                if let Some(m) = missions.mission_mut(s.player_id())
+                    && m.phase == crate::systems::missions::Phase::Active
                 {
-                    m.fail(self.tick);
+                    m.fail(world.tick);
                 }
                 s.status_dirty = true;
                 let affected = [id.0, car_id.expect("blocked driving exit").0];
-                self.transition(peer, s, &affected)?;
-                self.reliable(
+                Replication::transition(peer, s, &affected, world, sessions, population, self)?;
+                Replication::reliable(
                     peer,
                     s.id.as_deref(),
-                    ServerMessage::ControlChanged(self.owner(s)?),
+                    ServerMessage::ControlChanged(Replication::owner(s, world)?),
+                    world,
+                    sessions,
                 );
             }
             return Ok(());
         };
         if let Some(car) = car_id {
-            let car = self.vehicles.get_mut(&car.0).expect("arrest car");
+            let car = world.vehicles.get_mut(&car.0).expect("arrest car");
             car.state.driver_id = None;
             car.stop();
         }
-        let player = self.players.get_mut(&id.0).expect("arrest player");
+        let player = world.players.get_mut(&id.0).expect("arrest player");
         player.state.mode = CharacterMode::Arrested;
         player.state.vehicle_id = None;
         player.state.motor = sim_core::spawn_character(position, 0.0)?;
-        s.weapon.reload_end = None;
-        s.weapon.protected_until = None;
-        s.weapon.respawn = Some(self.tick.saturating_add(150));
-        s.wanted = Wanted::default();
-        self.police.release(id.0);
-        if let Some(m) = &mut s.mission
-            && m.phase == crate::missions::Phase::Active
+        world
+            .players
+            .get_mut(&s.player_id())
+            .expect("player equipment")
+            .weapon
+            .reload_end = None;
+        world
+            .players
+            .get_mut(&s.player_id())
+            .expect("player equipment")
+            .weapon
+            .protected_until = None;
+        world
+            .players
+            .get_mut(&s.player_id())
+            .expect("player equipment")
+            .weapon
+            .respawn = Some(world.tick.saturating_add(150));
+        *self.wanted_mut(s.player_id()) = Wanted::default();
+        self.release(id.0);
+        if let Some(m) = missions.mission_mut(s.player_id())
+            && m.phase == crate::systems::missions::Phase::Active
         {
-            m.fail(self.tick);
+            m.fail(world.tick);
         }
         s.status_dirty = true;
         let mut affected = vec![id.0];
         if let Some(car) = car_id {
             affected.push(car.0);
         }
-        self.transition(peer, s, &affected)?;
-        self.reliable(
+        Replication::transition(peer, s, &affected, world, sessions, population, self)?;
+        Replication::reliable(
             peer,
             s.id.as_deref(),
-            ServerMessage::ControlChanged(self.owner(s)?),
+            ServerMessage::ControlChanged(Replication::owner(s, world)?),
+            world,
+            sessions,
         );
         Ok(())
     }
@@ -761,207 +822,17 @@ mod tests {
         }
         assert!(w.advance(180, None, true));
     }
-    fn city() -> World {
-        World::new(
-            crate::content_loader::WorldContent::load_index(
-                &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../apps/client/public/content"),
-                "city.json",
-            )
-            .unwrap(),
-        )
-        .unwrap()
+}
+
+impl PoliceSystem {
+    pub(crate) fn wanted(&self, id: u32) -> &Wanted {
+        &self.wanted[&id]
     }
-    #[test]
-    fn retired_patrol_replacement_preserves_both_home_districts() {
-        let mut w = city();
-        for cycle in 0..6 {
-            let home = if cycle % 2 == 0 {
-                [-192.0, 0.0, 160.0]
-            } else {
-                [0.0, 0.0, -160.0]
-            };
-            let id = *w
-                .police
-                .units
-                .iter()
-                .find(|(_, u)| u.home == home)
-                .unwrap()
-                .0;
-            w.police.units.remove(&id);
-            w.vehicles.remove(&id);
-            w.collision
-                .set_vehicle_proxies(&w.vehicles.values().map(Vehicle::proxy).collect::<Vec<_>>())
-                .unwrap();
-            w.direct_police((cycle + 1) * 30, &[]).unwrap();
-            assert_eq!(w.police.units.len(), 2);
-            assert_eq!(
-                w.police
-                    .units
-                    .values()
-                    .filter(|u| u.home == [-192.0, 0.0, 160.0])
-                    .count(),
-                1,
-                "Quay must receive its replacement"
-            );
-            assert_eq!(
-                w.police
-                    .units
-                    .values()
-                    .filter(|u| u.home == [0.0, 0.0, -160.0])
-                    .count(),
-                1,
-                "Civic must receive its replacement"
-            );
-        }
-    }
-    #[test]
-    fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling() {
-        let mut w = city();
-        assert_eq!(w.police.units.len(), 2);
-        let initial: BTreeMap<_, _> = w
-            .police
-            .units
-            .keys()
-            .map(|id| (*id, w.vehicles[id].state.motor.position.0.map(|v| v.0)))
-            .collect();
-        let mut travelled = BTreeMap::<u32, f32>::new();
-        for tick in 1..=900 {
-            w.collision
-                .set_vehicle_proxies(&w.vehicles.values().map(Vehicle::proxy).collect::<Vec<_>>())
-                .unwrap();
-            // Observers at each unit prevent the stuck-retirement branch from hiding failures.
-            let observers: Vec<_> = w
-                .police
-                .units
-                .keys()
-                .map(|id| Observer {
-                    position: w.vehicles[id].state.motor.position.0.map(|v| v.0),
-                    yaw: 0.0,
-                })
-                .collect();
-            w.direct_police(tick, &observers).unwrap();
-            w.decide_police(tick, &[]).unwrap();
-            for id in w.police.units.keys().copied().collect::<Vec<_>>() {
-                let car = w.vehicles.get_mut(&id).unwrap();
-                let before = car.state.motor.position.0.map(|v| v.0);
-                let input = w
-                    .police
-                    .vehicle_input(id, tick, car.state.motor.speed.0)
-                    .unwrap();
-                w.collision.exclude_vehicle(Some(id));
-                car.state.motor = sim_core::step_vehicle(
-                    &car.state.motor,
-                    &input,
-                    &car.template,
-                    &sim_core::StepContext {
-                        tick,
-                        collision: &w.collision,
-                        config: &sim_core::SimConfig::from_content(&w.content.config).unwrap(),
-                    },
-                )
-                .unwrap()
-                .motor;
-                assert!(
-                    !w.collision
-                        .overlaps_vehicle(
-                            car.state.motor.position.0.map(|v| v.0),
-                            car.state.motor.yaw.0,
-                            car.template.dimensions.map(|v| v as f32)
-                        )
-                        .unwrap()
-                );
-                assert!(car.state.motor.speed.0.abs() <= 12.01);
-                *travelled.entry(id).or_default() +=
-                    distance(before, car.state.motor.position.0.map(|v| v.0));
-                w.collision
-                    .set_vehicle_proxies(
-                        &w.vehicles.values().map(Vehicle::proxy).collect::<Vec<_>>(),
-                    )
-                    .unwrap();
-            }
-            w.collision.exclude_vehicle(None);
-        }
-        assert_eq!(
-            w.police.units.keys().copied().collect::<Vec<_>>(),
-            initial.keys().copied().collect::<Vec<_>>()
-        );
-        println!("patrol distance over 900 ticks: {travelled:?}");
-        assert!(travelled.values().all(|d| *d > 40.0));
-    }
-    #[test]
-    fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits() {
-        let mut w = city();
-        let id = *w.police.units.keys().next().unwrap();
-        // The ray crosses a real building; a sound still reaches the same police car.
-        let collider = w
-            .content
-            .collision
-            .colliders
-            .iter()
-            .find(|c| c.flags & 2 != 0 && c.half_extents[1] > 2.0)
-            .unwrap();
-        let center = collider.center.map(|v| v as f32);
-        let left = [
-            center[0] - collider.half_extents[0] as f32 - 2.0,
-            0.0,
-            center[2],
-        ];
-        let right = [
-            center[0] + collider.half_extents[0] as f32 + 2.0,
-            0.0,
-            center[2],
-        ];
-        assert!(!sight(&w.collision, left, right, 60.0));
-        assert!(distance(left, right) < 80.0);
-        w.vehicles.get_mut(&id).unwrap().state.motor = sim_core::spawn_vehicle(left, 0.0).unwrap();
-        // Report needs an actor in EntityStore, but never trusts a client crime message.
-        let player = 999;
-        w.players.insert(
-            player,
-            crate::world::Player {
-                id: EntityId(player),
-                display_name: DisplayName("fixture".into()),
-                slot: 0,
-                state: CharacterState {
-                    motor: sim_core::spawn_character(right, 0.0).unwrap(),
-                    health: CharacterHealth(100),
-                    mode: CharacterMode::OnFoot,
-                    vehicle_id: None,
-                },
-            },
-        );
-        let others: Vec<_> = w
-            .police
-            .units
-            .keys()
-            .copied()
-            .filter(|u| *u != id)
-            .collect();
-        for other in others {
-            w.vehicles.get_mut(&other).unwrap().state.health = VehicleHealth(0);
-        }
-        w.report_crime(player, CrimeId::Theft(1, 1), CrimeKind::Theft, right);
-        w.report_crime(player, CrimeId::Impact(1, 1), CrimeKind::Harm, right);
-        assert!(w.police.crimes.is_empty());
-        w.report_crime(player, CrimeId::Shot(1), CrimeKind::Shot, right);
-        w.report_crime(player, CrimeId::Shot(1), CrimeKind::Shot, right);
-        assert_eq!(w.police.crimes.len(), 1);
-        w.police.crimes.clear();
-        w.report_crime(
-            player,
-            CrimeId::Shot(2),
-            CrimeKind::Shot,
-            [left[0] + 81.0, 0.0, left[2]],
-        );
-        assert!(w.police.crimes.is_empty());
-        w.vehicles.get_mut(&id).unwrap().state.health = VehicleHealth(0);
-        w.report_crime(
-            player,
-            CrimeId::Shot(3),
-            CrimeKind::PoliceCar(id),
-            [left[0] + 1.0, left[1], left[2]],
-        );
-        assert_eq!(w.police.crimes.len(), 1);
+    pub(crate) fn wanted_mut(&mut self, id: u32) -> &mut Wanted {
+        self.wanted.get_mut(&id).expect("admitted wanted state")
     }
 }
+
+#[cfg(test)]
+#[path = "police_tests.rs"]
+mod restored_tests;

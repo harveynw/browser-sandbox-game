@@ -1,7 +1,13 @@
-//! Bounded localhost admission/cache with memory or single-worker SQLite storage.
+//! Manages local guest identity, one-use join tickets, active sessions and committed profile data.
+//! `control` uses it to create or reuse guests, issue tickets and record transport readiness; `world`
+//! consumes those tickets, waits for profile admission and tracks active sessions. `jobs` and `repairs`
+//! use it to commit rewards, repair charges and refunds without applying an event twice. `config`
+//! selects in-memory storage or the SQLite worker in `persistence`, whose commands and results are
+//! queued and polled through this module; shared profile data uses the types defined in `protocol`.
 use crate::persistence::{Command, SqliteWorker, StoreError};
 use protocol::{Credits, DisplayName, OpaqueId, ProfileView};
 use std::collections::{BTreeMap, BTreeSet};
+/// Generate a prefixed hexadecimal ID from the requested number of OS-random bytes.
 pub fn random_id(prefix: &str, bytes: usize) -> Result<String, String> {
     let mut secret = vec![0; bytes];
     getrandom::fill(&mut secret).map_err(|_| "OS randomness unavailable")?;
@@ -13,6 +19,7 @@ pub fn random_id(prefix: &str, bytes: usize) -> Result<String, String> {
             .collect::<String>()
     ))
 }
+/// Hash a guest cookie or join-ticket secret with SHA-256 before indexing or storage.
 fn digest(secret: &str) -> String {
     content::canonical::sha256(secret.as_bytes())
 }
@@ -20,7 +27,7 @@ struct Profile {
     view: ProfileView,
     cookie_hash: String,
 }
-struct Ticket {
+struct JoiningTicket {
     profile_id: String,
     expires: u64,
 }
@@ -40,25 +47,41 @@ pub struct EconomicResult {
 }
 #[derive(Default)]
 pub struct Profiles {
+    // Optional worker owning the SQLite connection; absence selects in-memory storage.
     worker: Option<SqliteWorker>,
+    // Submitted persistence commands keyed by operation ID, retained until completion.
     outstanding: BTreeMap<String, Command>,
+    // Completed persistence results keyed by operation ID, waiting for their callers.
     completed: BTreeMap<String, Result<ProfileView, StoreError>>,
+    // Earliest simulation tick at which each failed persistence operation can be retried.
     retry_after: BTreeMap<String, u32>,
+    // Latest simulation tick supplied when polling persistence results.
     store_tick: u32,
+    // Tracks an observed storage-unavailable result until a later operation succeeds.
     store_unavailable: bool,
+    // Repair event IDs mapped to profile IDs, awaiting durable debit acknowledgement.
     finalizations: BTreeMap<String, String>,
+    // Committed profile records cached by profile ID.
     profiles: BTreeMap<String, Profile>,
+    // Guest cookie hashes mapped to their cached profile IDs.
     cookies: BTreeMap<String, String>,
-    tickets: BTreeMap<String, Ticket>,
+    // Hashed one-use join tickets mapped to their profile and expiry time.
+    tickets: BTreeMap<String, JoiningTicket>,
+    // Profile IDs mapped to their currently active gameplay session IDs.
     active: BTreeMap<String, String>,
+    // In-memory event ledger mapping IDs to profile, credit delta and completed-job flag.
     economic_events: BTreeMap<String, (String, i64, bool)>,
+    // In-memory repair debits and refunds waiting for their simulated completion tick.
     pending_economic: BTreeMap<String, PendingEconomic>,
+    // In-memory ledger capacity reserved for refunds of unacknowledged repair debits.
     reserved_refunds: BTreeSet<String>,
     /// The memory adapter exposes delayed completion like the SQLite worker.
     pub repair_delay_ticks: u32,
+    /// Monotonic expiry time in milliseconds of the last accepted WS/RTC probe report.
     pub probe_until_ms: u64,
 }
 impl Profiles {
+    /// Reuse or create an in-memory guest profile, returning a cookie secret only for a new guest.
     pub fn session(
         &mut self,
         cookie: Option<&str>,
@@ -76,6 +99,7 @@ impl Profiles {
         let cookie_hash = digest(&secret);
         let id = random_id("profile-", 16)?;
         let view = ProfileView {
+            tshirt_colour: Default::default(),
             profile_id: OpaqueId(id.clone()),
             display_name: DisplayName("Local Guest".into()),
             credits: Credits(0),
@@ -91,13 +115,14 @@ impl Profiles {
         );
         Ok((view, Some(secret)))
     }
+    /// Look up a committed cached profile using its guest cookie secret.
     pub fn profile(&self, cookie: Option<&str>) -> Option<ProfileView> {
         let hash = digest(cookie?);
         let id = self.cookies.get(&hash)?;
         let profile = self.profiles.get(id)?;
         (profile.cookie_hash == hash).then(|| profile.view.clone())
     }
-    /// Commit the reward and event atomically in memory; retries never award twice.
+    /// Apply a mission reward once, returning its committed profile or queuing a durable commit.
     pub fn apply_mission_reward(
         &mut self,
         profile_id: &str,
@@ -128,6 +153,7 @@ impl Profiles {
             0,
         )
     }
+    /// Apply an in-memory credit change once, checking event conflicts, balance bounds and ledger capacity.
     fn apply_economic(
         &mut self,
         profile_id: &str,
@@ -169,9 +195,11 @@ impl Profiles {
             .view = view.clone();
         Ok(view)
     }
+    /// Return the latest committed cached profile by profile ID.
     pub fn committed(&self, profile: &str) -> Option<ProfileView> {
         self.profiles.get(profile).map(|p| p.view.clone())
     }
+    /// Queue a 50-credit repair debit or refund through SQLite or delayed in-memory completion.
     pub fn submit_repair_event(
         &mut self,
         profile: &str,
@@ -210,6 +238,7 @@ impl Profiles {
         );
         Ok(())
     }
+    /// Acknowledge an applied repair debit so it no longer requires automatic refund protection.
     pub fn finish_repair_debit(&mut self, profile: &str, event: &str) {
         if self.worker.is_some() {
             // Queue failure is retained for retry; crash before acknowledgement is compensated at boot.
@@ -218,6 +247,7 @@ impl Profiles {
             self.reserved_refunds.remove(&format!("refund:{event}"));
         }
     }
+    /// Collect completed repair debits and refunds, advancing delayed in-memory work when due.
     pub fn poll_economic(&mut self, tick: u32) -> Vec<EconomicResult> {
         self.poll_store(tick);
         if self.worker.is_some() {
@@ -299,6 +329,7 @@ impl Profiles {
         }
         results
     }
+    /// Issue a join ticket valid for 30 seconds, replacing earlier tickets for the same guest.
     pub fn issue(&mut self, cookie: Option<&str>, now: u64) -> Result<String, String> {
         let profile = self.profile(cookie).ok_or("guest cookie required")?;
         self.tickets
@@ -309,13 +340,14 @@ impl Profiles {
         let ticket = random_id("", 32)?;
         self.tickets.insert(
             digest(&ticket),
-            Ticket {
+            JoiningTicket {
                 profile_id: profile.profile_id.0,
                 expires: now.saturating_add(30_000),
             },
         );
         Ok(ticket)
     }
+    /// Consume an unexpired in-memory join ticket and update the guest display name.
     pub fn consume(&mut self, ticket: &str, now: u64, name: DisplayName) -> Option<ProfileView> {
         if self.worker.is_some() {
             return None;
@@ -328,9 +360,11 @@ impl Profiles {
         profile.view.display_name = name;
         Some(profile.view.clone())
     }
+    /// Record the gameplay session currently active for a profile.
     pub fn activate(&mut self, profile: &str, session: &str) {
         self.active.insert(profile.into(), session.into());
     }
+    /// Clear a profile's active session only if it still matches the session being removed.
     pub fn deactivate(&mut self, profile: &str, session: &str) {
         if self.active.get(profile).is_some_and(|s| s == session) {
             self.active.remove(profile);
@@ -359,12 +393,14 @@ pub enum Admission {
     Pending(String),
 }
 impl Profiles {
+    /// Create a profile manager backed by a dedicated SQLite worker.
     pub fn sqlite(path: &std::path::Path) -> Result<Self, String> {
         Ok(Self {
             worker: Some(SqliteWorker::open(path)?),
             ..Self::default()
         })
     }
+    /// Check whether a profile has an outstanding economic commit or repair acknowledgement.
     pub fn economic_pending(&self, profile: &str) -> bool {
         self.finalizations.values().any(|p| p == profile)
             || self
@@ -372,15 +408,19 @@ impl Profiles {
                 .values()
                 .any(|c| matches!(c,Command::Economic {profile:p,..} if p==profile))
     }
+    /// Report whether this profile manager uses SQLite persistence.
     pub fn durable(&self) -> bool {
         self.worker.is_some()
     }
+    /// Report whether the SQLite worker is alive, or true for in-memory storage.
     pub fn healthy(&self) -> bool {
         self.worker.as_ref().is_none_or(SqliteWorker::healthy)
     }
+    /// Report whether storage is healthy and has no unresolved unavailable result.
     pub fn available(&self) -> bool {
         self.healthy() && !self.store_unavailable
     }
+    /// Submit a deduplicated persistence command while enforcing retry, capacity and per-profile limits.
     fn queue_store(&mut self, id: &str, command: Command) -> Result<(), String> {
         if let Some(old) = self.outstanding.get(id) {
             return if old == &command {
@@ -413,6 +453,7 @@ impl Profiles {
         self.outstanding.insert(id.into(), command);
         Ok(())
     }
+    /// Return a cached guest profile or queue its load/create, supplying a new cookie secret when needed.
     pub fn prepare_session(
         &mut self,
         cookie: Option<&str>,
@@ -459,16 +500,25 @@ impl Profiles {
         )?;
         Ok((None, valid.is_none().then_some(secret)))
     }
+    /// Consume a valid ticket and return the profile immediately or await its durable name update.
     pub fn begin_admission(
         &mut self,
         ticket: &str,
         now: u64,
         name: DisplayName,
+        tshirt_colour: protocol::TshirtColour,
     ) -> Result<Admission, protocol::RejectCode> {
         if self.worker.is_none() {
             return self
                 .consume(ticket, now, name)
-                .map(Admission::Ready)
+                .map(|mut view| {
+                    view.tshirt_colour = tshirt_colour;
+                    self.profiles
+                        .get_mut(&view.profile_id.0)
+                        .expect("consumed profile")
+                        .view = view.clone();
+                    Admission::Ready(view)
+                })
                 .ok_or(protocol::RejectCode::InvalidTicket);
         }
         let id = format!("name:{}", digest(ticket));
@@ -484,14 +534,52 @@ impl Profiles {
             Command::Name {
                 profile: ticket.profile_id,
                 name: name.0,
+                tshirt_colour: tshirt_colour.0,
             },
         )
         .map_err(|_| protocol::RejectCode::Unavailable)?;
         Ok(Admission::Pending(id))
     }
+    /// Commit a shirt change without touching the name or balance; callers poll pending writes.
+    pub fn update_tshirt_colour(
+        &mut self,
+        cookie: Option<&str>,
+        colour: protocol::TshirtColour,
+    ) -> Result<Option<ProfileView>, String> {
+        let view = self.profile(cookie).ok_or("guest session required")?;
+        if self.worker.is_none() {
+            let p = self
+                .profiles
+                .get_mut(&view.profile_id.0)
+                .expect("cached guest");
+            p.view.tshirt_colour = colour;
+            return Ok(Some(p.view.clone()));
+        }
+        let op = format!("colour:{}", view.profile_id.0);
+        if let Some(result) = self.completed.remove(&op) {
+            result.map_err(|_| "appearance storage unavailable")?;
+        }
+        // Serialize writes per profile, including requests from multiple tabs.
+        if self.outstanding.contains_key(&op) {
+            return Ok(None);
+        }
+        if view.tshirt_colour == colour {
+            return Ok(Some(view));
+        }
+        self.queue_store(
+            &op,
+            Command::TshirtColour {
+                profile: view.profile_id.0,
+                colour: colour.0,
+            },
+        )?;
+        Ok(None)
+    }
+    /// Take the completed profile or storage error for a pending admission operation.
     pub fn admission_result(&mut self, id: &str) -> Option<Result<ProfileView, StoreError>> {
         self.completed.remove(id)
     }
+    /// Collect worker results, update committed caches and retry bookkeeping, and submit repair acknowledgements.
     pub fn poll_store(&mut self, tick: u32) {
         self.store_tick = tick;
         let results = self

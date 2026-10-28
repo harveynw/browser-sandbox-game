@@ -6,8 +6,6 @@ export interface HudModel {
   pursuit: string;
   ammo: string;
   vehicle: string;
-  prompt: string;
-  tutorial: string;
   warning: string;
 }
 /** Values are read-only presentation snapshots, refreshed by the app at at most 10 Hz. */
@@ -16,35 +14,19 @@ export class GameHud {
   private objective = document.createElement("p");
   private wallet = document.createElement("div");
   private vitals = document.createElement("div");
-  private prompt = document.createElement("p");
-  private tutorial = document.createElement("p");
   private warning = document.createElement("p");
   constructor() {
     this.element.className = "game-hud";
     this.objective.className = "hud-objective";
     this.wallet.className = "hud-wallet";
     this.vitals.className = "hud-vitals";
-    this.prompt.className = "hud-prompt";
-    this.tutorial.className = "hud-tutorial";
     this.warning.className = "hud-warning";
-    this.prompt.setAttribute("role", "status");
-    this.element.append(
-      this.objective,
-      this.wallet,
-      this.vitals,
-      this.prompt,
-      this.tutorial,
-      this.warning,
-    );
+    this.element.append(this.objective, this.wallet, this.vitals, this.warning);
   }
   update(m: HudModel): void {
     this.objective.textContent = m.guidance;
     this.wallet.textContent = `${m.credits.toLocaleString()} CR\nHeat ${"●".repeat(m.heat)}${"○".repeat(3 - m.heat)} · ${m.pursuit}`;
     this.vitals.textContent = `HEALTH ${m.health} / 100\n${m.vehicle || m.ammo}`;
-    if (this.prompt.textContent !== m.prompt)
-      this.prompt.textContent = m.prompt;
-    this.tutorial.textContent = m.tutorial;
-    this.tutorial.hidden = !m.tutorial;
     this.warning.textContent = m.warning;
     this.warning.hidden = !m.warning;
   }

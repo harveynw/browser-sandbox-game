@@ -22,6 +22,8 @@ export type Revision = number;
 
 export type Credits = number;
 
+export type TshirtColour = number;
+
 export type InputAxis = number;
 
 export type Buttons = number;
@@ -72,7 +74,7 @@ export type ServerEnvelope = { v: ProtocolVersion, world_id: OpaqueId | null, se
 
 export type ClientMessage = { "kind": "client_hello", "data": ClientHello } | { "kind": "client_ready", "data": ClientReady } | { "kind": "input_batch", "data": InputBatch } | { "kind": "action", "data": ActionRequest } | { "kind": "ping", "data": Ping } | { "kind": "resync_request", "data": ResyncRequest } | { "kind": "leave", "data": Empty };
 
-export type ClientHello = { protocol_version: ProtocolVersion, build_id: BuildId, content_hash: ContentHash, sim_config_hash: ContentHash, join_ticket: OpaqueId, display_name: DisplayName, };
+export type ClientHello = { protocol_version: ProtocolVersion, build_id: BuildId, content_hash: ContentHash, sim_config_hash: ContentHash, join_ticket: OpaqueId, display_name: DisplayName, tshirt_colour: TshirtColour, };
 
 export type ClientReady = { baseline_id: BaselineId, };
 
@@ -110,7 +112,7 @@ export type RejectCode = "version_mismatch" | "content_mismatch" | "invalid_tick
 
 export type Welcome = { player_id: EntityId, server_tick: number, input_lead_ticks: InputLead, profile: ProfileView, };
 
-export type ProfileView = { profile_id: OpaqueId, display_name: DisplayName, credits: Credits, completed_jobs: number, };
+export type ProfileView = { profile_id: OpaqueId, display_name: DisplayName, credits: Credits, completed_jobs: number, tshirt_colour: TshirtColour, };
 
 export type BaselineBegin = { baseline_id: BaselineId, server_tick: number, };
 
@@ -126,7 +128,7 @@ export type HideReason = "out_of_range" | "destroyed" | "disconnected";
 
 export type Snapshot = { server_tick: number, records: Array<StateRecord>, };
 
-export type EntityDescriptor = { id: EntityId, entity_kind: EntityKind, template_id: TemplateId, display_name: DisplayName | null, };
+export type EntityDescriptor = { id: EntityId, entity_kind: EntityKind, template_id: TemplateId, display_name: DisplayName | null, tshirt_colour: TshirtColour | null, };
 
 export type EntityKind = "player" | "vehicle" | "pedestrian" | "police";
 
