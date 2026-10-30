@@ -344,3 +344,135 @@ it("freezes an arrested owner under held controls and resumes only with the resp
   expect(w.currentState().motor.position).not.toEqual(position);
   w.free();
 });
+
+it("recovers sampled car overlaps during prediction and replay without pausing or resyncing", async () => {
+  const source = JSON.parse(
+    await readFile(
+      new URL("../../../content/source/slice.json", import.meta.url),
+      "utf8",
+    ),
+  ) as {
+    vehicle_templates: import("@port-meridian/content").VehicleTemplate[];
+  };
+  const template = source.vehicle_templates[0];
+  if (!template) throw new Error("Missing compact test template");
+  for (const replay of [false, true]) {
+    const w = await world(),
+      clock = new ServerClock();
+    const failures: string[] = [];
+    const motor = {
+      position: [0, 0, 0] as [number, number, number],
+      velocity: [0, 0, 0] as [number, number, number],
+      yaw: 0,
+      speed: 0,
+      steering: 0,
+    };
+    const carOwner = (tick: number): OwnerState => ({
+      ...owner(tick),
+      controlled_entity_id: 2,
+      state: {
+        kind: "vehicle",
+        data: { motor, health: 100, driver_id: 1, disabled: false },
+      },
+      player_state: {
+        ...owner(tick).player_state,
+        mode: "driving",
+        vehicle_id: 2,
+      },
+    });
+    let overlap = false;
+    const p = new LocalPrediction(
+      w,
+      clock,
+      (reason) => failures.push(reason),
+      [template],
+      (_tick, _controlled, omitVehicles) =>
+        w.setVehicleProxies({
+          version: 1,
+          proxies:
+            overlap && !omitVehicles ? [{ entity_id: 3, template, motor }] : [],
+        }),
+    );
+    clock.observe(10, 0);
+    p.install(carOwner(10), 0);
+    overlap = true;
+    expect(() =>
+      replay ? p.reconcile(carOwner(11), 0) : p.advance(0, () => controls),
+    ).not.toThrow();
+    expect(p.stopped).toBe(false);
+    expect(failures).toEqual([]);
+    expect(p.advance(34, () => controls).length).toBeGreaterThan(0);
+    expect(p.stopped).toBe(false);
+    expect(failures).toEqual([]);
+    // Retrying without remote proxies must never bypass a real building.
+    w.loadCollision(
+      {
+        ...(fixture.collision as CollisionPackage),
+        colliders: [
+          ...(fixture.collision as CollisionPackage).colliders,
+          {
+            id: 999,
+            shape: "box",
+            role: "building",
+            center: [0, 1, 0],
+            half_extents: [5, 1, 5],
+            yaw: 0,
+            flags: 3,
+          },
+        ],
+      },
+      fixture.sim_config,
+    );
+    p.install(carOwner(14), 40);
+    expect(p.stopped).toBe(true);
+    expect(failures).toEqual(["invalid_state"]);
+    w.free();
+  }
+});
+
+it("exposes locally predicted steering before an owner snapshot and clears it on exit", async () => {
+  const source = JSON.parse(
+    await readFile(
+      new URL("../../../content/source/slice.json", import.meta.url),
+      "utf8",
+    ),
+  ) as {
+    vehicle_templates: import("@port-meridian/content").VehicleTemplate[];
+  };
+  const template = source.vehicle_templates[0];
+  if (!template) throw new Error("Missing vehicle template");
+  const w = await world(),
+    clock = new ServerClock();
+  const p = new LocalPrediction(w, clock, () => {}, [template]);
+  const carOwner: OwnerState = {
+    ...owner(10),
+    controlled_entity_id: 2,
+    state: {
+      kind: "vehicle",
+      data: {
+        motor: {
+          position: [0, 0, 0],
+          velocity: [0, 0, 0],
+          yaw: 0,
+          speed: 0,
+          steering: 0,
+        },
+        health: 100,
+        driver_id: 1,
+        disabled: false,
+      },
+    },
+    player_state: { ...owner(10).player_state, mode: "driving", vehicle_id: 2 },
+  };
+  clock.observe(10, 0);
+  p.install(carOwner, 0);
+  expect(p.vehicleSteering).toBe(0);
+  p.advance(0, () => ({ ...controls, move_x: 32767 }));
+  expect(Math.abs(p.vehicleSteering ?? 0)).toBeGreaterThan(0);
+  expect(
+    carOwner.state.kind === "vehicle" && carOwner.state.data.motor.steering,
+  ).toBe(0);
+  p.install(owner(14, initial, 2), 34);
+  expect(p.vehicleSteering).toBeUndefined();
+  w.free();
+});

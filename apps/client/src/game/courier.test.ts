@@ -35,6 +35,7 @@ it("shows success only from committed completion and retains failure feedback", 
 it("uses private trial indices and recovery exit state for objective guidance", () => {
   const trial = {
     id: "trial",
+    variants: [],
     terminal_zone_id: "trial",
     duration_ticks: 3600,
     reward_credits: 200,
@@ -118,4 +119,46 @@ it("distinguishes repair dwell, uncommitted payment and compensating refunds", (
   expect(
     repairGuidance({ ...r, phase: "cancelled", code: "unavailable" }),
   ).toContain("no charge");
+});
+
+it("shows the selected contract's payout, deadline, progress and confirmed result", async () => {
+  const { missionCard } = await import("./courier");
+  const city = await import("../../../../content/source/city.json");
+  const template = city.default.mission_templates.find(
+    (t) => t.id === "courier_quay_market",
+  ) as import("@port-meridian/content").MissionTemplate;
+  const selected = {
+    ...mission,
+    variant_index: 1,
+    target_position: [48, 0, -180] as [number, number, number],
+  };
+  const active = missionCard(selected, template, 4500, [48, 0, -170]);
+  expect(active).toMatchObject({
+    title: "Civic dispatch",
+    reward: "220 CR",
+    time: "0:30",
+    progress: "10 m",
+    urgent: true,
+    phase: "active",
+  });
+  expect(
+    missionCard({ ...selected, target_position: null }, template, 6000)?.phase,
+  ).toBe("pending");
+  expect(
+    missionCard({ ...selected, phase: "completed" }, template, 6000),
+  ).toMatchObject({ reward: "+220 CR", time: "PAID", urgent: false });
+  expect(
+    missionCard({ ...selected, phase: "failed" }, template, 6000),
+  ).toMatchObject({ reward: "0 CR", time: "ENDED", urgent: false });
+  const trial = city.default.mission_templates.find(
+    (t) => t.id === "trial_city_ring",
+  ) as import("@port-meridian/content").MissionTemplate;
+  expect(
+    missionCard(
+      { ...selected, template_id: trial.id, checkpoint_index: 3 },
+      trial,
+      0,
+    )?.progress,
+  ).toBe("Gate 3/6");
+  expect(missionCard(null, template, 0)).toBeNull();
 });

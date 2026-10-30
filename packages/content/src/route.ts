@@ -53,3 +53,32 @@ export function findRoute(
   }
   return route.reverse();
 }
+
+/** Route to the assigned courier zone, including its off-road delivery entrance. */
+export function courierRoute(
+  manifest: Pick<
+    import("./generated/types").WorldManifest,
+    "zones" | "road_graph"
+  >,
+  origin: readonly number[],
+  target: readonly number[],
+): Vec3[] {
+  const distance = (a: readonly number[], b: readonly number[]) =>
+    Math.hypot((a[0] ?? 0) - (b[0] ?? 0), (a[2] ?? 0) - (b[2] ?? 0));
+  const destination = manifest.zones.find(
+    (zone) => zone.kind === "delivery" && distance(zone.center, target) < 0.1,
+  );
+  const terminal = manifest.zones
+    .filter((zone) => zone.kind === "terminal")
+    .sort((a, b) => distance(a.center, origin) - distance(b.center, origin))[0];
+  if (!destination || !terminal) return [];
+  const route = findRoute(
+    manifest.road_graph,
+    terminal.access_id,
+    destination.access_id,
+  );
+  const end: Vec3 = [target[0] ?? 0, target[1] ?? 0, target[2] ?? 0];
+  if (!route.length || distance(route[route.length - 1] ?? [], end) > 0.01)
+    route.push(end);
+  return route;
+}

@@ -61,6 +61,7 @@ impl Sessions {
         systems: &mut Systems,
     ) {
         if let Some(id) = session.player {
+            systems.chat.disconnect(id.0);
             systems.missions.release_disconnected_recoveries(
                 id.0,
                 world,
@@ -553,7 +554,11 @@ impl Sessions {
                     world,
                     self,
                 );
+                systems.chat.on_ready(peer, s, world, self);
             }
+            ClientMessage::Chat(text) => systems
+                .chat
+                .handle_message(peer, s, text, now, world, self)?,
             ClientMessage::InputBatch(batch) => {
                 if !s.input_rate.allow(now) {
                     // RTC congestion can release more than a second of legitimate

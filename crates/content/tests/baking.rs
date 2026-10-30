@@ -260,3 +260,37 @@ fn full_city_rejects_unreachable_trial_gate_reused_recovery_slot_and_ground_hole
             .contains("ground must support")
     );
 }
+
+#[test]
+fn mission_variants_validate_references_kind_names_and_connected_routes() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let mut bad = source.clone();
+    bad.mission_templates[0].variants[0].objective = content::MissionObjective::Courier {
+        destination_zone_id: "missing".into(),
+        dwell_ticks: 30,
+        max_speed: 2.0,
+    };
+    assert!(validate::authoring(&bad).is_err());
+    let mut bad = source.clone();
+    bad.mission_templates[0].variants[0].name.clear();
+    assert!(validate::authoring(&bad).is_err());
+    let mut bad = source.clone();
+    bad.mission_templates[0].variants[0].objective = source.mission_templates[1].objective.clone();
+    assert!(validate::authoring(&bad).is_err());
+    let mut bad = source.clone();
+    bad.mission_templates[0].variants[0].duration_ticks = 0;
+    assert!(validate::authoring(&bad).is_err());
+    let mut package = bake::bake(&source).unwrap();
+    if let content::MissionObjective::TimeTrial { checkpoints, .. } =
+        &mut package.manifest.mission_templates[1].variants[0].objective
+    {
+        checkpoints[1] = [-200.0, 0.0, -200.0];
+    }
+    rehash(&mut package);
+    assert!(
+        validate::package(&package.manifest, &collision(&package), &package.files)
+            .unwrap_err()
+            .contains("trial gate disconnected")
+    );
+}

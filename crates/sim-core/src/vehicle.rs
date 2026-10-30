@@ -175,7 +175,10 @@ pub fn step_vehicle(
         position = p;
     }
     let velocity: [f32; 3] = std::array::from_fn(|i| (position[i] - p[i]) / DT_SECONDS);
-    let applied_speed = -yaw.sin() * velocity[0] - yaw.cos() * velocity[2];
+    // Differencing f32 world positions can round above the motor's speed limit.
+    // Keep the output valid as input to the next native or predicted tick.
+    let applied_speed = (-yaw.sin() * velocity[0] - yaw.cos() * velocity[2])
+        .clamp(-template.reverse_speed as f32, template.top_speed as f32);
     if context
         .collision
         .overlaps_vehicle(position, yaw, dimensions)?

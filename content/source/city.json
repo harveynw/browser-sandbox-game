@@ -330,6 +330,198 @@
         "max": [-197.0, -203.0]
       },
       "clear": false
+    },
+    {
+      "id": "parking_heights_public_01_clear",
+      "rect": {
+        "min": [-280, -307],
+        "max": [-272, -293]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_heights_public_01_driveway",
+      "rect": {
+        "min": [-279, -303],
+        "max": [-253, -297]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_heights_public_02_clear",
+      "rect": {
+        "min": [-280, -187],
+        "max": [-272, -173]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_heights_public_02_driveway",
+      "rect": {
+        "min": [-279, -183],
+        "max": [-253, -177]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_public_01_clear",
+      "rect": {
+        "min": [16, -307],
+        "max": [24, -293]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_public_01_driveway",
+      "rect": {
+        "min": [-3, -303],
+        "max": [23, -297]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_public_02_clear",
+      "rect": {
+        "min": [16, -227],
+        "max": [24, -213]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_civic_public_02_driveway",
+      "rect": {
+        "min": [-3, -223],
+        "max": [23, -217]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_ironworks_public_01_clear",
+      "rect": {
+        "min": [272, -307],
+        "max": [280, -293]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_ironworks_public_01_driveway",
+      "rect": {
+        "min": [253, -303],
+        "max": [279, -297]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_ironworks_public_02_clear",
+      "rect": {
+        "min": [272, -227],
+        "max": [280, -213]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_ironworks_public_02_driveway",
+      "rect": {
+        "min": [253, -223],
+        "max": [279, -217]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_quay_public_01_clear",
+      "rect": {
+        "min": [-280, 93],
+        "max": [-272, 107]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_quay_public_01_driveway",
+      "rect": {
+        "min": [-279, 97],
+        "max": [-253, 103]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_quay_public_02_clear",
+      "rect": {
+        "min": [-280, 273],
+        "max": [-272, 287]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_quay_public_02_driveway",
+      "rect": {
+        "min": [-279, 277],
+        "max": [-253, 283]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_market_public_01_clear",
+      "rect": {
+        "min": [16, 93],
+        "max": [24, 107]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_market_public_01_driveway",
+      "rect": {
+        "min": [-3, 97],
+        "max": [23, 103]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_market_public_02_clear",
+      "rect": {
+        "min": [16, 273],
+        "max": [24, 287]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_market_public_02_driveway",
+      "rect": {
+        "min": [-3, 277],
+        "max": [23, 283]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_docks_public_01_clear",
+      "rect": {
+        "min": [272, 73],
+        "max": [280, 87]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_docks_public_01_driveway",
+      "rect": {
+        "min": [253, 77],
+        "max": [279, 83]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_docks_public_02_clear",
+      "rect": {
+        "min": [272, 273],
+        "max": [280, 287]
+      },
+      "clear": true
+    },
+    {
+      "id": "parking_docks_public_02_driveway",
+      "rect": {
+        "min": [253, 277],
+        "max": [279, 283]
+      },
+      "clear": true
     }
   ],
   "accesses": [
@@ -479,6 +671,90 @@
       "road_axis": "z",
       "road_center": -128,
       "driveway_id": "parking_iron_sport_driveway"
+    },
+    {
+      "id": "parking_heights_public_01_access",
+      "position": [-276, 0, -300],
+      "road_axis": "x",
+      "road_center": -256,
+      "driveway_id": "parking_heights_public_01_driveway"
+    },
+    {
+      "id": "parking_heights_public_02_access",
+      "position": [-276, 0, -180],
+      "road_axis": "x",
+      "road_center": -256,
+      "driveway_id": "parking_heights_public_02_driveway"
+    },
+    {
+      "id": "parking_civic_public_01_access",
+      "position": [20, 0, -300],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "parking_civic_public_01_driveway"
+    },
+    {
+      "id": "parking_civic_public_02_access",
+      "position": [20, 0, -220],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "parking_civic_public_02_driveway"
+    },
+    {
+      "id": "parking_ironworks_public_01_access",
+      "position": [276, 0, -300],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "parking_ironworks_public_01_driveway"
+    },
+    {
+      "id": "parking_ironworks_public_02_access",
+      "position": [276, 0, -220],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "parking_ironworks_public_02_driveway"
+    },
+    {
+      "id": "parking_quay_public_01_access",
+      "position": [-276, 0, 100],
+      "road_axis": "x",
+      "road_center": -256,
+      "driveway_id": "parking_quay_public_01_driveway"
+    },
+    {
+      "id": "parking_quay_public_02_access",
+      "position": [-276, 0, 280],
+      "road_axis": "x",
+      "road_center": -256,
+      "driveway_id": "parking_quay_public_02_driveway"
+    },
+    {
+      "id": "parking_market_public_01_access",
+      "position": [20, 0, 100],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "parking_market_public_01_driveway"
+    },
+    {
+      "id": "parking_market_public_02_access",
+      "position": [20, 0, 280],
+      "road_axis": "x",
+      "road_center": 0,
+      "driveway_id": "parking_market_public_02_driveway"
+    },
+    {
+      "id": "parking_docks_public_01_access",
+      "position": [276, 0, 80],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "parking_docks_public_01_driveway"
+    },
+    {
+      "id": "parking_docks_public_02_access",
+      "position": [276, 0, 280],
+      "road_axis": "x",
+      "road_center": 256,
+      "driveway_id": "parking_docks_public_02_driveway"
     }
   ],
   "spawns": [
@@ -619,6 +895,126 @@
       "mission_reserved": false,
       "reservation_id": "parking_iron_sport_clear",
       "access_id": "parking_iron_sport_access"
+    },
+    {
+      "id": "parking_heights_public_01",
+      "position": [-276, 0, -300],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_heights_public_01_clear",
+      "access_id": "parking_heights_public_01_access"
+    },
+    {
+      "id": "parking_heights_public_02",
+      "position": [-276, 0, -180],
+      "yaw": 0,
+      "template_id": "sport",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_heights_public_02_clear",
+      "access_id": "parking_heights_public_02_access"
+    },
+    {
+      "id": "parking_civic_public_01",
+      "position": [20, 0, -300],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_civic_public_01_clear",
+      "access_id": "parking_civic_public_01_access"
+    },
+    {
+      "id": "parking_civic_public_02",
+      "position": [20, 0, -220],
+      "yaw": 0,
+      "template_id": "sport",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_civic_public_02_clear",
+      "access_id": "parking_civic_public_02_access"
+    },
+    {
+      "id": "parking_ironworks_public_01",
+      "position": [276, 0, -300],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_ironworks_public_01_clear",
+      "access_id": "parking_ironworks_public_01_access"
+    },
+    {
+      "id": "parking_ironworks_public_02",
+      "position": [276, 0, -220],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_ironworks_public_02_clear",
+      "access_id": "parking_ironworks_public_02_access"
+    },
+    {
+      "id": "parking_quay_public_01",
+      "position": [-276, 0, 100],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_quay_public_01_clear",
+      "access_id": "parking_quay_public_01_access"
+    },
+    {
+      "id": "parking_quay_public_02",
+      "position": [-276, 0, 280],
+      "yaw": 0,
+      "template_id": "sport",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_quay_public_02_clear",
+      "access_id": "parking_quay_public_02_access"
+    },
+    {
+      "id": "parking_market_public_01",
+      "position": [20, 0, 100],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_market_public_01_clear",
+      "access_id": "parking_market_public_01_access"
+    },
+    {
+      "id": "parking_market_public_02",
+      "position": [20, 0, 280],
+      "yaw": 0,
+      "template_id": "sport",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_market_public_02_clear",
+      "access_id": "parking_market_public_02_access"
+    },
+    {
+      "id": "parking_docks_public_01",
+      "position": [276, 0, 80],
+      "yaw": 0,
+      "template_id": "van",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_docks_public_01_clear",
+      "access_id": "parking_docks_public_01_access"
+    },
+    {
+      "id": "parking_docks_public_02",
+      "position": [276, 0, 280],
+      "yaw": 0,
+      "template_id": "compact",
+      "secured": false,
+      "mission_reserved": false,
+      "reservation_id": "parking_docks_public_02_clear",
+      "access_id": "parking_docks_public_02_access"
     }
   ],
   "zones": [
@@ -684,6 +1080,24 @@
       "reservation_id": "repair_forecourt",
       "access_id": "repair_access",
       "allowed_templates": []
+    },
+    {
+      "id": "delivery_civic",
+      "center": [48, 0, -180],
+      "radius": 3,
+      "kind": "delivery",
+      "reservation_id": "plaza_civic",
+      "access_id": "civic_terminal_access",
+      "allowed_templates": []
+    },
+    {
+      "id": "delivery_quay_garage",
+      "center": [-220, 0, 48],
+      "radius": 5,
+      "kind": "delivery",
+      "reservation_id": "garage_clear",
+      "access_id": "garage_access",
+      "allowed_templates": []
     }
   ],
   "mission_templates": [
@@ -699,7 +1113,48 @@
           "dwell_ticks": 30,
           "max_speed": 2
         }
-      }
+      },
+      "variants": [
+        {
+          "name": "Market express",
+          "reward_credits": 150,
+          "duration_ticks": 5400,
+          "objective": {
+            "kind": "courier",
+            "data": {
+              "destination_zone_id": "delivery_market",
+              "dwell_ticks": 30,
+              "max_speed": 2
+            }
+          }
+        },
+        {
+          "name": "Civic dispatch",
+          "reward_credits": 220,
+          "duration_ticks": 7200,
+          "objective": {
+            "kind": "courier",
+            "data": {
+              "destination_zone_id": "delivery_civic",
+              "dwell_ticks": 30,
+              "max_speed": 2
+            }
+          }
+        },
+        {
+          "name": "Quay garage drop",
+          "reward_credits": 120,
+          "duration_ticks": 3600,
+          "objective": {
+            "kind": "courier",
+            "data": {
+              "destination_zone_id": "delivery_quay_garage",
+              "dwell_ticks": 30,
+              "max_speed": 2
+            }
+          }
+        }
+      ]
     },
     {
       "id": "trial_city_ring",
@@ -720,7 +1175,49 @@
           ],
           "gate_radius": 8
         }
-      }
+      },
+      "variants": [
+        {
+          "name": "Coastal circuit",
+          "reward_credits": 200,
+          "duration_ticks": 3600,
+          "objective": {
+            "kind": "time_trial",
+            "data": {
+              "checkpoints": [
+                [0, 0, -256],
+                [256, 0, -256],
+                [256, 0, 128],
+                [0, 0, 256],
+                [-256, 0, 128],
+                [-256, 0, -256],
+                [0, 0, -256]
+              ],
+              "gate_radius": 8
+            }
+          }
+        },
+        {
+          "name": "Reverse city run",
+          "reward_credits": 200,
+          "duration_ticks": 3600,
+          "objective": {
+            "kind": "time_trial",
+            "data": {
+              "checkpoints": [
+                [0, 0, -256],
+                [-256, 0, -256],
+                [-256, 0, 128],
+                [0, 0, 256],
+                [256, 0, 128],
+                [256, 0, -256],
+                [0, 0, -256]
+              ],
+              "gate_radius": 8
+            }
+          }
+        }
+      ]
     },
     {
       "id": "recovery_docks_quay",
@@ -742,7 +1239,8 @@
           ],
           "garage_zone_id": "garage_quay"
         }
-      }
+      },
+      "variants": []
     }
   ],
   "vehicle_templates": [

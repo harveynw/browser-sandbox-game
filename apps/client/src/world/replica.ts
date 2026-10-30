@@ -12,6 +12,7 @@ export interface RenderActor {
   descriptor: EntityDescriptor;
   motor: CharacterMotor;
   stale: boolean;
+  steering?: number;
   state: EntityState;
 }
 type Sample = { tick: number; state: EntityState; snap: boolean };

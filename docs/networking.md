@@ -4,7 +4,7 @@
 
 ## Transport boundary
 
-The server uses `harveynw/net-crate` at **77b401b1376b5c8bcb98da2884efcb1e63082ba4**, with its pinned WebRTC dependency retained in Cargo.lock. The browser uses standard WebSocket/RTCPeerConnection signalling against that server. WS carries signalling and reliable binary messages; the `game` RTC channel is unordered with zero retransmits. The application does not replace RTC with WebSocket-only gameplay.
+The server uses `harveynw/net-crate` at **a25516439f95d421d3dc752be1cbded8150c8805**, with its pinned WebRTC dependency retained in Cargo.lock. The server uses ICE-lite with the WebSocket listener’s loopback IP explicitly passed as its WebRTC host; peers bind ephemeral UDP ports on that IP without external STUN/TURN servers. The browser uses standard WebSocket/RTCPeerConnection signalling and full ICE against that server. WS carries signalling and reliable binary messages; the `game` RTC channel is unordered with zero retransmits. The application does not replace RTC with WebSocket-only gameplay.
 
 `Network` owns the net crate handles, peer state and bounded application queues. The world drains lifecycle/messages, queues outgoing envelopes and requests disconnects directly. The game loop polls the net crate's events and flushes bounded application output directly; the net crate runs its own networking thread. Peer keys combine the crate's numeric ID and an application generation. Stale queued sends, closes and kills are ignored after generation replacement. The dependency's own untagged numeric events cannot be retroactively disambiguated by the application; see the limitations below.
 

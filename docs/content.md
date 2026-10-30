@@ -48,3 +48,9 @@ The renderer instances primitives by layer/palette. Eviction disposes instance b
 `/map` is a transport-free content inspector with orbit/pan/zoom, framing, collision, reservations, graphs, route and label layers. `/simulation` is the independent shared-motor diagnostic. Neither tool is an authoritative game client.
 
 All models, facade patterns, character rigs, landmarks, procedural effects, UI/map graphics and synthesized sounds are authored in this repository. No external recorded audio, music, models, texture packs or font files are required. [ASSET-LICENSES.md](../content/ASSET-LICENSES.md) records provenance without assigning a new public license to the repository.
+
+## Mission variants
+
+Each mission template may author a `variants` array of up to 16 named contracts. A variant supplies `name`, `duration_ticks`, `reward_credits` and a complete `objective` of the template's existing kind. Courier objectives reference validated delivery zones; trial variants author closed, connected checkpoint routes starting at the terminal. Empty or omitted variants preserve the base objective. Baking validates every option, including destination references, names, payout/duration bounds and route connectivity.
+
+`MissionSystem` selects once from the random mission instance ID, stores the selected objective and payout, and publishes `variant_index` in the private mission view. This index refers to the hash-pinned content package, allowing the HUD to display the selected contract without choosing gameplay rules itself. Recovery independently ranks all eligible parking slots, retaining capacity, ownership and clearance checks.

@@ -298,6 +298,10 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         .unwrap()
         .id
         .clone();
+    let reward = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        .as_ref()
+        .unwrap()
+        .reward;
     let target = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -352,7 +356,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
     assert_ne!(w.id, original);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
-        150
+        reward
     );
     assert_eq!(
         w.sessions.peers[&p]
@@ -375,8 +379,8 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
     );
     let until = Instant::now() + Duration::from_secs(3);
     loop {
-        if let Ok(p) = a.apply_mission_reward(&profile, &instance, 150) {
-            assert_eq!(p.credits.0, 150);
+        if let Ok(p) = a.apply_mission_reward(&profile, &instance, reward) {
+            assert_eq!(p.credits.0, reward);
             assert_eq!(p.completed_jobs, 1);
             break;
         }

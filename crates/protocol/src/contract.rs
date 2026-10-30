@@ -51,6 +51,8 @@ pub fn typescript() -> String {
         TemplateId,
         ContentHash,
         DisplayName,
+        ChatText,
+        ChatLine,
         DetailText,
         Vec3,
         Empty,

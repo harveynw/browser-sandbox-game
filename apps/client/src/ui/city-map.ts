@@ -1,5 +1,5 @@
 import {
-  findRoute,
+  courierRoute,
   type LoadedPackage,
   type Primitive,
 } from "@port-meridian/content";
@@ -53,6 +53,7 @@ export class CityMap {
   private target: readonly number[] | null | undefined;
   private courier = false;
   private destinationButton: HTMLButtonElement | undefined;
+  private routeKey = "";
   private route: readonly (readonly number[])[] = [];
   private readonly abort = new AbortController();
   private drag: { x: number; y: number } | undefined;
@@ -242,16 +243,8 @@ export class CityMap {
         );
       }
     }
-    try {
-      this.route = findRoute(
-        assets.manifest.road_graph,
-        "terminal_access",
-        "market_access",
-      );
-    } catch {
-      /* authored fallback map still works */
-    }
   }
+
   get open(): boolean {
     return !this.element.hidden;
   }
@@ -271,6 +264,14 @@ export class CityMap {
     courier: boolean,
     minimap: HTMLCanvasElement,
   ): void {
+    const key = courier && target ? target.join(",") : "";
+    if (key !== this.routeKey) {
+      this.routeKey = key;
+      this.route =
+        target && courier
+          ? courierRoute(this.assets.manifest, motor.position, target)
+          : [];
+    }
     this.courier = courier;
     if (this.destinationButton) this.destinationButton.disabled = !target;
     this.motor = motor;

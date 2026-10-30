@@ -21,8 +21,8 @@ export function facadeDetails(buildings: readonly Primitive[]): Primitive[] {
         color,
         collider_id: null,
       });
-      const trim = "#dec8a6",
-        glass = "#405e68";
+      const trim = style % 2 === 0 ? "#ff3ca6" : "#31f4d0",
+        glass = style % 3 === 0 ? "#ffd96a" : "#60b6ff";
       const result = [
         piece(
           "roof",

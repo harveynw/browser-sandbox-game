@@ -111,6 +111,12 @@ pub fn valid_text(kind: &str, value: &str) -> bool {
                     .bytes()
                     .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         }
+        "ChatText" => {
+            !value.trim().is_empty()
+                && count <= 256
+                && value.len() <= 512
+                && !value.chars().any(|c| c.is_control() && c != '\n')
+        }
         "DetailText" => {
             value.len() <= crate::limits::MAX_STRING_BYTES && !value.chars().any(char::is_control)
         }
@@ -152,6 +158,12 @@ text!(OpaqueId, 1, 64, "^[A-Za-z0-9_.:-]+$");
 text!(BuildId, 1, 64, "^[A-Za-z0-9_.:-]+$");
 text!(TemplateId, 1, 64, "^[A-Za-z0-9_.:-]+$");
 text!(ContentHash, 64, 64, "^[0-9a-f]{64}$");
+text!(
+    ChatText,
+    1,
+    256,
+    "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
+);
 text!(DisplayName, 3, 20, "^[^\\u0000-\\u001f\\u007f-\\u009f]+$");
 text!(DetailText, 0, 512, "^[^\\u0000-\\u001f\\u007f-\\u009f]*$");
 
@@ -196,7 +208,7 @@ wire_struct!(ServerEnvelope {
 });
 wire_enum!(ClientMessage {
     ClientHello(ClientHello), ClientReady(ClientReady), InputBatch(InputBatch),
-    Action(ActionRequest), Ping(Ping), ResyncRequest(ResyncRequest), Leave(Empty),
+    Action(ActionRequest), Chat(ChatText), Ping(Ping), ResyncRequest(ResyncRequest), Leave(Empty),
 });
 wire_struct!(ClientHello {
     protocol_version: ProtocolVersion,
@@ -267,6 +279,7 @@ wire_enum!(ServerMessage {
     ServerHello(ServerHello), Reject(Reject), Welcome(Welcome),
     BaselineBegin(BaselineBegin), EntityShow(EntityShow), BaselineEnd(BaselineEnd),
     StartPlay(StartPlay), EntityHide(EntityHide), Snapshot(Snapshot),
+    Chat(ChatLine), ChatError(DetailText),
     OwnerState(OwnerState), ControlChanged(OwnerState), ActionResult(ActionResult),
     PlayerStatus(PlayerStatus), WorldEvent(WorldEvent), Pong(Pong), Disconnect(Disconnect),
 });
@@ -419,6 +432,9 @@ string_enum!(ActionCode {
 wire_struct!(MissionView {
     instance_id: OpaqueId, template_id: TemplateId, phase: MissionPhase,
     checkpoint_index: u16, deadline_tick: Tick,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    variant_index: Option<u16>,
     target_entity_id: Option<EntityId>,
     target_position: Option<Vec3>,
 });
@@ -480,4 +496,11 @@ wire_struct!(Pong {
 wire_struct!(Disconnect {
     code: TemplateId,
     detail: DetailText
+});
+
+wire_struct!(ChatLine {
+    id: EventId,
+    username: DisplayName,
+    text: ChatText,
+    server_tick: Tick,
 });

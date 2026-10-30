@@ -29,8 +29,11 @@ export interface Settings {
 }
 const key = "port-meridian.settings.v1";
 export function validKey(code: string): boolean {
-  return /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right))$/.test(
-    code,
+  return (
+    code !== "KeyT" &&
+    /^(Key[A-Z]|Digit[0-9]|Arrow(Up|Down|Left|Right)|Space|Shift(Left|Right))$/.test(
+      code,
+    )
   );
 }
 export function rebind(

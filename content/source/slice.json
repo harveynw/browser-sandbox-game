@@ -250,7 +250,8 @@
           "dwell_ticks": 30,
           "max_speed": 2
         }
-      }
+      },
+      "variants": []
     }
   ],
   "vehicle_templates": [

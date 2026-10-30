@@ -1286,7 +1286,7 @@ dependencies = [
 [[package]]
 name = "net"
 version = "0.1.0"
-source = "git+https://github.com/harveynw/net-crate?rev=77b401b1376b5c8bcb98da2884efcb1e63082ba4#77b401b1376b5c8bcb98da2884efcb1e63082ba4"
+source = "git+https://github.com/harveynw/net-crate?rev=a25516439f95d421d3dc752be1cbded8150c8805#a25516439f95d421d3dc752be1cbded8150c8805"
 dependencies = [
  "async-trait",
  "bytes",

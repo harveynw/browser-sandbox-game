@@ -44,6 +44,7 @@ pub fn typescript() -> String {
         Zone,
         ZoneKind,
         MissionTemplate,
+        MissionVariant,
         MissionObjective,
         VehicleTemplate,
         CharacterConfig,

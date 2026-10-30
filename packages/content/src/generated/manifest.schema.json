@@ -357,6 +357,13 @@
         },
         "terminal_zone_id": {
           "type": "string"
+        },
+        "variants": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MissionVariant"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -364,7 +371,36 @@
         "id",
         "objective",
         "reward_credits",
-        "terminal_zone_id"
+        "terminal_zone_id",
+        "variants"
+      ],
+      "type": "object"
+    },
+    "MissionVariant": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "objective": {
+          "$ref": "#/$defs/MissionObjective"
+        },
+        "reward_credits": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "duration_ticks",
+        "name",
+        "objective",
+        "reward_credits"
       ],
       "type": "object"
     },

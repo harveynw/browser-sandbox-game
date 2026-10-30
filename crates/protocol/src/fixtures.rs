@@ -61,6 +61,30 @@ pub fn positive() -> Result<Vec<Fixture>> {
     let u = Delivery::Unreliable;
     let examples = vec![
         (
+            "chat_send",
+            "client",
+            r,
+            tagged("chat", json!("Hello *world*!")),
+        ),
+        (
+            "chat_line",
+            "server",
+            r,
+            tagged(
+                "chat",
+                json!({"id":1,"username":"Guest One","text":"Hello _everyone_!","server_tick":30}),
+            ),
+        ),
+        (
+            "chat_error",
+            "server",
+            r,
+            tagged(
+                "chat_error",
+                json!("Please wait a second between messages."),
+            ),
+        ),
+        (
             "client_hello",
             "client",
             r,

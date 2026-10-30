@@ -34,6 +34,20 @@ export function controlGroups(bindings: Bindings) {
       ],
     },
     {
+      title: "Chat",
+      rows: [
+        ["T", "Focus chat"],
+        ["Enter", "Send message"],
+        ["Shift + Enter", "New line"],
+        ["Esc", "Close chat"],
+        ["Click game", "Resume gameplay"],
+        ["*text* / **text**", "Bold"],
+        ["_text_", "Italic"],
+        ["~text~ / ~~text~~", "Strikethrough"],
+        ["`text`", "Inline code"],
+      ],
+    },
+    {
       title: "World & menus",
       rows: [
         [key("job"), "Jobs / repair"],

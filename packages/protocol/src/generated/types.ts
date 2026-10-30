@@ -62,6 +62,10 @@ export type ContentHash = string;
 
 export type DisplayName = string;
 
+export type ChatText = string;
+
+export type ChatLine = { id: EventId, username: DisplayName, text: ChatText, server_tick: number, };
+
 export type DetailText = string;
 
 export type Vec3 = [Scalar, Scalar, Scalar];
@@ -72,7 +76,7 @@ export type ClientEnvelope = { v: ProtocolVersion, world_id: OpaqueId | null, se
 
 export type ServerEnvelope = { v: ProtocolVersion, world_id: OpaqueId | null, session_id: OpaqueId | null, message: ServerMessage, };
 
-export type ClientMessage = { "kind": "client_hello", "data": ClientHello } | { "kind": "client_ready", "data": ClientReady } | { "kind": "input_batch", "data": InputBatch } | { "kind": "action", "data": ActionRequest } | { "kind": "ping", "data": Ping } | { "kind": "resync_request", "data": ResyncRequest } | { "kind": "leave", "data": Empty };
+export type ClientMessage = { "kind": "client_hello", "data": ClientHello } | { "kind": "client_ready", "data": ClientReady } | { "kind": "input_batch", "data": InputBatch } | { "kind": "action", "data": ActionRequest } | { "kind": "chat", "data": ChatText } | { "kind": "ping", "data": Ping } | { "kind": "resync_request", "data": ResyncRequest } | { "kind": "leave", "data": Empty };
 
 export type ClientHello = { protocol_version: ProtocolVersion, build_id: BuildId, content_hash: ContentHash, sim_config_hash: ContentHash, join_ticket: OpaqueId, display_name: DisplayName, tshirt_colour: TshirtColour, };
 
@@ -102,7 +106,7 @@ export type ResyncReason = "stale" | "overflow" | "invalid_state";
 
 export type Delivery = "reliable" | "unreliable";
 
-export type ServerMessage = { "kind": "server_hello", "data": ServerHello } | { "kind": "reject", "data": Reject } | { "kind": "welcome", "data": Welcome } | { "kind": "baseline_begin", "data": BaselineBegin } | { "kind": "entity_show", "data": EntityShow } | { "kind": "baseline_end", "data": BaselineEnd } | { "kind": "start_play", "data": StartPlay } | { "kind": "entity_hide", "data": EntityHide } | { "kind": "snapshot", "data": Snapshot } | { "kind": "owner_state", "data": OwnerState } | { "kind": "control_changed", "data": OwnerState } | { "kind": "action_result", "data": ActionResult } | { "kind": "player_status", "data": PlayerStatus } | { "kind": "world_event", "data": WorldEvent } | { "kind": "pong", "data": Pong } | { "kind": "disconnect", "data": Disconnect };
+export type ServerMessage = { "kind": "server_hello", "data": ServerHello } | { "kind": "reject", "data": Reject } | { "kind": "welcome", "data": Welcome } | { "kind": "baseline_begin", "data": BaselineBegin } | { "kind": "entity_show", "data": EntityShow } | { "kind": "baseline_end", "data": BaselineEnd } | { "kind": "start_play", "data": StartPlay } | { "kind": "entity_hide", "data": EntityHide } | { "kind": "snapshot", "data": Snapshot } | { "kind": "chat", "data": ChatLine } | { "kind": "chat_error", "data": DetailText } | { "kind": "owner_state", "data": OwnerState } | { "kind": "control_changed", "data": OwnerState } | { "kind": "action_result", "data": ActionResult } | { "kind": "player_status", "data": PlayerStatus } | { "kind": "world_event", "data": WorldEvent } | { "kind": "pong", "data": Pong } | { "kind": "disconnect", "data": Disconnect };
 
 export type ServerHello = { protocol_version: ProtocolVersion, build_id: BuildId, content_hash: ContentHash, sim_config_hash: ContentHash, tick_rate: TickRate, snapshot_rate: SnapshotRate, };
 
@@ -152,7 +156,7 @@ export type ActionResult = { request_id: RequestId, applied_tick: number, ok: bo
 
 export type ActionCode = "ok" | "not_ready" | "stale_epoch" | "stale_request" | "invalid_target" | "out_of_range" | "occupied" | "too_fast" | "exit_blocked" | "cooldown" | "no_ammo" | "dead" | "unavailable" | "insufficient_funds" | "already_active" | "not_active" | "pursuit_active";
 
-export type MissionView = { instance_id: OpaqueId, template_id: TemplateId, phase: MissionPhase, checkpoint_index: number, deadline_tick: number, target_entity_id: EntityId | null, target_position: Vec3 | null, };
+export type MissionView = { instance_id: OpaqueId, template_id: TemplateId, phase: MissionPhase, checkpoint_index: number, deadline_tick: number, variant_index?: number, target_entity_id: EntityId | null, target_position: Vec3 | null, };
 
 export type MissionPhase = "active" | "completed" | "failed";
 

@@ -390,3 +390,32 @@ fn recorded_native_vehicle_trace_retains_all_sixty_checkpoints() {
     }
     assert_eq!((tick, checked), (1800, 60));
 }
+
+// Position rounding at full speed must not produce a motor rejected on the next tick.
+#[test]
+fn full_speed_sports_car_remains_valid_at_large_world_coordinates() {
+    let (config, world) = room(false);
+    let mut template = source().vehicle_templates[0].clone();
+    template.top_speed = 30.0;
+    for yaw in [0.0_f32, 0.7, -1.2] {
+        let mut state = spawn_vehicle([100.0, 0.0, 100.0], yaw).unwrap();
+        state.speed = Scalar(30.0);
+        for tick in 1..=15 {
+            let mut input = neutral_input(tick, Yaw(yaw));
+            input.move_z = InputAxis(32767);
+            state = step_vehicle(
+                &state,
+                &input,
+                &template,
+                &StepContext {
+                    tick,
+                    collision: &world,
+                    config: &config,
+                },
+            )
+            .unwrap_or_else(|error| panic!("tick {tick}: {error}; {state:?}"))
+            .motor;
+            assert!(state.speed.0 <= 30.0, "tick {tick}: {}", state.speed.0);
+        }
+    }
+}

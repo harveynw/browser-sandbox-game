@@ -638,7 +638,7 @@ select {
   position: absolute;
   top: 18px;
   left: 18px;
-  width: min(420px, calc(100vw - 350px));
+  width: min(360px, calc(100vw - 426px));
   border-left: 3px solid var(--gold);
 }
 .hud-wallet {
@@ -880,4 +880,353 @@ select {
   color: #bce8da;
   white-space: pre-line;
   font: inherit;
+}
+
+.chat-panel {
+  position: fixed;
+  z-index: 3;
+  left: 18px;
+  bottom: 200px;
+  width: min(420px, calc(100vw - 36px));
+  color: #edf5fa;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.chat-messages {
+  max-height: 220px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  text-shadow: 0 1px 3px #071920;
+}
+.chat-line {
+  background: #102831cc;
+  padding: 3px 8px;
+}
+.chat-name {
+  color: var(--sea);
+  font-weight: 600;
+}
+.chat-panel form {
+  background: #102831ed;
+  padding: 8px;
+  border: 1px solid #7ca79d;
+  border-radius: 5px;
+  margin-top: 6px;
+}
+.chat-panel textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: none;
+  background: #1e3a44;
+  color: var(--paper);
+  border: 1px solid #719c96;
+  border-radius: 3px;
+  padding: 6px;
+  font: inherit;
+}
+.chat-panel code {
+  background: #071920;
+  padding: 1px 3px;
+}
+.chat-panel[data-editing="true"] .chat-messages {
+  overflow: auto;
+}
+.chat-error {
+  font: inherit;
+  color: #ffcf68;
+  background: #102831ed;
+  padding: 5px 8px;
+}
+@media (max-width: 760px) {
+  .chat-panel {
+    bottom: 116px;
+    width: min(400px, calc(100vw - 180px));
+  }
+  .chat-panel[data-editing="true"] {
+    width: calc(100vw - 36px);
+  }
+}
+
+/* Night-city presentation adapted from previous.html. */
+.game-mode {
+  --ink: #080912;
+  --paper: #f7f8fc;
+  --sea: #31f4d0;
+  --gold: #ffd75e;
+  --pink: #ff3ca6;
+  background: var(--ink);
+}
+.game-menu {
+  background: linear-gradient(145deg, #121622f7, #070910f7);
+  border: 1px solid #ffffff30;
+  border-top: 4px solid var(--pink);
+  box-shadow:
+    0 30px 100px #0009,
+    0 -8px 40px #ff3ca614;
+  backdrop-filter: blur(14px);
+}
+.game-menu h1 {
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: -0.06em;
+  text-shadow: 4px 4px #ff3ca638;
+}
+.game-menu .eyebrow {
+  color: var(--sea);
+  letter-spacing: 0.2em;
+}
+.game-menu button {
+  background: #202637;
+  color: var(--paper);
+  border-color: #ffffff29;
+  font-weight: 800;
+}
+.game-menu .actions button:first-child {
+  background: var(--sea);
+  color: #06120f;
+  box-shadow: 0 0 28px #31f4d026;
+}
+.game-menu input[type="text"],
+.game-menu select {
+  background: #0b101b;
+  border-color: #ffffff29;
+}
+.game-menu .game-profile {
+  border-color: var(--pink);
+  background: #ff3ca60a;
+}
+.game-hud > * {
+  background: #070a12d1;
+  border-color: #ffffff29;
+  box-shadow: 0 9px 30px #0005;
+  backdrop-filter: blur(14px);
+}
+.hud-objective {
+  border-left: 2px solid var(--sea);
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c5ced8;
+}
+.hud-objective-label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--sea);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.hud-objective p {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.hud-wallet {
+  right: 258px;
+  min-width: 110px;
+  color: var(--sea);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.hud-wanted {
+  position: absolute;
+  top: 18px;
+  right: 138px;
+  letter-spacing: 0.12em;
+  color: #424958;
+  font-size: 20px;
+  padding: 8px 12px;
+}
+.hud-wanted .hot {
+  color: var(--gold);
+  text-shadow: 0 0 12px #ffd75ecc;
+}
+.hud-vitals {
+  width: 310px;
+  border: 0;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, #070a12cc, #070a1280);
+}
+.hud-statrow {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 8px 0;
+}
+.hud-statrow > span {
+  width: 52px;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-shadow: 0 2px 8px #000;
+}
+.hud-bar {
+  height: 9px;
+  flex: 1;
+  background: #0009;
+  border: 1px solid #ffffff38;
+  overflow: hidden;
+  transform: skew(-12deg);
+}
+.hud-bar i {
+  display: block;
+  height: 100%;
+  transition: width 0.16s;
+  background: linear-gradient(90deg, #ff315d, #ff3ca6);
+  box-shadow: 0 0 13px #ff3ca6;
+}
+.hud-bar-ammo i {
+  background: linear-gradient(90deg, #208eff, #31f4d0);
+  box-shadow: 0 0 13px #31f4d0;
+}
+.hud-combat {
+  margin: 10px 0 0;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.city-minimap {
+  border-color: #ffffff47;
+  background: #0b1018;
+  box-shadow: 0 12px 36px #0006;
+  border-radius: 18px;
+}
+.game-metrics,
+.controls-panel,
+.chat-panel,
+.city-map {
+  background: #070a12d9;
+  border-color: #ffffff29;
+  backdrop-filter: blur(14px);
+}
+.game-metrics > summary,
+.controls-panel > summary {
+  background: #0c101b;
+  color: #31f4d0;
+}
+@media (max-width: 700px) {
+  .hud-wallet {
+    right: auto;
+    left: 18px;
+    top: 12px;
+  }
+  .hud-wanted {
+    top: 12px;
+    right: 130px;
+  }
+  .hud-vitals {
+    width: auto;
+    left: 18px;
+    right: 18px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-bar i {
+    transition: none;
+  }
+}
+.game-app[data-reduced="true"] .hud-bar i {
+  transition: none;
+}
+
+.chat-line,
+.chat-panel form {
+  background: #070a12d1;
+  border-color: #ffffff29;
+}
+.chat-panel textarea {
+  background: #141a28;
+  border-color: #ffffff29;
+}
+.game-controls > summary {
+  color: var(--sea);
+  background: #0c101b;
+}
+
+.hud-bar-vehicle i {
+  background: linear-gradient(90deg, #27ae60, #8af59a);
+  box-shadow: 0 0 13px #52e681;
+}
+.hud-statrow[hidden] {
+  display: none;
+}
+
+.hud-contract-title {
+  margin: 3px 0 12px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+.hud-contract-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.25fr;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #ffffff18;
+  border-bottom: 1px solid #ffffff18;
+}
+.hud-contract-stats span {
+  display: block;
+  color: #98a6b5;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.hud-contract-stats strong {
+  display: block;
+  color: #fff;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.hud-contract-stats > :nth-child(2) strong {
+  color: var(--gold);
+}
+.hud-contract-meter {
+  height: 3px;
+  margin-top: 12px;
+  background: #ffffff18;
+  overflow: hidden;
+}
+.hud-contract-meter i {
+  display: block;
+  height: 100%;
+  background: var(--sea);
+}
+.hud-objective[data-urgent="true"] {
+  border-left-color: #ff6b6b;
+}
+.hud-objective[data-urgent="true"] .hud-objective-label,
+.hud-objective[data-urgent="true"] .hud-contract-stats > :first-child strong {
+  color: #ff8585;
+}
+.hud-objective[data-urgent="true"] .hud-contract-meter i {
+  background: #ff6b6b;
+}
+.hud-objective[data-phase="completed"] {
+  border-color: #31f4d080;
+  background: #0b2426ed;
+}
+.hud-objective[data-phase="failed"] {
+  border-left-color: #ff6b6b;
+}
+@media (min-width: 701px) and (max-width: 850px) {
+  .hud-contract-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .hud-contract-stats > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-height: 550px) {
+  .hud-objective {
+    max-height: calc(100dvh - 200px);
+    overflow: auto;
+  }
 }

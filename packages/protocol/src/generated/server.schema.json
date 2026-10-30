@@ -183,6 +183,37 @@
       ],
       "type": "object"
     },
+    "ChatLine": {
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/EventId"
+        },
+        "server_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "$ref": "#/$defs/ChatText"
+        },
+        "username": {
+          "$ref": "#/$defs/DisplayName"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "text",
+        "server_tick"
+      ],
+      "type": "object"
+    },
+    "ChatText": {
+      "maxLength": 256,
+      "minLength": 1,
+      "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$",
+      "type": "string"
+    },
     "ContentHash": {
       "maxLength": 64,
       "minLength": 64,
@@ -498,6 +529,15 @@
         },
         "template_id": {
           "$ref": "#/$defs/TemplateId"
+        },
+        "variant_index": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         }
       },
       "required": [
@@ -961,6 +1001,38 @@
             },
             "kind": {
               "const": "snapshot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/ChatLine"
+            },
+            "kind": {
+              "const": "chat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "$ref": "#/$defs/DetailText"
+            },
+            "kind": {
+              "const": "chat_error",
               "type": "string"
             }
           },

@@ -823,7 +823,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     let mut w = World::new(content).unwrap();
     let mut a = Profiles::default();
     let mut t = FakeTransport::default();
-    assert_eq!(w.systems.population.pools.len(), 4);
+    assert_eq!(w.systems.population.pools.len(), 16);
     assert_eq!(w.systems.police.units.len(), 2);
     assert!(w.vehicles.values().any(|v| v.template.id == "van"));
     assert!(w.vehicles.values().any(|v| v.template.id == "sport"));
@@ -1300,3 +1300,5 @@ fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {
 mod restored_gameplay;
 
 mod shirt_colour;
+
+mod chat;

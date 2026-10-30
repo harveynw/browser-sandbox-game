@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalJson,
   findRoute,
+  courierRoute,
   loadPackage,
   manifestHash,
   sha256,
@@ -197,4 +198,33 @@ it("boots a streamed city with complete physics and verifies later distant chunk
     streamVisuals: true,
   });
   await expect(other.loadChunk(distant.id)).rejects.toThrow("SHA-256 mismatch");
+});
+
+it("courier routes end at each assigned variant's delivery zone rather than the old Market destination", async () => {
+  const data = await loadPackage(
+    new URL("http://localhost/content/city.json"),
+    undefined,
+    mockFetch,
+    { streamVisuals: true },
+  );
+  const template = data.manifest.mission_templates.find(
+    (t) => t.id === "courier_quay_market",
+  );
+  expect(template?.variants).toHaveLength(3);
+  const routes: string[] = [];
+  for (const variant of template?.variants ?? []) {
+    if (variant.objective.kind !== "courier")
+      throw new Error("Expected courier variant");
+    const destinationId = variant.objective.data.destination_zone_id;
+    const zone = data.manifest.zones.find((z) => z.id === destinationId);
+    if (!zone) throw new Error("Missing delivery zone");
+    const route = courierRoute(data.manifest, [-172, 0, 180], zone.center);
+    expect(route.length).toBeGreaterThan(1);
+    expect(route[route.length - 1]).toEqual(zone.center);
+    routes.push(JSON.stringify(route));
+  }
+  expect(new Set(routes).size).toBe(3);
+  expect(courierRoute(data.manifest, [-172, 0, 180], [999, 0, 999])).toEqual(
+    [],
+  );
 });

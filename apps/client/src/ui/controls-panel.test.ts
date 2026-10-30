@@ -8,6 +8,7 @@ it("shows movement, vehicle, combat and menu controls with their current binding
     "Movement",
     "Vehicles",
     "Combat",
+    "Chat",
     "World & menus",
   ]);
   const rows = groups.flatMap((group) => group.rows);

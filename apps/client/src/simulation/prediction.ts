@@ -79,11 +79,12 @@ export class LocalPrediction {
     private readonly prepare: (
       tick: number,
       controlled: number,
+      omitVehicles?: boolean,
     ) => void = () => {},
     private readonly templateFor: (id: number) => string | undefined = () =>
       "compact",
   ) {}
-  private resetOwner(owner: OwnerState): void {
+  private resetOwner(owner: OwnerState): boolean {
     this.prepare(owner.server_tick, owner.controlled_entity_id);
     const vehicle =
       owner.state.kind === "vehicle" ? owner.state.data.motor : undefined;
@@ -94,14 +95,41 @@ export class LocalPrediction {
       : undefined;
     if (vehicle && !template)
       throw new Error("Controlled vehicle template unavailable");
-    this.world.reset({
-      version: 1,
-      tick: owner.server_tick,
-      control_epoch: owner.control_epoch,
-      controlled_entity_id: owner.controlled_entity_id,
-      motor: actorMotor(owner.state.data.motor),
-      ...(vehicle && template ? { vehicle: { motor: vehicle, template } } : {}),
-    });
+    const reset = () =>
+      this.world.reset({
+        version: 1,
+        tick: owner.server_tick,
+        control_epoch: owner.control_epoch,
+        controlled_entity_id: owner.controlled_entity_id,
+        motor: actorMotor(owner.state.data.motor),
+        ...(vehicle && template
+          ? { vehicle: { motor: vehicle, template } }
+          : {}),
+      });
+    try {
+      reset();
+    } catch (error) {
+      if (
+        vehicle &&
+        error instanceof Error &&
+        /vehicle (starts|endpoint) obstructed/.test(error.message)
+      ) {
+        this.prepare(owner.server_tick, owner.controlled_entity_id, true);
+        try {
+          reset();
+          return true;
+        } catch {
+          this.fail("invalid_state");
+          return false;
+        }
+      }
+      throw error;
+    }
+    return true;
+  }
+  get vehicleSteering(): number | undefined {
+    if (!this.current || this.owner?.state.kind !== "vehicle") return undefined;
+    return this.world.currentState().vehicle?.motor.steering;
   }
   get tick(): number {
     return this.current ? this.world.currentState().tick : 0;
@@ -117,7 +145,7 @@ export class LocalPrediction {
     return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)] ?? 0;
   }
   install(owner: OwnerState, now: number): void {
-    this.resetOwner(owner);
+    if (!this.resetOwner(owner)) return;
     this.owner = owner;
     this.history.clear();
     this.offset = [0, 0, 0];
@@ -136,7 +164,7 @@ export class LocalPrediction {
       return;
     }
     while (this.tick < first - 1)
-      this.step(neutral(this.tick + 1, this.current.yaw));
+      if (!this.step(neutral(this.tick + 1, this.current.yaw))) return;
     const cached = this.future;
     this.future = undefined;
     if (
@@ -152,7 +180,7 @@ export class LocalPrediction {
     this.stop();
     this.resync(reason);
   }
-  private step(input: InputFrame): void {
+  private step(input: InputFrame): boolean {
     this.prepare(input.tick, this.owner?.controlled_entity_id ?? 0);
     this.previous = this.current;
     if (
@@ -168,8 +196,30 @@ export class LocalPrediction {
         motor: this.current ?? this.owner.player_state.motor,
       });
       this.current = this.world.currentState().motor;
-    } else this.current = this.world.step(input).motor;
+    } else {
+      try {
+        this.current = this.world.step(input).motor;
+      } catch (error) {
+        // Remote cars are sampled independently of our predicted/replayed tick.
+        // Retry this prediction with static collision only; authority still
+        // resolves car contacts and corrects us through normal owner updates.
+        if (
+          this.owner?.state.kind === "vehicle" &&
+          error instanceof Error &&
+          /vehicle (starts|endpoint) obstructed/.test(error.message)
+        ) {
+          this.prepare(input.tick, this.owner.controlled_entity_id, true);
+          try {
+            this.current = this.world.step(input).motor;
+          } catch {
+            this.fail("invalid_state");
+            return false;
+          }
+        } else throw error;
+      }
+    }
     this.history.set(input.tick, { input, motor: this.current });
+    return true;
   }
   advance(now: number, sample: () => Controls): InputFrame[] {
     if (this.stopped || !this.current || !this.owner) return [];
@@ -203,7 +253,7 @@ export class LocalPrediction {
         return [];
       }
       const frame = { ...sample(), tick: this.tick + 1 };
-      this.step(frame);
+      if (!this.step(frame)) return [];
       generated.push(frame);
       this.accumulated = Math.max(0, this.accumulated - STEP_MS);
     }
@@ -213,7 +263,7 @@ export class LocalPrediction {
     return [...this.history.values()].slice(-3).map((h) => h.input);
   }
   reconcile(owner: OwnerState, now: number): void {
-    if (!this.owner) return;
+    if (!this.owner || this.stopped) return;
     if (owner.control_epoch > this.epoch) {
       if (
         !this.future ||
@@ -242,7 +292,7 @@ export class LocalPrediction {
     const oldMotor = this.current;
     const oldRender = this.presentation(now);
     const oldMode = this.owner.player_state.mode;
-    this.resetOwner(owner);
+    if (!this.resetOwner(owner)) return;
     for (const tick of this.history.keys())
       if (tick <= owner.consumed_through_tick) this.history.delete(tick);
     this.owner = owner;
@@ -250,9 +300,12 @@ export class LocalPrediction {
     this.current = actorMotor(owner.state.data.motor);
     this.replaySteps = 0;
     for (let tick = owner.server_tick + 1; tick <= end; tick++) {
-      this.step(
-        this.history.get(tick)?.input ?? neutral(tick, this.current.yaw),
-      );
+      if (
+        !this.step(
+          this.history.get(tick)?.input ?? neutral(tick, this.current.yaw),
+        )
+      )
+        return;
       this.replaySteps++;
     }
     this.correction = oldMotor

@@ -137,3 +137,35 @@ fn tshirt_colour_is_a_bounded_rgb_integer() {
         assert!(serde_json::from_value::<protocol::TshirtColour>(value).is_err());
     }
 }
+
+#[test]
+fn chat_text_rejects_empty_control_and_oversized_messages() {
+    for text in ["", "   ", "bad\0text"] {
+        assert!(serde_json::from_value::<protocol::ChatText>(serde_json::json!(text)).is_err());
+    }
+    for text in ["a".repeat(257), "🙂".repeat(129)] {
+        assert!(serde_json::from_value::<protocol::ChatText>(serde_json::json!(text)).is_err());
+    }
+    let text = "Hi *bold*\n_italic_ ~strike~ `code` 🙂";
+    assert_eq!(
+        serde_json::from_value::<protocol::ChatText>(serde_json::json!(text))
+            .unwrap()
+            .0,
+        text
+    );
+}
+
+#[test]
+fn mission_variant_selection_is_optional_for_legacy_views_and_roundtrips() {
+    let legacy = serde_json::json!({
+        "instance_id": "mission-test", "template_id": "courier_quay_market",
+        "phase": "active", "checkpoint_index": 0, "deadline_tick": 5400,
+        "target_entity_id": null, "target_position": [0, 0, 0]
+    });
+    let mut view: protocol::MissionView = serde_json::from_value(legacy).unwrap();
+    assert_eq!(view.variant_index, None);
+    view.variant_index = Some(2);
+    let encoded = rmp_serde::to_vec_named(&view).unwrap();
+    let decoded: protocol::MissionView = rmp_serde::from_slice(&encoded).unwrap();
+    assert_eq!(decoded, view);
+}

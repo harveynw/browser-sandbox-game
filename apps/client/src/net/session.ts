@@ -1,6 +1,7 @@
 import { decodeServer, encodeClient } from "@port-meridian/protocol";
 import type {
   ClientMessage,
+  ChatLine,
   ServerEnvelope,
   CharacterMotor,
   InputFrame,
@@ -19,6 +20,8 @@ import { ReplicaStore } from "../world/replica";
 import type { PredictionWorld } from "../simulation/bridge";
 
 export interface SessionEvents {
+  chat?: (line: ChatLine) => void;
+  chatError?: (text: string) => void;
   tshirtColour?: (colour: number) => void;
   appearanceError?: () => void;
   worldEvent?: (event: WorldEvent, own: boolean) => void;
@@ -177,6 +180,9 @@ export class GameSession {
       this.savingColour = false;
     }
   }
+  sendChat(text: string): boolean {
+    return this.phase === "playing" && this.send({ kind: "chat", data: text });
+  }
   private async api(path: string, body: unknown = {}): Promise<unknown> {
     const deadline = performance.now() + 5000;
     let response: Response;
@@ -239,7 +245,11 @@ export class GameSession {
         this.clock,
         (reason) => this.requestResync(reason),
         assets.manifest.vehicle_templates,
-        (tick, controlled) => {
+        (tick, controlled, omitVehicles = false) => {
+          if (omitVehicles) {
+            prediction.setVehicleProxies({ version: 1, proxies: [] });
+            return;
+          }
           const proxies = this.replicas
             .sampleAll(tick, performance.now())
             .flatMap((actor) => {
@@ -496,6 +506,12 @@ export class GameSession {
         this.ping("unreliable");
         break;
       }
+      case "chat":
+        this.events.chat?.(message.data);
+        break;
+      case "chat_error":
+        this.events.chatError?.(message.data);
+        break;
       case "player_status":
         if (message.data.revision < this.statusRevision) return;
         this.statusRevision = message.data.revision;
@@ -867,7 +883,12 @@ export class GameSession {
       .filter((r) => r.id !== this.player);
     const controlled = actors.find((a) => a.id === this.controlled);
     const predicted = this.presentation(now);
-    if (controlled && predicted) controlled.motor = predicted;
+    if (controlled && predicted) {
+      controlled.motor = predicted;
+      if (controlled.state.kind === "vehicle")
+        controlled.steering =
+          this.local?.vehicleSteering ?? controlled.state.data.motor.steering;
+    }
     for (const actor of actors) {
       if (
         actor.state.kind !== "character" ||

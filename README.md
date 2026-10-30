@@ -32,7 +32,7 @@ Normal saves live in `var/profiles.sqlite`. For isolated testing, use `npm run p
 
 WASD/arrows move or drive, Shift sprints, Space jumps or applies the handbrake, and E enters/exits cars. RMB/Q aims, left click/X fires and R reloads. F opens job choices at a cyan terminal or repairs a stopped car in the green Ironworks zone. M opens the map; Esc opens the menu while the world continues. If mouse capture is declined, drag the scene to look. Controls can be remapped in the menu.
 
-Start at the cyan Quay terminal for courier or recovery work. Courier deliveries pay 150 credits, recovery pays 250, and the north city ring time trial pays 200. Repairs cost 50. The [gameplay guide](docs/gameplay.md) describes locations, conditions, timers and police rules.
+Start at the cyan Quay terminal for courier or recovery work. Courier contracts pay 120–220 credits depending on the assigned destination, recovery pays 250, and the north city ring time trial pays 200. Repairs cost 50. The [gameplay guide](docs/gameplay.md) describes locations, conditions, timers and police rules.
 
 ## Documentation
 

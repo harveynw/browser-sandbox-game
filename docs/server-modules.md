@@ -25,6 +25,7 @@ flowchart TB
         movement["movement.rs: MovementSystem"]
         population["population.rs: PopulationSystem"]
         combat["combat.rs: CombatSystem"]
+        chat["chat.rs: ChatSystem"]
         police["police.rs: PoliceSystem"]
         missions["missions.rs: MissionSystem"]
         repairs["repairs.rs: RepairSystem"]
@@ -51,6 +52,8 @@ flowchart TB
     tick -->|timings| performance
     sessions -->|drain input| transport
     sessions -->|join and disconnect| admission
+    sessions -->|delegate chat and readiness| chat
+    chat -->|broadcast and replay reliably| replication
     sessions -->|dispatch actions and cleanup| combat & police & missions & repairs & population
     sessions -->|control transitions and baselines| replication
     replication -->|send queued output| transport
@@ -68,7 +71,7 @@ flowchart TB
     repairs -->|check wanted state| police
     missions -->|committed rewards| admission
     repairs -->|debits and refunds| admission
-    owners -->|owns instances| movement & population & combat & police & missions & repairs
+    owners -->|owns instances| movement & population & combat & police & missions & repairs & chat
     world -->|stores| player & vehicle
     population -->|stores| pedestrian
     player -->|owns equipment| weapon
@@ -77,3 +80,5 @@ flowchart TB
     police -. "test module" .-> police_tests
     police_tests -. exercises .-> police & world & owners
 ```
+
+Mission selection remains inside `MissionSystem`: `systems/missions/selection.rs` ranks authored options from the random instance ID, and `systems/missions/state.rs` owns objective progression, deadlines and mission views. `missions.rs` handles acceptance, recovery reservations and committed rewards. Neither sessions nor the frontend chooses random objectives.

@@ -105,11 +105,13 @@ async function connect() {
   const phases = vi.fn(),
     owners = vi.fn(),
     status = vi.fn(),
-    colours = vi.fn();
+    colours = vi.fn(),
+    chat = vi.fn();
   const game = new GameSession(() => {}, status, {
     phase: phases,
     owner: owners,
     tshirtColour: colours,
+    chat,
   });
   live.push(game);
   await game.connect();
@@ -142,7 +144,7 @@ async function connect() {
       },
     },
   });
-  return { game, phases, owners, status, colours };
+  return { game, phases, owners, status, colours, chat };
 }
 function baseline(id = 1, visibility = 1, tick = 10) {
   receive({
@@ -465,4 +467,21 @@ it("updates the owner render colour from a reliable descriptor refresh without r
     game.replicas.sampleAll(10, performance.now())[0]?.descriptor.tshirt_colour,
   ).toBe(0x22cc66);
   expect(sent()).toHaveLength(messages);
+});
+
+it("sends chat only when ready and receives reliable server-authored messages", async () => {
+  const { game, chat } = await connect();
+  expect(game.sendChat("Too early")).toBe(false);
+  baseline();
+  start();
+  expect(game.sendChat("Hello *everyone*")).toBe(true);
+  expect(sent().at(-1)).toEqual({ kind: "chat", data: "Hello *everyone*" });
+  const line = {
+    id: 1,
+    username: "Alice",
+    text: "Hello *everyone*",
+    server_tick: 10,
+  };
+  receive({ kind: "chat", data: line });
+  expect(chat).toHaveBeenCalledWith(line);
 });

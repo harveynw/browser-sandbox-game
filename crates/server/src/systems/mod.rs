@@ -1,5 +1,6 @@
 //! Gameplay systems own rule-specific bookkeeping, separately from world entities.
 use std::result::Result;
+pub mod chat;
 pub mod combat;
 pub mod missions;
 pub mod movement;
@@ -15,6 +16,7 @@ use population::PopulationSystem;
 use repairs::RepairSystem;
 /// Concrete resources passed to the tick in an explicit order; no dynamic scheduler.
 pub struct Systems {
+    pub chat: chat::ChatSystem,
     pub movement: MovementSystem,
     pub combat: CombatSystem,
     pub missions: MissionSystem,
@@ -46,6 +48,7 @@ impl Systems {
             }
         }
         let mut systems = Self {
+            chat: Default::default(),
             movement: MovementSystem,
             population,
             police,

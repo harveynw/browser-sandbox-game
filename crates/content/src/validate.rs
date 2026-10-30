@@ -323,59 +323,81 @@ pub fn authoring(a: &Authoring) -> Result<()> {
                 && m.reward_credits <= 10000,
             "invalid mission start/reward/duration",
         )?;
-        match &m.objective {
-            MissionObjective::Courier {
-                destination_zone_id,
-                dwell_ticks,
-                max_speed,
-            } => require(
-                a.zones
-                    .iter()
-                    .any(|z| &z.id == destination_zone_id && z.kind == ZoneKind::Delivery)
-                    && *dwell_ticks > 0
-                    && *max_speed > 0.0,
-                "invalid courier destination/dwell",
-            )?,
-            MissionObjective::TimeTrial {
-                checkpoints,
-                gate_radius,
-            } => {
-                require(
-                    full && checkpoints.len() >= 3
-                        && checkpoints.first() == checkpoints.last()
-                        && *gate_radius == 8.0,
-                    "invalid time trial gates",
-                )?;
-                for point in checkpoints {
+        require(m.variants.len() <= 16, "too many mission variants")?;
+        let mut names = BTreeSet::new();
+        for variant in &m.variants {
+            require(
+                !variant.name.trim().is_empty()
+                    && variant.name.len() <= 64
+                    && names.insert(&variant.name)
+                    && variant.duration_ticks > 0
+                    && variant.duration_ticks <= 30 * 3600
+                    && variant.reward_credits <= 10000
+                    && std::mem::discriminant(&variant.objective)
+                        == std::mem::discriminant(&m.objective),
+                "invalid mission variant",
+            )?;
+        }
+        for objective in
+            std::iter::once(&m.objective).chain(m.variants.iter().map(|v| &v.objective))
+        {
+            match objective {
+                MissionObjective::Courier {
+                    destination_zone_id,
+                    dwell_ticks,
+                    max_speed,
+                } => require(
+                    a.zones
+                        .iter()
+                        .any(|z| &z.id == destination_zone_id && z.kind == ZoneKind::Delivery)
+                        && *dwell_ticks > 0
+                        && *max_speed > 0.0,
+                    "invalid courier destination/dwell",
+                )?,
+                MissionObjective::TimeTrial {
+                    checkpoints,
+                    gate_radius,
+                } => {
                     require(
-                        finite(*point)
-                            && point[1] == 0.0
-                            && contains(
-                                &bounds_rect(&a.bounds),
-                                &around(*point, [*gate_radius; 2]),
-                            ),
-                        "trial gate outside map",
+                        full && (3..=32).contains(&checkpoints.len())
+                            && (checkpoints[0][0] - terminal.center[0])
+                                .hypot(checkpoints[0][2] - terminal.center[2])
+                                <= *gate_radius
+                            && checkpoints.first() == checkpoints.last()
+                            && *gate_radius == 8.0,
+                        "invalid time trial gates",
                     )?;
+                    for point in checkpoints {
+                        require(
+                            finite(*point)
+                                && point[1] == 0.0
+                                && contains(
+                                    &bounds_rect(&a.bounds),
+                                    &around(*point, [*gate_radius; 2]),
+                                ),
+                            "trial gate outside map",
+                        )?;
+                    }
                 }
-            }
-            MissionObjective::Recovery {
-                parking_ids,
-                garage_zone_id,
-            } => {
-                require(
-                    full && parking_ids.len() == 8
-                        && a.zones
-                            .iter()
-                            .any(|z| &z.id == garage_zone_id && z.kind == ZoneKind::Garage),
-                    "invalid recovery lot/garage",
-                )?;
-                let unique: BTreeSet<_> = parking_ids.iter().collect();
-                require(unique.len() == 8, "duplicate recovery slots")?;
-                for id in parking_ids {
+                MissionObjective::Recovery {
+                    parking_ids,
+                    garage_zone_id,
+                } => {
                     require(
-                        a.parking.iter().any(|p| &p.id == id && p.mission_reserved),
-                        "unknown/unreserved recovery slot",
+                        full && parking_ids.len() == 8
+                            && a.zones
+                                .iter()
+                                .any(|z| &z.id == garage_zone_id && z.kind == ZoneKind::Garage),
+                        "invalid recovery lot/garage",
                     )?;
+                    let unique: BTreeSet<_> = parking_ids.iter().collect();
+                    require(unique.len() == 8, "duplicate recovery slots")?;
+                    for id in parking_ids {
+                        require(
+                            a.parking.iter().any(|p| &p.id == id && p.mission_reserved),
+                            "unknown/unreserved recovery slot",
+                        )?;
+                    }
                 }
             }
         }
@@ -575,18 +597,23 @@ pub fn package(
     graph(&m.road_graph, m, &c.colliders)?;
     graph(&m.pedestrian_graph, m, &c.colliders)?;
     for mission in &m.mission_templates {
-        if let MissionObjective::TimeTrial {
-            checkpoints,
-            gate_radius,
-        } = &mission.objective
+        for objective in
+            std::iter::once(&mission.objective).chain(mission.variants.iter().map(|v| &v.objective))
         {
-            for point in checkpoints {
-                require(
-                    m.road_graph.nodes.iter().any(|n| {
-                        (n.position[0] - point[0]).hypot(n.position[2] - point[2]) <= *gate_radius
-                    }),
-                    "trial gate disconnected from road graph",
-                )?;
+            if let MissionObjective::TimeTrial {
+                checkpoints,
+                gate_radius,
+            } = objective
+            {
+                for point in checkpoints {
+                    require(
+                        m.road_graph.nodes.iter().any(|n| {
+                            (n.position[0] - point[0]).hypot(n.position[2] - point[2])
+                                <= *gate_radius
+                        }),
+                        "trial gate disconnected from road graph",
+                    )?;
+                }
             }
         }
     }

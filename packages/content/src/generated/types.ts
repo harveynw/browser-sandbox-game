@@ -20,7 +20,9 @@ export type Zone = { id: string, center: [number, number, number], radius: numbe
 
 export type ZoneKind = "delivery" | "garage" | "repair" | "terminal";
 
-export type MissionTemplate = { id: string, terminal_zone_id: string, duration_ticks: number, reward_credits: number, objective: MissionObjective, };
+export type MissionTemplate = { id: string, terminal_zone_id: string, duration_ticks: number, reward_credits: number, objective: MissionObjective, variants: Array<MissionVariant>, };
+
+export type MissionVariant = { name: string, duration_ticks: number, reward_credits: number, objective: MissionObjective, };
 
 export type MissionObjective = { "kind": "courier", "data": { destination_zone_id: string, dwell_ticks: number, max_speed: number, } } | { "kind": "time_trial", "data": { checkpoints: Array<[number, number, number]>, gate_radius: number, } } | { "kind": "recovery", "data": { parking_ids: Array<string>, garage_zone_id: string, } };
 

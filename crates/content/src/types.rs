@@ -71,6 +71,14 @@ object!(MissionTemplate {
     terminal_zone_id: String,
     duration_ticks: u32,
     reward_credits: u32,
+    objective: MissionObjective,
+    #[serde(default)]
+    variants: Vec<MissionVariant>
+});
+object!(MissionVariant {
+    name: String,
+    duration_ticks: u32,
+    reward_credits: u32,
     objective: MissionObjective
 });
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]

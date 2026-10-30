@@ -58,3 +58,5 @@ A reliable baseline freezes a relevant set and sends Begin → Shows → End. Cl
 OwnerState provides the controlled actor and player state, server tick, control epoch and processed input position. Only a reliable ControlChanged can install a new ownership epoch. Private PlayerStatus includes committed economy, ammunition, heat/pursuit, mission and repair views; those fields are not published in another player's replica.
 
 Wire shape or interpretation changes require a protocol version change and regenerated fixtures. Content and local bridge versions are independent. Run `npm run protocol:generate` explicitly after changing DTOs and `npm run protocol:check` to detect drift without overwriting generated output. Fixture support is test/generator data, not an extra runtime transport layer.
+
+Mission views optionally include `variant_index`, identifying the server-selected entry in the template's content variants. Absence means the base objective (legacy views remain decodable). The selection persists for the instance through retries and resync; only committed completion authorizes the UI's paid state.

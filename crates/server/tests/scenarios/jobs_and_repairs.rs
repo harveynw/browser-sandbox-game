@@ -216,14 +216,15 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
             .checkpoint_index,
         1
     );
-    for point in [
-        [256.0, 0.0, -256.0],
-        [256.0, 0.0, 128.0],
-        [0.0, 0.0, 256.0],
-        [-256.0, 0.0, 128.0],
-        [-256.0, 0.0, -256.0],
-        [0.0, 0.0, -256.0],
-    ] {
+    let selected_gates = match &w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        .as_ref()
+        .unwrap()
+        .objective
+    {
+        server::systems::missions::Objective::TimeTrial { checkpoints, .. } => checkpoints.clone(),
+        _ => panic!("expected trial"),
+    };
+    for point in selected_gates.into_iter().skip(1) {
         car_at(&mut w, 1, point);
         step(&mut w, &mut a, &mut t);
     }
@@ -284,7 +285,7 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
             .values()
             .filter(|pool| **pool == server::systems::population::VehiclePool::Parked)
             .count(),
-        12
+        24
     );
     let car = w.systems.missions.active[&w.sessions.peers[&peer(0)].player_id()]
         .as_ref()
@@ -529,4 +530,73 @@ fn cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward() {
             .mode,
         CharacterMode::OnFoot
     );
+}
+
+#[test]
+fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards() {
+    // Exercise every authored option deterministically, through real acceptance and payout.
+    for index in 0..3 {
+        let (mut w, mut profiles, mut transport) = police_setup();
+        let template = w
+            .content
+            .manifest
+            .mission_templates
+            .iter_mut()
+            .find(|t| t.id == "courier_quay_market")
+            .unwrap();
+        let variant = template.variants[index].clone();
+        template.variants = vec![variant.clone()];
+        let p = peer(0);
+        join(&mut w, &mut profiles, &mut transport, p, None);
+        ready(&mut w, &mut profiles, &mut transport, p);
+        place(&mut w, p, [-172.0, 0.02, 180.0]);
+        let accepted_at = w.tick;
+        job(&w, &mut transport, p, 1, "courier_quay_market");
+        step(&mut w, &mut profiles, &mut transport);
+        let mission = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+            .as_ref()
+            .unwrap();
+        assert_eq!(mission.variant_index, Some(0));
+        assert_eq!(mission.view().variant_index, Some(0));
+        assert_eq!(mission.reward, variant.reward_credits);
+        assert_eq!(mission.deadline, accepted_at + variant.duration_ticks);
+        let target = mission.target;
+        let instance = mission.id.clone();
+        let content::MissionObjective::Courier {
+            destination_zone_id,
+            ..
+        } = &variant.objective
+        else {
+            panic!("courier")
+        };
+        let zone = w
+            .content
+            .manifest
+            .zones
+            .iter()
+            .find(|z| &z.id == destination_zone_id)
+            .unwrap();
+        assert_eq!(target, zone.center.map(|v| v as f32));
+        // Retried requests must not roll a new contract or change its payout.
+        job(&w, &mut transport, p, 1, "courier_quay_market");
+        step(&mut w, &mut profiles, &mut transport);
+        assert_eq!(
+            w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+                .as_ref()
+                .unwrap()
+                .id,
+            instance
+        );
+        place(&mut w, p, [target[0], 0.02, target[2]]);
+        ticks(&mut w, &mut profiles, &mut transport, p, 31);
+        assert_eq!(
+            w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
+            variant.reward_credits
+        );
+        ticks(&mut w, &mut profiles, &mut transport, p, 2);
+        assert_eq!(
+            w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
+            variant.reward_credits
+        );
+    }
 }

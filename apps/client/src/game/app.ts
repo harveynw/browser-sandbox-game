@@ -1,12 +1,18 @@
 import { GameAudio } from "../audio/sound";
 import { CityMap } from "../ui/city-map";
 import { GameHud, Tutorial, friendlyProblem } from "../ui/hud";
+import { ChatPanel } from "../ui/chat-panel";
 import { ControlsPanel } from "../ui/controls-panel";
 import { SettingsPanel } from "../ui/settings-panel";
 import { readSettings, saveSettings, controlText } from "./settings";
 import { Diagnostics } from "./diagnostics";
 import { simulationMemoryBytes } from "../simulation/bridge";
-import { courierGuidance, repairGuidance } from "./courier";
+import {
+  courierGuidance,
+  repairGuidance,
+  missionCard,
+  selectedMissionTemplate,
+} from "./courier";
 import type {
   CharacterMode,
   CharacterMotor,
@@ -56,6 +62,16 @@ export class GameApp {
   private readonly audio = new GameAudio();
   private readonly tutorial = new Tutorial();
   private readonly controls = new ControlsPanel();
+  private readonly chat = new ChatPanel(
+    (text) => this.session?.sendChat(text) ?? false,
+    () => {
+      this.input.clear();
+      this.audio.pause(true);
+      this.overlay.hidden = true;
+      if (document.pointerLockElement === this.canvas)
+        document.exitPointerLock();
+    },
+  );
   private cityMap: CityMap | undefined;
   private readonly mapButton = document.createElement("button");
   private readonly instructions = document.createElement("p");
@@ -209,6 +225,7 @@ export class GameApp {
       this.minimap,
       this.cross,
       this.hud.element,
+      this.chat.element,
       panels,
       this.overlay,
     );
@@ -229,17 +246,36 @@ export class GameApp {
     this.canvas.addEventListener(
       "click",
       () => {
+        this.chat.blur();
         void this.capture();
       },
       options,
     );
     this.unbind = bindInput(this.canvas, this.input, () => {
       this.audio.pause(true);
-      this.overlay.hidden = !!this.cityMap?.open;
+      this.overlay.hidden = !!this.cityMap?.open || this.chat.focused;
       this.root.dataset.paused = "true";
       if (this.phase === "playing")
         this.status.textContent = "Paused — the online world continues.";
     });
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (
+          e.code !== "KeyT" ||
+          e.repeat ||
+          this.phase !== "playing" ||
+          this.cityMap?.open ||
+          e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement
+        )
+          return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.chat.focus();
+      },
+      { ...options, capture: true },
+    );
     document.addEventListener(
       "pointerlockchange",
       () => {
@@ -376,6 +412,8 @@ export class GameApp {
   }
   private setPhase(phase: AppPhase, message?: string): void {
     this.phase = phase;
+    this.chat.element.hidden = phase !== "playing";
+    if (phase !== "playing") this.chat.blur();
     this.mapButton.hidden = phase !== "playing";
     if (phase !== "playing") {
       this.audio.pause(true);
@@ -419,6 +457,7 @@ export class GameApp {
     saveSettings(this.settings);
     void this.audio.unlock();
     this.session?.close("Rejoining");
+    this.chat.clear();
     this.cleanupScene();
     const unsupported = this.supportReason();
     if (unsupported) {
@@ -439,6 +478,8 @@ export class GameApp {
           this.setPhase("authenticating", "Joining your guest session…");
       },
       {
+        chat: (line) => this.chat.receive(line),
+        chatError: (text) => this.chat.notice(text),
         assets: (assets, queries) => {
           if (this.session !== session) return;
           this.assets = assets;
@@ -573,6 +614,7 @@ export class GameApp {
     this.status.textContent = "Drag the scene to look. Esc opens the menu.";
   }
   private animate(now: number): void {
+    this.chat.update(now);
     if (this.disposed) return;
     this.debug.frame(
       now - this.previous,
@@ -637,13 +679,27 @@ export class GameApp {
         );
         this.renderer.remotes(remotes);
         const mission = this.session?.currentMission;
-        const objective = this.assets?.manifest.mission_templates.find(
-          (t) => t.id === mission?.template_id,
+        const objective = selectedMissionTemplate(
+          this.assets?.manifest.mission_templates.find(
+            (t) => t.id === mission?.template_id,
+          ),
+          mission ?? null,
         )?.objective;
+        const targetRadius =
+          objective?.kind === "courier"
+            ? Math.min(
+                5,
+                this.assets?.manifest.zones.find(
+                  (z) => z.id === objective.data.destination_zone_id,
+                )?.radius ?? 5,
+              )
+            : objective?.kind === "time_trial"
+              ? objective.data.gate_radius
+              : 5;
         this.renderer.setMissionTarget(
           mission?.phase === "active" ? mission.target_position : null,
           objective?.kind === "courier",
-          objective?.kind === "time_trial" ? objective.data.gate_radius : 5,
+          targetRadius,
         );
         const distance = this.camera.update(
           this.renderer.camera,
@@ -768,7 +824,15 @@ export class GameApp {
           this.jobChoices.replaceChildren(
             ...jobs.map((t) => {
               const button = document.createElement("button");
-              button.textContent = `${t.objective.kind === "courier" ? "Courier" : t.objective.kind === "recovery" ? "Vehicle recovery" : "Time trial (driving)"} · ${t.reward_credits} credits · ${t.duration_ticks / 30}s`;
+              const contracts = t.variants?.length ? t.variants : [t];
+              const rewards = contracts.map((v) => v.reward_credits);
+              const minReward = Math.min(...rewards),
+                maxReward = Math.max(...rewards);
+              const payout =
+                minReward === maxReward
+                  ? `${minReward}`
+                  : `${minReward}–${maxReward}`;
+              button.textContent = `${t.objective.kind === "courier" ? "Courier" : t.objective.kind === "recovery" ? "Vehicle recovery" : "Time trial (driving)"} · ${payout} credits · ${t.objective.kind === "courier" ? "Random destination" : t.objective.kind === "time_trial" ? "Random route" : "Reserved vehicle"}`;
               button.addEventListener(
                 "click",
                 () => {
@@ -788,7 +852,7 @@ export class GameApp {
           mission?.phase !== "active" ||
           mission.target_position === null;
         const drivingStatus = this.session?.isDriving
-          ? ` · ${(Math.hypot(...(localMotor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h · Car health ${this.carHealth}${this.input.active && this.input.down("jump") ? " · Handbrake" : ""}`
+          ? ` · ${(Math.hypot(...(localMotor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.down("jump") ? " · Handbrake" : ""}`
           : "";
         this.debug.update({
           now,
@@ -809,12 +873,24 @@ export class GameApp {
             ? `Arrested · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
             : this.health <= 0
               ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
-              : `AMMO ${this.magazine} / 12${this.reloadEnd !== null ? " · Reloading" : ""}${this.protectedUntil !== null && estimated < this.protectedUntil ? " · Protected" : ""}${now < this.hitUntil ? " · Hit confirmed" : ""}`;
+              : [
+                  this.reloadEnd !== null ? "Reloading" : "",
+                  this.protectedUntil !== null &&
+                  estimated < this.protectedUntil
+                    ? "Protected"
+                    : "",
+                  now < this.hitUntil ? "Hit confirmed" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
         const prompt = this.session?.interactionPrompt(now) ?? "";
         const repair = this.session?.currentRepair;
         this.hud.element.hidden =
-          this.phase !== "playing" || !this.input.active;
-        this.minimap.hidden = this.phase !== "playing" || !this.input.active;
+          this.phase !== "playing" ||
+          (!this.input.active && !this.chat.focused);
+        this.minimap.hidden =
+          this.phase !== "playing" ||
+          (!this.input.active && !this.chat.focused);
         this.root.dataset.paused = String(!this.input.active);
         this.menuSummary.textContent =
           this.phase === "playing"
@@ -846,6 +922,21 @@ export class GameApp {
         );
         this.hud.update({
           guidance: repair ? repairGuidance(repair) : guidance,
+          mission: repair
+            ? null
+            : missionCard(
+                mission,
+                this.assets?.manifest.mission_templates.find(
+                  (t) => t.id === mission?.template_id,
+                ),
+                estimated,
+                localMotor?.position,
+              ),
+          objectiveLabel: repair
+            ? "Vehicle repair"
+            : mission
+              ? "Current job"
+              : "Nearby jobs",
           credits: this.credits,
           health: this.health,
           heat: this.heat,
@@ -858,7 +949,16 @@ export class GameApp {
                   ? "Searching · stay hidden"
                   : "Pursuit · break sight",
           ammo: controlText(combat, this.settings.bindings),
+          magazine: this.magazine,
           vehicle: drivingStatus.replace(/^ · /, ""),
+          vehicleHealth:
+            this.session?.isDriving && this.carHealth !== null
+              ? {
+                  current: this.carHealth,
+                  maximum:
+                    this.session.controlledVehicleTemplate?.health ?? 100,
+                }
+              : null,
           warning: net?.stale
             ? "Connection delayed — waiting for the server"
             : (this.session?.actionMessage ?? ""),

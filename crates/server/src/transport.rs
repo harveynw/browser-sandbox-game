@@ -251,8 +251,10 @@ impl Network {
 impl Network {
     pub fn start(address: &str) -> std::io::Result<Self> {
         // Detect ordinary bind errors synchronously; the net crate still has a bind race.
-        drop(std::net::TcpListener::bind(address)?);
-        let (server, events) = net::Server::new(address);
+        let listener = std::net::TcpListener::bind(address)?;
+        let webrtc_host = listener.local_addr()?.ip();
+        drop(listener);
+        let (server, events) = net::Server::new(address, webrtc_host);
         Ok(Self {
             server: Some(server),
             events,
