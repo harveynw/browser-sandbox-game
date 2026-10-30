@@ -1302,3 +1302,59 @@ mod restored_gameplay;
 mod shirt_colour;
 
 mod chat;
+
+#[test]
+fn public_admission_requires_configured_origin_and_issues_secure_same_origin_ws() {
+    let (w, _, _) = setup();
+    let mut control = server::control::Control::new(&w.core);
+    control.public_origin = Some("https://game.example.test".into());
+    assert_eq!(
+        control
+            .route(
+                "POST",
+                "/api/session",
+                Some("http://localhost:4173"),
+                None,
+                b"{}",
+                0
+            )
+            .code,
+        403
+    );
+    assert_eq!(
+        control
+            .route(
+                "POST",
+                "/api/session",
+                Some("https://evil.example.test"),
+                None,
+                b"{}",
+                0
+            )
+            .code,
+        403
+    );
+    let reply = control.route(
+        "POST",
+        "/api/session",
+        Some("https://game.example.test"),
+        None,
+        b"{}",
+        0,
+    );
+    assert_eq!(reply.code, 200);
+    let cookie = reply.cookie.unwrap();
+    assert!(cookie.contains("; Secure"));
+    assert!(cookie.contains("HttpOnly; SameSite=Strict"));
+    let secret = cookie.split(';').next().unwrap().split_once('=').unwrap().1;
+    let ticket = control.route(
+        "POST",
+        "/api/join-ticket",
+        Some("https://game.example.test"),
+        Some(secret),
+        b"{}",
+        0,
+    );
+    assert_eq!(ticket.code, 200);
+    assert_eq!(ticket.body["ws_url"], "wss://game.example.test/ws");
+}

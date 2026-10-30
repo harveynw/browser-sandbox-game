@@ -74,3 +74,7 @@ For frontend-only work, `npm run dev` plus `cargo run -p server --locked` remain
 - `/api/metrics`: cached read-only timing, queue, population and encoded-byte counters.
 
 Metrics/readiness are operator diagnostics, not world-mutation APIs. Diagnostics routes `/diagnostic`, `/simulation` and `/map` provide transport, shared-motor and content checks. See [testing](testing.md).
+
+## Experimental remote playtest
+
+See [deployment operations](../deploy/README.md) for the Ubuntu service and Caddy configuration. Optional `[network]` settings supply `public_origin` (an HTTPS origin without a path) and `webrtc_host` (a concrete local interface IP reachable by clients). Admission then restricts POST origins to that hostname, sets Secure cookies and returns its `/ws` WSS URL. Internal HTTP/WS remain loopback; RTC UDP binds the separately configured IP. Default configs retain local behavior. Public readiness requires actual browser WS/RTC receipts; localhost startup probes do not validate this mode.

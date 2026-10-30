@@ -78,11 +78,12 @@ fn run() -> Result<(), String> {
     let started = Instant::now();
     let mut state = Control::new(&world);
     state.profiles = profiles;
+    state.public_origin = config.network.public_origin.clone();
     let control = Arc::new(Mutex::new(state));
     let http = HttpControl::start(control.clone(), started)
         .map_err(|e| format!("HTTP bind/start: {e}"))?;
-    let mut network =
-        Network::start("127.0.0.1:3000").map_err(|e| format!("WS bind/start: {e}"))?;
+    let mut network = Network::start_with_host("127.0.0.1:3000", config.network.webrtc_host)
+        .map_err(|e| format!("WS bind/start: {e}"))?;
     println!(
         "Port Meridian localhost world {}: WS/RTC 127.0.0.1:3000, HTTP 127.0.0.1:3001",
         world.id

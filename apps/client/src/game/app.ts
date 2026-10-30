@@ -360,7 +360,7 @@ export class GameApp {
     this.setPhase(
       unsupported ? "fatal" : "menu",
       unsupported ??
-        "Explore six city districts. Start the local game server, then choose Play.",
+        "Explore six city districts. Choose Play to join the city.",
     );
     this.frame = requestAnimationFrame((now) => this.animate(now));
   }
@@ -473,7 +473,7 @@ export class GameApp {
         if (text.startsWith("Closed:"))
           this.setPhase("disconnected", friendlyProblem(text.slice(8)));
         else if (text.startsWith("Connecting"))
-          this.setPhase("connecting", "Connecting to the local game server…");
+          this.setPhase("connecting", "Connecting to the city…");
         else if (text.startsWith("Authenticating"))
           this.setPhase("authenticating", "Joining your guest session…");
       },

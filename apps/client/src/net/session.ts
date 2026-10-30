@@ -288,9 +288,10 @@ export class GameSession {
         typeof ticket.join_ticket !== "string" ||
         !/^[0-9a-f]{64}$/.test(ticket.join_ticket) ||
         !("ws_url" in ticket) ||
-        ticket.ws_url !== "ws://127.0.0.1:3000"
+        (ticket.ws_url !== "ws://127.0.0.1:3000" &&
+          ticket.ws_url !== `wss://${location.host}/ws`)
       )
-        throw new Error("Invalid local join-ticket response");
+        throw new Error("Invalid join-ticket response");
       this.ticket = ticket.join_ticket;
       this.status("Connecting WS + RTC…");
       this.timer = setInterval(() => {

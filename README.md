@@ -59,3 +59,7 @@ These guides describe the implemented game. The owning code, generated contracts
 `npm run check` verifies generated outputs, WASM, types, lint/formatting and Rust/TypeScript tests. `npm run build` produces the client and native artifacts. Socket/process tests run explicitly as described in [testing](docs/testing.md).
 
 The supported deployment is **localhost**. Local gameplay is verified with the in-app Chromium browser, including two guests, driving deliveries, police escape and saved rewards across restarts. The broader browser matrix remains unverified. Process supervision is verified on macOS; Linux is unverified and Windows supervision is unsupported. Target-network performance, reference-hardware budgets and sustained memory stability remain **unqualified**; the [performance guide](docs/performance.md) records the measured limits. Public hosting requires separate deployment and transport work.
+
+## Experimental droplet playtest
+
+The Ubuntu deployment uses HTTPS/WSS through Caddy and direct ICE-lite WebRTC on a configured host IP. Configuration, service operations and save backup instructions are in [deploy/README.md](deploy/README.md). Localhost remains the default; the small public playtest has no loaded-capacity or long-session qualification.

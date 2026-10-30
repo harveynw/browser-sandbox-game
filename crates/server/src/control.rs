@@ -24,6 +24,7 @@ pub struct Status {
     pub transport_healthy: bool,
 }
 pub struct Control {
+    pub public_origin: Option<String>,
     pub metrics: Value,
     tick_work: crate::performance::Histogram,
     populated_tick_work: crate::performance::Histogram,
@@ -72,6 +73,7 @@ impl Control {
     pub fn new(world: &World) -> Self {
         let hello = world.build();
         Self {
+            public_origin: None,
             metrics: json!({}),
             tick_work: Default::default(),
             populated_tick_work: Default::default(),
@@ -180,18 +182,23 @@ impl Control {
         if method != "POST" {
             return Reply::error(405, "method not allowed");
         }
-        if !matches!(
-            origin,
-            Some(
-                "http://localhost:5173"
-                    | "http://localhost:4173"
-                    | "http://localhost:3001"
-                    | "http://127.0.0.1:5173"
-                    | "http://127.0.0.1:4173"
-                    | "http://127.0.0.1:3001"
+        let allowed = if let Some(public) = &self.public_origin {
+            origin == Some(public.as_str())
+        } else {
+            matches!(
+                origin,
+                Some(
+                    "http://localhost:5173"
+                        | "http://localhost:4173"
+                        | "http://localhost:3001"
+                        | "http://127.0.0.1:5173"
+                        | "http://127.0.0.1:4173"
+                        | "http://127.0.0.1:3001"
+                )
             )
-        ) {
-            return Reply::error(403, "local development Origin required");
+        };
+        if !allowed {
+            return Reply::error(403, "configured Origin required");
         }
         match path {
             "/api/session" => {
@@ -204,7 +211,12 @@ impl Control {
                         body: json!({"profile":profile,"pending":profile.is_none()}),
                         cookie: secret.map(|s| {
                             format!(
-                                "{COOKIE}={s}; HttpOnly; SameSite=Strict; Path=/api{}",
+                                "{COOKIE}={s}; HttpOnly; SameSite=Strict; Path=/api{}{}",
+                                if self.public_origin.is_some() {
+                                    "; Secure"
+                                } else {
+                                    ""
+                                },
                                 if self.profiles.durable() {
                                     "; Max-Age=31536000"
                                 } else {
@@ -247,7 +259,7 @@ impl Control {
                 match self.profiles.issue(cookie, now) {
                     Ok(ticket) => Reply::new(
                         200,
-                        json!({"join_ticket":ticket,"expires_in_ms":30000,"ws_url":"ws://127.0.0.1:3000"}),
+                        json!({"join_ticket":ticket,"expires_in_ms":30000,"ws_url":self.public_origin.as_ref().map(|origin| format!("wss://{}/ws", &origin[8..])).unwrap_or_else(|| "ws://127.0.0.1:3000".into())}),
                     ),
                     Err(_) => Reply::error(503, "ticket capacity unavailable"),
                 }
