@@ -1,6 +1,6 @@
 # Content source and assets
 
-Edit `source/city.json` for the live 768 m city and `source/slice.json` for the preserved regression fixture; never edit generated packages directly. Rust `content` owns the DTOs and validation. `npm run content:bake` emits contracts and both immutable packages; `npm run content:check` detects contract, source/output and extra-file drift without writing files. `npm run build` bakes before building Vite; `npm run check` requires committed generated output to match.
+Edit `source/city.json` for the live 768 m city and `source/slice.json` for the preserved regression fixture; never edit generated packages directly. Rust `content` owns the DTOs and validation. `npm run content:bake` emits contracts and both immutable packages; `npm run content:check` detects contract, source/output and extra-file drift without writing files. `npm run build` bakes before building Vite; `npm run check` verifies the locally baked packages and committed contracts/indexes match. Package directories are build artifacts ignored by Git; run `npm run content:bake` (or `npm run build`) after a fresh checkout before checking content.
 
 Preview with `npm run dev`, then open http://localhost:5173/map. This page needs only the Vite/static server. Its car models are parking previews, not physical entities. Use the inspector controls for collision, reservations, directed vehicle lanes, sidewalks/crossings and the courier route.
 

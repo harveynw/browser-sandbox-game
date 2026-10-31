@@ -6,6 +6,7 @@ coverage/
 *.tsbuildinfo
 /packages/sim-wasm/
 /content/generated/
+/apps/client/public/content/packages/
 
 # Local runtime state and environment overrides
 /var/
