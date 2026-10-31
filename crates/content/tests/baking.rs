@@ -294,3 +294,150 @@ fn mission_variants_validate_references_kind_names_and_connected_routes() {
             .contains("trial gate disconnected")
     );
 }
+
+#[test]
+fn district_architecture_varies_dimensions_within_safe_plots_and_matches_collision() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let p = bake::bake(&source).unwrap();
+    let c = collision(&p);
+    validate::package(&p.manifest, &c, &p.files).unwrap();
+    for id in [
+        "old_quay",
+        "ironworks",
+        "north_heights",
+        "civic_center",
+        "market_grid",
+        "east_docks",
+    ] {
+        let d = source.districts.iter().find(|d| d.id == id).unwrap();
+        let buildings: Vec<_> = c
+            .colliders
+            .iter()
+            .filter(|c| {
+                c.role == ColliderRole::Building
+                    && c.center[0] >= d.rect.min[0]
+                    && c.center[0] < d.rect.max[0]
+                    && c.center[2] >= d.rect.min[1]
+                    && c.center[2] < d.rect.max[1]
+            })
+            .collect();
+        assert!(buildings.len() > 10);
+        for b in &buildings {
+            let visual = p
+                .manifest
+                .chunks
+                .iter()
+                .flat_map(|chunk| {
+                    let v: VisualChunk =
+                        serde_json::from_slice(&p.files[&chunk.visual_url]).unwrap();
+                    v.primitives
+                })
+                .find(|v| v.collider_id == Some(b.id))
+                .unwrap();
+            let r = &visual.building.as_ref().unwrap().architecture;
+            assert!((r.width[0]..=r.width[1]).contains(&(b.half_extents[0] * 2.0)));
+            assert!((r.depth[0]..=r.depth[1]).contains(&(b.half_extents[2] * 2.0)));
+            let floors = b.half_extents[1] * 2.0 / r.floor_height;
+            assert!((floors - floors.round()).abs() < 1e-8);
+            assert!(
+                floors.round() >= f64::from(r.floors[0])
+                    && floors.round() <= f64::from(r.floors[1])
+            );
+            for chunk in &p.manifest.chunks {
+                let visual: VisualChunk =
+                    serde_json::from_slice(&p.files[&chunk.visual_url]).unwrap();
+                for primitive in visual
+                    .primitives
+                    .iter()
+                    .filter(|v| v.collider_id == Some(b.id))
+                {
+                    assert_eq!(primitive.center, b.center);
+                    assert_eq!(primitive.half_extents, b.half_extents);
+                }
+            }
+        }
+        assert!(
+            buildings
+                .iter()
+                .any(|b| b.half_extents[0] != buildings[0].half_extents[0])
+        );
+        assert!(
+            buildings
+                .iter()
+                .any(|b| b.half_extents[1] != buildings[0].half_extents[1])
+        );
+    }
+}
+
+#[test]
+fn invalid_architecture_cannot_overflow_plots_or_world_height() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    for variant in 0..4 {
+        let mut a = source.clone();
+        let r = &mut a.districts[0].architecture;
+        match variant {
+            0 => r.width = [10.0, 100.0],
+            1 => r.floors = [4, 2],
+            2 => r.floor_height = f64::NAN,
+            _ => {
+                r.floors = [12, 12];
+                r.floor_height = 6.0;
+            }
+        }
+        assert!(bake::bake(&a).is_err());
+    }
+}
+
+#[test]
+fn dense_city_has_attached_shells_and_mixed_neighbourhoods() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let p = bake::bake(&source).unwrap();
+    let c = collision(&p);
+    validate::package(&p.manifest, &c, &p.files).unwrap();
+    let buildings: Vec<_> = p
+        .manifest
+        .chunks
+        .iter()
+        .flat_map(|chunk| {
+            let v: VisualChunk = serde_json::from_slice(&p.files[&chunk.visual_url]).unwrap();
+            v.primitives
+        })
+        .filter(|v| v.building.is_some())
+        .collect();
+    assert!(
+        buildings
+            .iter()
+            .any(|v| !v.building.as_ref().unwrap().neighbours.is_empty())
+    );
+    for d in &source.districts {
+        let local: Vec<_> = buildings
+            .iter()
+            .filter(|v| {
+                v.center[0] >= d.rect.min[0]
+                    && v.center[0] < d.rect.max[0]
+                    && v.center[2] >= d.rect.min[1]
+                    && v.center[2] < d.rect.max[1]
+            })
+            .collect();
+        assert!(
+            local
+                .iter()
+                .any(|v| v.building.as_ref().unwrap().architecture.style != d.architecture.style)
+        );
+        let purposes: std::collections::BTreeSet<_> = local
+            .iter()
+            .map(|v| &v.building.as_ref().unwrap().purpose)
+            .collect();
+        assert!(purposes.len() >= 2);
+    }
+    assert!(
+        c.colliders
+            .iter()
+            .filter(|v| v.role == ColliderRole::Building)
+            .count()
+            < 4096
+    );
+}

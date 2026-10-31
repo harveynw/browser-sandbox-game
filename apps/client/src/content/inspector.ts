@@ -71,8 +71,13 @@ export function mountMapInspector(root: HTMLElement): () => void {
     input.type = "checkbox";
     input.checked = initial;
     input.onchange = () => handler(input.checked);
-    label.append(input, ` ${name}`);
-    actions.append(label);
+    input.id = `map-layer-${actions.querySelectorAll("input").length}`;
+    label.htmlFor = input.id;
+    label.textContent = name;
+    const row = document.createElement("div");
+    row.className = "field-row";
+    row.append(input, label);
+    actions.append(row);
     listeners.push(() => {
       input.onchange = null;
     });
@@ -314,7 +319,7 @@ export function mountMapInspector(root: HTMLElement): () => void {
     ].map((label) => {
       const el = document.createElement("span");
       el.textContent = label.text;
-      el.style.color = label.color;
+      el.style.borderLeft = `3px solid ${label.color}`;
       labels.append(el);
       return {
         el,

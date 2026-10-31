@@ -1,8 +1,129 @@
 {
   "$defs": {
+    "ArchitectureRecipe": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "floor_height": {
+          "format": "double",
+          "type": "number"
+        },
+        "floors": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "style": {
+          "$ref": "#/$defs/ArchitectureStyle"
+        },
+        "width": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "depth",
+        "floor_height",
+        "floors",
+        "style",
+        "width"
+      ],
+      "type": "object"
+    },
+    "ArchitectureStyle": {
+      "enum": [
+        "quay",
+        "industrial",
+        "modern",
+        "residential",
+        "civic",
+        "market",
+        "dockside"
+      ],
+      "type": "string"
+    },
+    "Bounds": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "min": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "max",
+        "min"
+      ],
+      "type": "object"
+    },
+    "BuildingIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "$ref": "#/$defs/ArchitectureRecipe"
+        },
+        "neighbours": {
+          "items": {
+            "$ref": "#/$defs/Bounds"
+          },
+          "type": "array"
+        },
+        "purpose": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "architecture",
+        "neighbours",
+        "purpose"
+      ],
+      "type": "object"
+    },
     "Primitive": {
       "additionalProperties": false,
       "properties": {
+        "building": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BuildingIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "center": {
           "items": {
             "format": "double",

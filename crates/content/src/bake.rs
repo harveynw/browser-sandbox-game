@@ -37,6 +37,7 @@ fn primitive(
         half_extents,
         color: color.into(),
         collider_id,
+        building: None,
     }
 }
 fn asset<T: serde::Serialize>(
@@ -48,6 +49,58 @@ fn asset<T: serde::Serialize>(
     let hash = canonical::sha256(&bytes);
     files.insert(name.into(), bytes);
     Ok(hash)
+}
+fn coordinate_seed(seed: u32, x: f64, z: f64) -> u32 {
+    let v =
+        seed ^ (x as i32 as u32).wrapping_mul(73856093) ^ (z as i32 as u32).wrapping_mul(19349663);
+    let v = (v ^ (v >> 16)).wrapping_mul(0x7feb352d);
+    let v = (v ^ (v >> 15)).wrapping_mul(0x846ca68b);
+    v ^ (v >> 16)
+}
+fn select_architecture(
+    source: &Authoring,
+    x: f64,
+    z: f64,
+    px: f64,
+    pz: f64,
+) -> Option<(&ArchitectureRecipe, &str)> {
+    let weights: Vec<_> = source
+        .districts
+        .iter()
+        .map(|d| {
+            let axis = |v: f64, lo: f64, hi: f64| {
+                let t = ((v - lo + 48.0) / 96.0).clamp(0.0, 1.0);
+                let u = ((hi + 48.0 - v) / 96.0).clamp(0.0, 1.0);
+                t * t * (3.0 - 2.0 * t) * u * u * (3.0 - 2.0 * u)
+            };
+            axis(x, d.rect.min[0], d.rect.max[0]) * axis(z, d.rect.min[1], d.rect.max[1])
+        })
+        .collect();
+    let total: f64 = weights.iter().sum();
+    let mut pick = f64::from(coordinate_seed(
+        source.buildings.seed,
+        (px / 40.0).floor() * 40.0,
+        (pz / 40.0).floor() * 40.0,
+    )) / (f64::from(u32::MAX) + 1.0)
+        * total;
+    for (d, w) in source.districts.iter().zip(weights) {
+        if pick < w {
+            let total: u32 = d.archetypes.iter().map(|a| a.weight).sum();
+            if total == 0 {
+                return Some((&d.architecture, "housing"));
+            }
+            let mut choice = coordinate_seed(source.buildings.seed ^ 0xa1b2c3d4, px, pz) % total;
+            for a in &d.archetypes {
+                if choice < a.weight {
+                    return Some((&a.architecture, &a.purpose));
+                }
+                choice -= a.weight;
+            }
+            return Some((&d.architecture, "housing"));
+        }
+        pick -= w;
+    }
+    None
 }
 pub fn bake(source: &Authoring) -> Result<BakedPackage> {
     validate::authoring(source)?;
@@ -87,15 +140,22 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
     let full = source.bounds.min[0] == -384.0;
     let recipe = &source.buildings;
     let mut rng = recipe.seed;
+    let mut identities = BTreeMap::new();
     for xpair in source.roads.x.windows(2) {
         for zpair in source.roads.z.windows(2) {
             let mut x = ((xpair[0] + recipe.setback) / recipe.grid).ceil() * recipe.grid;
             while x + recipe.size <= xpair[1] - recipe.setback {
+                let parcel_width =
+                    if full && coordinate_seed(recipe.seed ^ 17, x, zpair[0]) % 3 == 0 {
+                        16.0
+                    } else {
+                        recipe.size
+                    };
                 let mut z = ((zpair[0] + recipe.setback) / recipe.grid).ceil() * recipe.grid;
                 while z + recipe.size <= zpair[1] - recipe.setback {
                     let rect = Rect {
                         min: [x, z],
-                        max: [x + recipe.size, z + recipe.size],
+                        max: [x + parcel_width, z + recipe.size],
                     };
                     if !source
                         .reservations
@@ -103,17 +163,78 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
                         .any(|r| validate::overlap(&rect, &r.rect))
                     {
                         rng = rng.wrapping_mul(1664525).wrapping_add(1013904223);
-                        let height = 8.0 + 4.0 * f64::from(rng % 4);
+                        let mut dimensions =
+                            [recipe.size, 8.0 + 4.0 * f64::from(rng % 4), recipe.size];
+                        let mut cx = x + parcel_width / 2.0;
+                        let mut cz = z + recipe.size / 2.0;
+                        let selected = select_architecture(source, cx, cz, x, z);
+                        if let Some((architecture, _)) = selected {
+                            // Coordinate-derived entropy keeps a plot stable when another is reserved.
+                            let seed = recipe.seed
+                                ^ (x as i32 as u32).wrapping_mul(73856093)
+                                ^ (z as i32 as u32).wrapping_mul(19349663);
+                            let mix = |v: u32| {
+                                let v = (v ^ (v >> 16)).wrapping_mul(0x7feb352d);
+                                let v = (v ^ (v >> 15)).wrapping_mul(0x846ca68b);
+                                v ^ (v >> 16)
+                            };
+                            let sample = |range: [f64; 2], salt| {
+                                // Half-metre increments avoid canonical floating-point rounding issues.
+                                range[0]
+                                    + f64::from(
+                                        mix(seed ^ salt)
+                                            % ((2.0 * (range[1] - range[0])) as u32 + 1),
+                                    ) / 2.0
+                            };
+                            let floors = architecture.floors[0]
+                                + mix(seed ^ 3)
+                                    % (architecture.floors[1] - architecture.floors[0] + 1);
+                            dimensions = [
+                                sample(
+                                    [
+                                        architecture.width[0].min(parcel_width),
+                                        architecture.width[1].min(parcel_width),
+                                    ],
+                                    1,
+                                ),
+                                (f64::from(floors) * architecture.floor_height * 100.0).round()
+                                    / 100.0,
+                                sample(architecture.depth, 2),
+                            ];
+                        }
+                        // Anchor to the closest street edge; paired rear edges share parcel boundaries.
+                        let edge_x = if cx - xpair[0] <= xpair[1] - cx {
+                            x
+                        } else {
+                            x + parcel_width - dimensions[0]
+                        };
+                        let edge_z = if cz - zpair[0] <= zpair[1] - cz {
+                            z
+                        } else {
+                            z + recipe.size - dimensions[2]
+                        };
+                        cx = edge_x + dimensions[0] / 2.0;
+                        cz = edge_z + dimensions[2] / 2.0;
+                        if let Some((architecture, purpose)) = selected {
+                            identities.insert(
+                                colliders.len() as u32 + 1,
+                                BuildingIdentity {
+                                    architecture: architecture.clone(),
+                                    purpose: purpose.into(),
+                                    neighbours: Vec::new(),
+                                },
+                            );
+                        }
                         collider(
                             &mut colliders,
                             ColliderRole::Building,
-                            [x + recipe.size / 2.0, height / 2.0, z + recipe.size / 2.0],
-                            [recipe.size / 2.0, height / 2.0, recipe.size / 2.0],
+                            [cx, dimensions[1] / 2.0, cz],
+                            dimensions.map(|n| n / 2.0),
                         );
                     }
                     z += recipe.size + recipe.spacing;
                 }
-                x += recipe.size + recipe.spacing;
+                x += parcel_width + recipe.spacing;
             }
         }
     }
@@ -131,6 +252,26 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         schema_version: 1,
         colliders,
     };
+    for c in &collision.colliders {
+        if let Some(identity) = identities.get_mut(&c.id) {
+            identity.neighbours = collision
+                .colliders
+                .iter()
+                .filter(|other| {
+                    other.role == ColliderRole::Building
+                        && other.id != c.id
+                        && [0, 2].iter().all(|&axis| {
+                            (other.center[axis] - c.center[axis]).abs()
+                                <= other.half_extents[axis] + c.half_extents[axis] + 0.8
+                        })
+                })
+                .map(|other| Bounds {
+                    min: std::array::from_fn(|axis| other.center[axis] - other.half_extents[axis]),
+                    max: std::array::from_fn(|axis| other.center[axis] + other.half_extents[axis]),
+                })
+                .collect();
+        }
+    }
     let mut visuals = Vec::new();
     let palette = ["#687f87", "#83958e", "#9c8d80", "#75858d"];
     let mut landmark_index = 0;
@@ -157,14 +298,35 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
                 (VisualRole::Landmark, color.as_str())
             }
         };
-        visuals.push(primitive(
-            format!("solid_{}", c.id),
+        let mut shell = primitive(
+            if identities.contains_key(&c.id) {
+                format!("building_{}_{}", c.center[0], c.center[2])
+            } else {
+                format!("solid_{}", c.id)
+            },
             role,
             c.center,
             c.half_extents,
             color,
             Some(c.id),
-        ));
+        );
+        shell.building = identities.get(&c.id).cloned();
+        if let Some(identity) = &shell.building {
+            let colors: &[&str] = match identity.architecture.style {
+                ArchitectureStyle::Quay => &["#a77861", "#bdac88", "#8d6860", "#b39a7d"],
+                ArchitectureStyle::Industrial => &["#827a69", "#756b62", "#8b8070", "#777e79"],
+                ArchitectureStyle::Residential => &["#b3b6a0", "#a5b3ad", "#b5b0a6"],
+                ArchitectureStyle::Civic => &["#c9c4ae", "#bcbfb5", "#d0c6b4"],
+                ArchitectureStyle::Market => &["#c49b72", "#af826c", "#b6ac86", "#91a49b"],
+                ArchitectureStyle::Dockside => &["#6d8994", "#81989c", "#89958c"],
+                ArchitectureStyle::Modern => &["#687f87", "#83958e"],
+            };
+            let h = shell.id.bytes().fold(2166136261u32, |h, c| {
+                (h ^ u32::from(c)).wrapping_mul(16777619)
+            });
+            shell.color = colors[h as usize % colors.len()].into();
+        }
+        visuals.push(shell);
     }
     let road_half = source.roads.carriageway_width / 2.0;
     let pavement_half = road_half + source.roads.sidewalk_width;

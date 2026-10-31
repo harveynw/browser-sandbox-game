@@ -117,11 +117,41 @@ pub fn authoring(a: &Authoring) -> Result<()> {
     unique(a.districts.iter().map(|d| d.id.as_str()), "district")?;
     for (i, d) in a.districts.iter().enumerate() {
         require(
+            d.archetypes.len() <= 16
+                && d.archetypes.iter().all(|v| {
+                    v.weight > 0 && v.weight <= 1000 && !v.id.is_empty() && !v.purpose.is_empty()
+                }),
+            "invalid building archetype",
+        )?;
+        unique(d.archetypes.iter().map(|v| v.id.as_str()), "archetype")?;
+        require(
             contains(&bounds_rect(&a.bounds), &d.rect)
                 && d.rect.max[0] - d.rect.min[0] == 256.0
                 && d.rect.max[1] - d.rect.min[1] == 384.0,
             "district dimensions",
         )?;
+        {
+            for r in
+                std::iter::once(&d.architecture).chain(d.archetypes.iter().map(|v| &v.architecture))
+            {
+                require(
+                    [r.width, r.depth].iter().all(|range| {
+                        range.iter().all(|v| v.is_finite())
+                            && range[0] >= 6.0
+                            && range[0] <= range[1]
+                            && range[1] <= a.buildings.size
+                            && range.iter().all(|v| (v * 2.0).fract() == 0.0)
+                    }) && r.floors[0] >= 1
+                        && r.floors[0] <= r.floors[1]
+                        && r.floors[1] <= 12
+                        && r.floor_height.is_finite()
+                        && r.floor_height >= 2.5
+                        && r.floor_height <= 6.0
+                        && f64::from(r.floors[1]) * r.floor_height + 3.0 <= a.bounds.max[1],
+                    "invalid district architecture dimensions or floor range",
+                )?;
+            }
+        }
         for other in a.districts.iter().skip(i + 1) {
             require(!overlap(&d.rect, &other.rect), "district overlap")?;
         }
@@ -157,7 +187,7 @@ pub fn authoring(a: &Authoring) -> Result<()> {
         r.grid == 4.0
             && r.size >= 4.0
             && r.size <= 40.0
-            && r.spacing >= 3.0
+            && r.spacing >= 0.0
             && r.spacing <= 20.0
             && r.setback >= 12.0
             && r.setback <= 20.0
@@ -519,12 +549,10 @@ pub fn package(
         .collect();
     for (i, a) in buildings.iter().enumerate() {
         for b in buildings.iter().skip(i + 1) {
-            let mut rect = footprint(a);
-            for axis in 0..2 {
-                rect.min[axis] -= 3.0;
-                rect.max[axis] += 3.0;
-            }
-            require(!overlap(&rect, &footprint(b)), "buildings need 3m passage")?;
+            require(
+                !overlap(&footprint(a), &footprint(b)),
+                "building shells overlap",
+            )?;
         }
     }
     let config: SimConfig =

@@ -35,6 +35,66 @@
       ],
       "type": "object"
     },
+    "ArchitectureRecipe": {
+      "additionalProperties": false,
+      "properties": {
+        "depth": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "floor_height": {
+          "format": "double",
+          "type": "number"
+        },
+        "floors": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "style": {
+          "$ref": "#/$defs/ArchitectureStyle"
+        },
+        "width": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "depth",
+        "floor_height",
+        "floors",
+        "style",
+        "width"
+      ],
+      "type": "object"
+    },
+    "ArchitectureStyle": {
+      "enum": [
+        "quay",
+        "industrial",
+        "modern",
+        "residential",
+        "civic",
+        "market",
+        "dockside"
+      ],
+      "type": "string"
+    },
     "Axis": {
       "enum": [
         "x",
@@ -67,6 +127,32 @@
       "required": [
         "max",
         "min"
+      ],
+      "type": "object"
+    },
+    "BuildingArchetype": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "$ref": "#/$defs/ArchitectureRecipe"
+        },
+        "id": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "weight": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "architecture",
+        "id",
+        "purpose",
+        "weight"
       ],
       "type": "object"
     },
@@ -116,6 +202,16 @@
     "District": {
       "additionalProperties": false,
       "properties": {
+        "archetypes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/BuildingArchetype"
+          },
+          "type": "array"
+        },
+        "architecture": {
+          "$ref": "#/$defs/ArchitectureRecipe"
+        },
         "color": {
           "type": "string"
         },
@@ -130,6 +226,7 @@
         }
       },
       "required": [
+        "architecture",
         "color",
         "id",
         "name",

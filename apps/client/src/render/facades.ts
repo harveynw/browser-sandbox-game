@@ -1,9 +1,22 @@
-import type { Primitive } from "@port-meridian/content";
+import { architectureDetails, buildingDistrict } from "./architecture";
+import type { District, Roads, Primitive } from "@port-meridian/content";
 /** Eight original modular facade patterns, instanced from the unchanged verified footprints. */
-export function facadeDetails(buildings: readonly Primitive[]): Primitive[] {
+export function facadeDetails(
+  buildings: readonly Primitive[],
+  districts: readonly District[] = [],
+  roads?: Roads,
+): Primitive[] {
   return buildings
     .filter((p) => p.role === "building")
     .flatMap((p) => {
+      const district = buildingDistrict(p, districts);
+      if (
+        roads &&
+        district &&
+        (p.building?.architecture.style ?? district.architecture.style) !==
+          "modern"
+      )
+        return architectureDetails(p, district, roads);
       const style =
         [...p.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0) % 8;
       const [x, y, z] = p.center,

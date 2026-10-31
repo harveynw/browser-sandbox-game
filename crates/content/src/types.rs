@@ -155,11 +155,38 @@ object!(Landmark {
     size: Vec3,
     color: String
 });
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ArchitectureStyle {
+    Quay,
+    Industrial,
+    Modern,
+    Residential,
+    Civic,
+    Market,
+    Dockside,
+}
+object!(ArchitectureRecipe {
+    style: ArchitectureStyle,
+    width: [f64; 2],
+    depth: [f64; 2],
+    floors: [u32; 2],
+    floor_height: f64
+});
+object!(BuildingArchetype {
+    id: String,
+    purpose: String,
+    weight: u32,
+    architecture: ArchitectureRecipe,
+});
 object!(District {
     id: String,
     name: String,
     rect: Rect,
-    color: String
+    color: String,
+    architecture: ArchitectureRecipe,
+    #[serde(default)]
+    archetypes: Vec<BuildingArchetype>
 });
 object!(Authoring {
     schema_version: u32, world_asset_id: String, bounds: Bounds, roads: Roads,
@@ -227,10 +254,18 @@ pub enum VisualRole {
     Landmark,
     Vehicle,
 }
+object!(BuildingIdentity {
+    architecture: ArchitectureRecipe,
+    purpose: String,
+    neighbours: Vec<Bounds>,
+});
 object!(Primitive {
     id: String, role: VisualRole, center: Vec3, half_extents: Vec3, color: String,
     #[serde(deserialize_with = "required_nullable")]
     collider_id: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    building: Option<BuildingIdentity>,
 });
 object!(VisualChunk { schema_version: u32, id: String, primitives: Vec<Primitive> });
 object!(DebugOverlay { schema_version: u32, colliders: Vec<StaticCollider>, reservations: Vec<Reservation>, accesses: Vec<Access> });

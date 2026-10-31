@@ -13,7 +13,14 @@ pub fn schema<T: JsonSchema>() -> Value {
         match v {
             Value::Object(o) => {
                 if let Some(Value::Object(p)) = o.get("properties") {
-                    o.insert("required".into(), json!(p.keys().collect::<Vec<_>>()));
+                    o.insert(
+                        "required".into(),
+                        json!(
+                            p.keys()
+                                .filter(|k| k.as_str() != "building" && k.as_str() != "archetypes")
+                                .collect::<Vec<_>>()
+                        ),
+                    );
                 }
                 for v in o.values_mut() {
                     required(v);
@@ -52,6 +59,10 @@ pub fn typescript() -> String {
         SimConfig,
         BuildingRecipe,
         Landmark,
+        ArchitectureStyle,
+        ArchitectureRecipe,
+        BuildingArchetype,
+        BuildingIdentity,
         District,
         Authoring,
         ColliderRole,

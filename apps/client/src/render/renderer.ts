@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CharacterRig, DynamicBatch, carLean } from "./character";
+import { buildingAppearance } from "./architecture";
 import { facadeDetails } from "./facades";
 import { VehicleModels, wheelRollDelta, steerWheels } from "./vehicles";
 import {
@@ -407,10 +408,12 @@ export class GameRenderer {
               ? 1
               : 0;
       // Neon facade accents remain luminous without adding per-building lights.
+      const architectural = p.id.includes("-architecture-");
       const luminous =
-        p.id.includes("-front-") ||
-        p.id.includes("-side-") ||
-        p.id.endsWith("-roof");
+        !architectural &&
+        (p.id.includes("-front-") ||
+          p.id.includes("-side-") ||
+          p.id.endsWith("-roof"));
       const color =
         p.role === "road"
           ? "#242b35"
@@ -420,7 +423,10 @@ export class GameRenderer {
               ? "#17221e"
               : p.role === "building" && !luminous
                 ? new THREE.Color(p.color)
-                    .lerp(new THREE.Color("#192034"), 0.6)
+                    .lerp(
+                      new THREE.Color("#192034"),
+                      architectural ? 0.12 : 0.35,
+                    )
                     .getStyle()
                 : p.color;
       const key = `${color}:${layer}:${luminous}`;
@@ -464,8 +470,13 @@ export class GameRenderer {
   }
   private showChunk(chunk: VisualChunk): void {
     this.hideChunk(chunk.id);
-    const group = this.batch(chunk.primitives);
-    const facade = this.batch(facadeDetails(chunk.primitives));
+    const { districts, roads } = this.assets.manifest;
+    const group = this.batch(
+      chunk.primitives.map((p) => buildingAppearance(p, districts)),
+    );
+    const facade = this.batch(
+      facadeDetails(chunk.primitives, districts, roads),
+    );
     facade.name = "facades";
     facade.visible = !this.low;
     group.add(facade);

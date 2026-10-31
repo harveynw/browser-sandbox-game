@@ -1,0 +1,288 @@
+/* This file is injected with 98.css exclusively on the four tool routes. */
+html:has(body.tooling-mode) {
+  background: #008080;
+  color-scheme: light;
+}
+body.tooling-mode {
+  display: block;
+  margin: 0;
+  background: #008080;
+  color: #222;
+  font:
+    11px "Pixelated MS Sans Serif",
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: auto;
+}
+.tooling-mode #app {
+  width: auto;
+  padding: 0;
+  margin: 0;
+}
+.tooling-mode main {
+  width: auto;
+  padding: 0;
+}
+.tooling-mode p {
+  color: #222;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 8px 0;
+}
+.tooling-mode h1 {
+  font:
+    bold 14px Arial,
+    sans-serif;
+  letter-spacing: 0;
+  line-height: 1.2;
+  margin: 10px 0;
+}
+.tooling-mode .eyebrow {
+  color: #555;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin: 6px 0;
+}
+.tooling-mode a {
+  color: #000080;
+}
+.tooling-mode button {
+  border: 0;
+  border-radius: 0;
+  padding: 0 8px;
+  font:
+    11px "Pixelated MS Sans Serif",
+    Arial,
+    sans-serif;
+  color: #222;
+  background: silver;
+  cursor: pointer;
+}
+.tooling-mode button:disabled {
+  opacity: 1;
+  color: gray;
+  cursor: default;
+}
+.tooling-mode button:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+.tooling-mode input,
+.tooling-mode select {
+  color: #222;
+  font-size: 11px;
+}
+.tooling-mode .actions {
+  gap: 4px;
+  margin: 8px 0;
+}
+.tooling-mode pre {
+  box-shadow:
+    inset -1px -1px #fff,
+    inset 1px 1px gray,
+    inset -2px -2px #dfdfdf,
+    inset 2px 2px #0a0a0a;
+  background: #fff;
+  color: #222;
+  font:
+    11px/1.5 "Lucida Console",
+    monospace;
+  padding: 8px;
+  height: min(40vh, 320px);
+  margin: 8px 0;
+}
+.tooling-mode .status {
+  color: #000080;
+  font-size: 11px;
+}
+.tooling-mode .tools {
+  margin: 8px 0;
+  font-size: 11px;
+}
+.tooling-mode .tool-menu {
+  position: fixed;
+  inset: 0 0 auto;
+  height: 29px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  background: silver;
+  box-shadow:
+    inset 0 1px #fff,
+    0 1px #808080;
+  z-index: 20;
+}
+.tool-menu strong {
+  padding: 0 14px 0 3px;
+  font:
+    bold 11px Arial,
+    sans-serif;
+}
+.tool-menu a {
+  text-decoration: none;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.tool-menu a:hover,
+.tool-menu a[aria-current] {
+  background: #000080;
+  color: white;
+}
+.tool-menu .tool-play {
+  margin-left: auto;
+}
+.tooling-mode .tool-status {
+  position: fixed;
+  inset: auto 0 0;
+  min-height: 24px;
+  background: silver;
+  padding: 2px;
+  box-sizing: border-box;
+  z-index: 20;
+}
+.tooling-mode .tool-status p {
+  margin: 0;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.tool-status .status-bar-field:first-child {
+  flex-grow: 3;
+}
+.tooling-mode .window {
+  border: 0;
+  border-radius: 0;
+  background: silver;
+  color: #222;
+  padding: 3px;
+}
+.tooling-mode .title-bar {
+  min-height: 18px;
+  padding: 3px;
+  margin: 0 0 6px;
+}
+.tooling-mode .tool-dialog {
+  width: min(780px, calc(100vw - 32px));
+  box-sizing: border-box;
+  margin: 48px auto;
+}
+.tool-dialog > :not(.title-bar) {
+  margin-left: 9px;
+  margin-right: 9px;
+}
+.tool-dialog > main {
+  padding: 0 9px 4px;
+}
+.tooling-mode .map-hud,
+.tooling-mode .architecture-panel {
+  position: fixed;
+  top: 39px;
+  left: 10px;
+  width: 300px;
+  max-width: calc(100vw - 26px);
+  max-height: calc(100dvh - 78px);
+  overflow: auto;
+  box-sizing: border-box;
+  z-index: 3;
+}
+.tooling-mode .map-hud > :not(.title-bar),
+.tooling-mode .architecture-panel > :not(.title-bar) {
+  margin-left: 7px;
+  margin-right: 7px;
+}
+.tooling-mode .map-hud h1 {
+  font-size: 13px;
+}
+.tooling-mode .map-hud p,
+.tooling-mode .map-hud summary {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #222;
+}
+.tooling-mode .map-hud summary {
+  padding: 5px 0;
+  font-weight: bold;
+}
+.tooling-mode .map-actions {
+  gap: 6px;
+  margin: 8px 0;
+}
+.tooling-mode .map-actions label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+.tooling-mode .map-actions button {
+  padding: 0 6px;
+  font-size: 11px;
+}
+.tooling-mode .map-details {
+  background: #fff;
+  padding: 6px;
+  border: 1px inset #ddd;
+  font: 10px/1.4 monospace;
+}
+.tooling-mode .map-labels span {
+  background: #ffffdf;
+  color: #222;
+  border: 1px solid #808080;
+  border-radius: 0;
+  padding: 2px 4px;
+  font:
+    10px Arial,
+    sans-serif;
+}
+.tooling-mode .architecture-workspace {
+  position: fixed;
+  inset: 30px 0 26px;
+}
+.tooling-mode .architecture-workspace canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.tooling-mode .architecture-panel label {
+  display: block;
+}
+.tooling-mode .architecture-panel select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+.tooling-mode .architecture-panel input[type="range"] {
+  width: 190px;
+  margin: 8px 7px 4px 0;
+}
+.tooling-mode .architecture-panel output {
+  font:
+    11px "Lucida Console",
+    monospace;
+}
+@media (max-width: 600px) {
+  .tooling-mode .tool-menu {
+    height: auto;
+    min-height: 29px;
+    flex-wrap: wrap;
+  }
+  .tool-menu strong {
+    display: none;
+  }
+  .tool-menu a {
+    padding: 4px 5px;
+  }
+  .tooling-mode .map-hud,
+  .tooling-mode .architecture-panel {
+    top: 65px;
+    width: 250px;
+    max-height: calc(100dvh - 105px);
+  }
+  .tooling-mode .tool-dialog {
+    margin-top: 70px;
+  }
+  .tool-status .status-bar-field:last-child {
+    display: none;
+  }
+}

@@ -14,7 +14,7 @@
   "buildings": {
     "grid": 4,
     "size": 20,
-    "spacing": 8,
+    "spacing": 0,
     "setback": 12,
     "seed": 424242
   },
@@ -1386,7 +1386,52 @@
         "min": [-384, -384],
         "max": [-128, 0]
       },
-      "color": "#8fa98a"
+      "color": "#8fa98a",
+      "architecture": {
+        "style": "residential",
+        "width": [12, 18],
+        "depth": [14, 20],
+        "floors": [5, 9],
+        "floor_height": 3
+      },
+      "archetypes": [
+        {
+          "id": "north_heights_primary",
+          "purpose": "housing",
+          "weight": 65,
+          "architecture": {
+            "style": "residential",
+            "width": [12, 18],
+            "depth": [14, 20],
+            "floors": [5, 9],
+            "floor_height": 3
+          }
+        },
+        {
+          "id": "north_heights_local",
+          "purpose": "office",
+          "weight": 20,
+          "architecture": {
+            "style": "residential",
+            "width": [12, 16],
+            "depth": [14, 20],
+            "floors": [5, 8],
+            "floor_height": 3
+          }
+        },
+        {
+          "id": "north_heights_support",
+          "purpose": "shop_housing",
+          "weight": 15,
+          "architecture": {
+            "style": "market",
+            "width": [10, 16],
+            "depth": [12, 18],
+            "floors": [3, 5],
+            "floor_height": 3.2
+          }
+        }
+      ]
     },
     {
       "id": "civic_center",
@@ -1395,7 +1440,52 @@
         "min": [-128, -384],
         "max": [128, 0]
       },
-      "color": "#bac3c0"
+      "color": "#bac3c0",
+      "architecture": {
+        "style": "civic",
+        "width": [16, 20],
+        "depth": [14, 20],
+        "floors": [3, 6],
+        "floor_height": 4
+      },
+      "archetypes": [
+        {
+          "id": "civic_center_primary",
+          "purpose": "public_office",
+          "weight": 65,
+          "architecture": {
+            "style": "civic",
+            "width": [16, 20],
+            "depth": [14, 20],
+            "floors": [3, 6],
+            "floor_height": 4
+          }
+        },
+        {
+          "id": "civic_center_local",
+          "purpose": "office",
+          "weight": 20,
+          "architecture": {
+            "style": "civic",
+            "width": [16, 18],
+            "depth": [14, 20],
+            "floors": [3, 5],
+            "floor_height": 4
+          }
+        },
+        {
+          "id": "civic_center_support",
+          "purpose": "housing",
+          "weight": 15,
+          "architecture": {
+            "style": "residential",
+            "width": [12, 18],
+            "depth": [14, 20],
+            "floors": [5, 9],
+            "floor_height": 3
+          }
+        }
+      ]
     },
     {
       "id": "ironworks",
@@ -1404,7 +1494,52 @@
         "min": [128, -384],
         "max": [384, 0]
       },
-      "color": "#a08478"
+      "color": "#a08478",
+      "architecture": {
+        "style": "industrial",
+        "width": [16, 20],
+        "depth": [16, 20],
+        "floors": [1, 2],
+        "floor_height": 5
+      },
+      "archetypes": [
+        {
+          "id": "ironworks_primary",
+          "purpose": "factory",
+          "weight": 65,
+          "architecture": {
+            "style": "industrial",
+            "width": [16, 20],
+            "depth": [16, 20],
+            "floors": [1, 2],
+            "floor_height": 5
+          }
+        },
+        {
+          "id": "ironworks_local",
+          "purpose": "workshop",
+          "weight": 20,
+          "architecture": {
+            "style": "industrial",
+            "width": [16, 18],
+            "depth": [16, 20],
+            "floors": [1, 1],
+            "floor_height": 5
+          }
+        },
+        {
+          "id": "ironworks_support",
+          "purpose": "housing",
+          "weight": 15,
+          "architecture": {
+            "style": "residential",
+            "width": [12, 18],
+            "depth": [14, 20],
+            "floors": [5, 9],
+            "floor_height": 3
+          }
+        }
+      ]
     },
     {
       "id": "old_quay",
@@ -1413,7 +1548,52 @@
         "min": [-384, 0],
         "max": [-128, 384]
       },
-      "color": "#9b8170"
+      "color": "#9b8170",
+      "architecture": {
+        "style": "quay",
+        "width": [10, 16],
+        "depth": [12, 20],
+        "floors": [2, 4],
+        "floor_height": 3.2
+      },
+      "archetypes": [
+        {
+          "id": "old_quay_primary",
+          "purpose": "housing",
+          "weight": 65,
+          "architecture": {
+            "style": "quay",
+            "width": [10, 16],
+            "depth": [12, 20],
+            "floors": [2, 4],
+            "floor_height": 3.2
+          }
+        },
+        {
+          "id": "old_quay_local",
+          "purpose": "office",
+          "weight": 20,
+          "architecture": {
+            "style": "quay",
+            "width": [10, 14],
+            "depth": [12, 20],
+            "floors": [2, 3],
+            "floor_height": 3.2
+          }
+        },
+        {
+          "id": "old_quay_support",
+          "purpose": "shop_housing",
+          "weight": 15,
+          "architecture": {
+            "style": "market",
+            "width": [10, 16],
+            "depth": [12, 18],
+            "floors": [3, 5],
+            "floor_height": 3.2
+          }
+        }
+      ]
     },
     {
       "id": "market_grid",
@@ -1422,7 +1602,52 @@
         "min": [-128, 0],
         "max": [128, 384]
       },
-      "color": "#b5a17b"
+      "color": "#b5a17b",
+      "architecture": {
+        "style": "market",
+        "width": [10, 16],
+        "depth": [12, 18],
+        "floors": [3, 5],
+        "floor_height": 3.2
+      },
+      "archetypes": [
+        {
+          "id": "market_grid_primary",
+          "purpose": "shop_housing",
+          "weight": 65,
+          "architecture": {
+            "style": "market",
+            "width": [10, 16],
+            "depth": [12, 18],
+            "floors": [3, 5],
+            "floor_height": 3.2
+          }
+        },
+        {
+          "id": "market_grid_local",
+          "purpose": "office",
+          "weight": 20,
+          "architecture": {
+            "style": "market",
+            "width": [10, 14],
+            "depth": [12, 18],
+            "floors": [3, 4],
+            "floor_height": 3.2
+          }
+        },
+        {
+          "id": "market_grid_support",
+          "purpose": "housing",
+          "weight": 15,
+          "architecture": {
+            "style": "quay",
+            "width": [10, 16],
+            "depth": [12, 20],
+            "floors": [2, 4],
+            "floor_height": 3.2
+          }
+        }
+      ]
     },
     {
       "id": "east_docks",
@@ -1431,7 +1656,52 @@
         "min": [128, 0],
         "max": [384, 384]
       },
-      "color": "#738f9d"
+      "color": "#738f9d",
+      "architecture": {
+        "style": "dockside",
+        "width": [14, 20],
+        "depth": [18, 20],
+        "floors": [1, 2],
+        "floor_height": 4.5
+      },
+      "archetypes": [
+        {
+          "id": "east_docks_primary",
+          "purpose": "warehouse",
+          "weight": 65,
+          "architecture": {
+            "style": "dockside",
+            "width": [14, 20],
+            "depth": [18, 20],
+            "floors": [1, 2],
+            "floor_height": 4.5
+          }
+        },
+        {
+          "id": "east_docks_local",
+          "purpose": "workshop",
+          "weight": 20,
+          "architecture": {
+            "style": "dockside",
+            "width": [14, 18],
+            "depth": [18, 20],
+            "floors": [1, 1],
+            "floor_height": 4.5
+          }
+        },
+        {
+          "id": "east_docks_support",
+          "purpose": "workshop",
+          "weight": 15,
+          "architecture": {
+            "style": "industrial",
+            "width": [16, 20],
+            "depth": [16, 20],
+            "floors": [1, 2],
+            "floor_height": 5
+          }
+        }
+      ]
     }
   ]
 }

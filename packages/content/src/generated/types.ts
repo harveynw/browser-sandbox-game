@@ -38,7 +38,15 @@ export type BuildingRecipe = { grid: number, size: number, spacing: number, setb
 
 export type Landmark = { id: string, position: [number, number, number], size: [number, number, number], color: string, };
 
-export type District = { id: string, name: string, rect: Rect, color: string, };
+export type ArchitectureStyle = "quay" | "industrial" | "modern" | "residential" | "civic" | "market" | "dockside";
+
+export type ArchitectureRecipe = { style: ArchitectureStyle, width: [number, number], depth: [number, number], floors: [number, number], floor_height: number, };
+
+export type BuildingArchetype = { id: string, purpose: string, weight: number, architecture: ArchitectureRecipe, };
+
+export type BuildingIdentity = { architecture: ArchitectureRecipe, purpose: string, neighbours: Array<Bounds>, };
+
+export type District = { id: string, name: string, rect: Rect, color: string, architecture: ArchitectureRecipe, archetypes: Array<BuildingArchetype>, };
 
 export type Authoring = { schema_version: number, world_asset_id: string, bounds: Bounds, roads: Roads, buildings: BuildingRecipe, districts: Array<District>, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, landmarks: Array<Landmark>, sim_config: SimConfig, };
 
@@ -62,7 +70,7 @@ export type RoadGraph = { nodes: Array<GraphNode>, edges: Array<GraphEdge>, acce
 
 export type VisualRole = "ground" | "road" | "sidewalk" | "marking" | "building" | "boundary" | "landmark" | "vehicle";
 
-export type Primitive = { id: string, role: VisualRole, center: [number, number, number], half_extents: [number, number, number], color: string, collider_id: number | null, };
+export type Primitive = { id: string, role: VisualRole, center: [number, number, number], half_extents: [number, number, number], color: string, collider_id: number | null, building?: BuildingIdentity, };
 
 export type VisualChunk = { schema_version: number, id: string, primitives: Array<Primitive>, };
 
