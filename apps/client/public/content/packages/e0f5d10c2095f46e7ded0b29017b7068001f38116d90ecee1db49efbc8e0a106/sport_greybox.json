@@ -1,1 +1,0 @@
-{"id":"sport_greybox","primitives":[{"center":[0,0.625,0],"collider_id":null,"color":"#69bdd4","half_extents":[0.95,0.625,2.25],"id":"body","role":"vehicle"},{"center":[0,1,-0.3],"collider_id":null,"color":"#193440","half_extents":[0.83,0.25,1.125],"id":"windows","role":"vehicle"}],"schema_version":1}
