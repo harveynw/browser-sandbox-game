@@ -1,3 +1,4 @@
+import { treeShape, treeGeometries } from "./trees";
 import * as THREE from "three";
 import { CharacterRig, DynamicBatch, carLean } from "./character";
 import { buildingAppearance } from "./architecture";
@@ -108,6 +109,7 @@ export class GameRenderer {
     slot.until = performance.now() + 180;
   }
   private low = false;
+  private readonly trees = treeGeometries();
   private readonly palette = new Map<string, THREE.MeshStandardMaterial>();
   private readonly chunks = new Map<string, THREE.Group>();
   private readonly fallback = new Map<string, THREE.Group>();
@@ -205,6 +207,8 @@ export class GameRenderer {
     const cube = new THREE.BoxGeometry(1, 1, 1);
     this.geometry.add(cube);
     this.cube = cube;
+    for (const geometry of Object.values(this.trees))
+      this.geometry.add(geometry);
     const gunMaterial = new THREE.MeshStandardMaterial({
       color: "#58686f",
       roughness: 0.65,
@@ -429,7 +433,7 @@ export class GameRenderer {
                     )
                     .getStyle()
                 : p.color;
-      const key = `${color}:${layer}:${luminous}`;
+      const key = `${color}:${layer}:${luminous}:${treeShape(p)}`;
       let material = this.palette.get(key);
       if (!material) {
         material = new THREE.MeshStandardMaterial({
@@ -451,7 +455,14 @@ export class GameRenderer {
     const group = new THREE.Group();
     const dummy = new THREE.Object3D();
     for (const [material, values] of buckets) {
-      const mesh = new THREE.InstancedMesh(this.cube, material, values.length);
+      const first = values[0];
+      if (!first) continue;
+      const shape = treeShape(first);
+      const mesh = new THREE.InstancedMesh(
+        shape === "box" ? this.cube : this.trees[shape],
+        material,
+        values.length,
+      );
       mesh.receiveShadow = true;
       values.forEach((p, i) => {
         dummy.position.set(...p.center);

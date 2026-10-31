@@ -390,6 +390,9 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             }
         }
     }
+    if full {
+        visuals.extend(crate::vegetation::trees(source, &collision));
+    }
     let mut files = BTreeMap::new();
     let mut chunks = Vec::new();
     let xs = if full { 0..=5 } else { 1..=2 };
@@ -472,7 +475,8 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             .filter(|p| {
                 matches!(
                     p.role,
-                    VisualRole::Building
+                    VisualRole::Vegetation
+                        | VisualRole::Building
                         | VisualRole::Landmark
                         | VisualRole::Ground
                         | VisualRole::Boundary

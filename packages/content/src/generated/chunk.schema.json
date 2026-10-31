@@ -172,6 +172,7 @@
     },
     "VisualRole": {
       "enum": [
+        "vegetation",
         "ground",
         "road",
         "sidewalk",

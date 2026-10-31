@@ -245,6 +245,7 @@ object!(RoadGraph { nodes: Vec<GraphNode>, edges: Vec<GraphEdge>, accesses: Vec<
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(rename_all = "snake_case")]
 pub enum VisualRole {
+    Vegetation,
     Ground,
     Road,
     Sidewalk,

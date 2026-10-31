@@ -1,4 +1,5 @@
 use content::{Authoring, ColliderRole, CollisionPackage, VisualChunk, bake, canonical, validate};
+use content::{Rect, VisualRole};
 fn source() -> Authoring {
     serde_json::from_str(include_str!("../../../content/source/slice.json"))
         .expect("authored slice")
@@ -440,4 +441,98 @@ fn dense_city_has_attached_shells_and_mixed_neighbourhoods() {
             .count()
             < 4096
     );
+}
+
+#[test]
+fn ornamental_trees_keep_canopies_clear_of_buildings_roads_and_access() {
+    let source: Authoring =
+        serde_json::from_str(include_str!("../../../content/source/city.json")).unwrap();
+    let p = bake::bake(&source).unwrap();
+    let c = collision(&p);
+    validate::package(&p.manifest, &c, &p.files).unwrap();
+    let trees: Vec<_> = p
+        .manifest
+        .chunks
+        .iter()
+        .flat_map(|chunk| {
+            let v: VisualChunk = serde_json::from_slice(&p.files[&chunk.visual_url]).unwrap();
+            v.primitives
+        })
+        .filter(|v| v.role == VisualRole::Vegetation)
+        .collect();
+    let trunks: Vec<_> = trees.iter().filter(|v| v.id.ends_with("_trunk")).collect();
+    assert!(trunks.len() > 20 && trunks.len() <= 240);
+    for kind in 0..3 {
+        assert!(
+            trunks
+                .iter()
+                .any(|p| p.id.ends_with(&format!("_{kind}_trunk")))
+        );
+    }
+    let mut groups: std::collections::BTreeMap<String, Vec<&content::Primitive>> =
+        std::collections::BTreeMap::new();
+    for tree in &trunks {
+        let key = tree.id.split('_').take(3).collect::<Vec<_>>().join("_");
+        groups.entry(key).or_default().push(tree);
+    }
+    assert!(groups.keys().any(|k| k.starts_with("tree_park_")));
+    assert!(groups.keys().any(|k| k.starts_with("tree_boulevard_")));
+    for (key, members) in groups {
+        if key.starts_with("tree_park_") {
+            assert_eq!(members.len(), 5);
+            for a in &members {
+                for b in &members {
+                    assert!((a.center[0] - b.center[0]).hypot(a.center[2] - b.center[2]) <= 18.0);
+                }
+            }
+        } else {
+            assert!((3..=8).contains(&members.len()));
+            assert!([0, 2].iter().any(|&axis| {
+                members
+                    .iter()
+                    .all(|p| p.center[axis] == members[0].center[axis])
+            }));
+            let mut positions: Vec<_> = members.iter().map(|p| p.center[0] + p.center[2]).collect();
+            positions.sort_by(f64::total_cmp);
+            assert!(
+                positions
+                    .windows(2)
+                    .all(|p| (p[1] - p[0] - 10.0).abs() < 1e-8)
+            );
+        }
+    }
+    for tree in trees {
+        assert!(tree.collider_id.is_none());
+        let rect = Rect {
+            min: [
+                tree.center[0] - tree.half_extents[0],
+                tree.center[2] - tree.half_extents[2],
+            ],
+            max: [
+                tree.center[0] + tree.half_extents[0],
+                tree.center[2] + tree.half_extents[2],
+            ],
+        };
+        for r in &source.reservations {
+            assert!(!validate::overlap(&rect, &r.rect));
+        }
+        for (axis, roads) in [(0, &source.roads.x), (2, &source.roads.z)] {
+            assert!(
+                roads
+                    .iter()
+                    .all(|v| (tree.center[axis] - v).abs() >= tree.half_extents[axis] + 9.0)
+            );
+        }
+        for b in c
+            .colliders
+            .iter()
+            .filter(|v| matches!(v.role, ColliderRole::Building | ColliderRole::Landmark))
+        {
+            assert!(
+                (tree.center[0] - b.center[0]).abs() >= tree.half_extents[0] + b.half_extents[0]
+                    || (tree.center[2] - b.center[2]).abs()
+                        >= tree.half_extents[2] + b.half_extents[2]
+            );
+        }
+    }
 }

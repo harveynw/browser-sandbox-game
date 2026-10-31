@@ -1,3 +1,4 @@
+import { treeShape, treeGeometries } from "../render/trees";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { findRoute, loadPackage } from "@port-meridian/content";
@@ -138,6 +139,8 @@ export function mountMapInspector(root: HTMLElement): () => void {
     scene.add(sunlight);
     const cube = new THREE.BoxGeometry(1, 1, 1);
     geometries.add(cube);
+    const trees = treeGeometries();
+    for (const geometry of Object.values(trees)) geometries.add(geometry);
     const outlines = new THREE.EdgesGeometry(cube);
     geometries.add(outlines);
     const palette = new Map<string, THREE.MeshStandardMaterial>();
@@ -168,7 +171,11 @@ export function mountMapInspector(root: HTMLElement): () => void {
             : p.role === "sidewalk"
               ? 1
               : 0;
-      const mesh = new THREE.Mesh(cube, material(p.color, layer));
+      const shape = treeShape(p);
+      const mesh = new THREE.Mesh(
+        shape === "box" ? cube : trees[shape],
+        material(p.color, layer),
+      );
       mesh.position.set(...p.center);
       mesh.scale.set(...(p.half_extents.map((n) => n * 2) as Vec3));
       parent.add(mesh);

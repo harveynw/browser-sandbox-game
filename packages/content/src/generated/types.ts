@@ -68,7 +68,7 @@ export type GraphAccess = { access_id: string, node_id: number, };
 
 export type RoadGraph = { nodes: Array<GraphNode>, edges: Array<GraphEdge>, accesses: Array<GraphAccess>, };
 
-export type VisualRole = "ground" | "road" | "sidewalk" | "marking" | "building" | "boundary" | "landmark" | "vehicle";
+export type VisualRole = "vegetation" | "ground" | "road" | "sidewalk" | "marking" | "building" | "boundary" | "landmark" | "vehicle";
 
 export type Primitive = { id: string, role: VisualRole, center: [number, number, number], half_extents: [number, number, number], color: string, collider_id: number | null, building?: BuildingIdentity, };
 
