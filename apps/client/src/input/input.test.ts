@@ -186,3 +186,40 @@ it("requires active aim for fire edges and clears weapon actions on blur", () =>
   expect(input.consumeReload()).toBe(false);
   expect(input.aiming).toBe(false);
 });
+
+it("keeps automatic intent held while single-shot edges remain one-shot and requires release after interruption", () => {
+  const input = new InputState();
+  input.active = true;
+  input.mouseButton(2, true);
+  input.mouseButton(0, true);
+  expect(input.consumeFire()).toBe(true);
+  expect(input.consumeFire()).toBe(false);
+  expect(input.triggerHeld).toBe(true);
+  input.stopFiring();
+  expect(input.triggerHeld).toBe(false);
+  input.mouseButton(0, true);
+  expect(input.triggerHeld).toBe(false);
+  input.mouseButton(0, false);
+  input.mouseButton(0, true);
+  expect(input.triggerHeld).toBe(true);
+  input.mouseButton(2, false);
+  input.mouseButton(2, true);
+  expect(input.triggerHeld).toBe(false);
+  input.clear();
+  expect(input.triggerHeld).toBe(false);
+});
+it("queues slot and wheel selection only during active gameplay", () => {
+  const input = new InputState();
+  input.press("Digit2");
+  input.wheel(1);
+  expect(input.consumeWeapon()).toBeNull();
+  expect(input.consumeCycle()).toBe(0);
+  input.active = true;
+  input.press("Digit3");
+  expect(input.consumeWeapon()).toBe(2);
+  expect(input.consumeWeapon()).toBeNull();
+  input.wheel(-1);
+  expect(input.consumeCycle()).toBe(-1);
+  input.clear();
+  expect(input.consumeCycle()).toBe(0);
+});

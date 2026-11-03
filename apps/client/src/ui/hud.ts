@@ -9,6 +9,7 @@ export interface HudModel {
   pursuit: string;
   ammo: string;
   magazine: number;
+  capacity?: number;
   vehicle: string;
   vehicleHealth: { current: number; maximum: number } | null;
   warning: string;
@@ -143,9 +144,11 @@ export class GameHud {
     );
     this.wanted.title = m.pursuit;
     const health = Math.max(0, Math.min(100, m.health));
-    const magazine = Math.max(0, Math.min(12, m.magazine));
+    const capacity = m.capacity ?? 12;
+    const magazine = Math.max(0, Math.min(capacity, m.magazine));
+    this.ammoBar.setAttribute("aria-valuemax", String(capacity));
     this.healthFill.style.width = `${health}%`;
-    this.ammoFill.style.width = `${(magazine / 12) * 100}%`;
+    this.ammoFill.style.width = `${(magazine / capacity) * 100}%`;
     this.healthBar.setAttribute("aria-valuenow", String(health));
     this.ammoBar.setAttribute("aria-valuenow", String(magazine));
     this.vehicleRow.hidden = m.vehicleHealth === null;

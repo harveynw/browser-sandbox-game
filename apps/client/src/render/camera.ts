@@ -11,7 +11,8 @@ export class FollowCamera {
     yaw: number,
     pitch: number,
     dt: number,
-    queries: Pick<PredictionWorld, "spherecastStatic">,
+    queries: Pick<PredictionWorld, "spherecastStatic"> &
+      Partial<Pick<PredictionWorld, "raycastStatic">>,
     reducedMotion = false,
     driving = false,
     vehicleHeight = 1.4,
@@ -26,7 +27,7 @@ export class FollowCamera {
       camera.fov = next;
       camera.updateProjectionMatrix();
     }
-    const range = aiming && !driving ? 0.1 : driving ? 7 : 4.5;
+    const range = aiming && !driving ? 1.65 : driving ? 7 : 4.5;
     const lift = driving ? Math.max(0, vehicleHeight - 1.4) : 0;
     const target = new Vector3(
       feet[0],
@@ -38,6 +39,10 @@ export class FollowCamera {
       -Math.sin(pitch) * range,
       Math.cos(yaw) * Math.cos(pitch) * range,
     );
+    if (aiming && !driving) {
+      desired.x += Math.cos(yaw) * 0.5;
+      desired.z -= Math.sin(yaw) * 0.5;
+    }
     const full = desired.length();
     desired.normalize();
     const hit = queries.spherecastStatic({
@@ -54,15 +59,23 @@ export class FollowCamera {
         (allowed - this.distance) * (1 - Math.exp(-Math.min(dt, 0.1) / 0.2));
     camera.position.copy(target).addScaledVector(desired, this.distance);
     if (aiming && !driving) {
+      const direction = new Vector3(
+        -Math.sin(yaw) * Math.cos(pitch),
+        Math.sin(pitch),
+        -Math.cos(yaw) * Math.cos(pitch),
+      );
+      const obstruction = queries.raycastStatic?.({
+        version: 1,
+        origin: target.toArray(),
+        direction: direction.toArray(),
+        max_distance: 120,
+      }).hit;
       camera.lookAt(
         target
           .clone()
-          .add(
-            new Vector3(
-              -Math.sin(yaw) * Math.cos(pitch),
-              Math.sin(pitch),
-              -Math.cos(yaw) * Math.cos(pitch),
-            ).multiplyScalar(80),
+          .addScaledVector(
+            direction,
+            Math.max(0.05, obstruction?.distance ?? 80),
           ),
       );
       return this.distance;

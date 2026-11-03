@@ -80,6 +80,8 @@ pub fn typescript() -> String {
         DebugOverlay,
         ChunkAsset,
         VisualAsset,
+        WeaponDefinition,
+        WeaponId,
         WorldManifest,
         PackageIndex
     );

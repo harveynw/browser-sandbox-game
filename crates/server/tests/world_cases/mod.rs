@@ -125,7 +125,7 @@ fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
     t.events.push_back(TransportEvent::Message {
         peer: p,
         message: ClientEnvelope {
-            v: ProtocolVersion(3),
+            v: ProtocolVersion(4),
             world_id: Some(OpaqueId(w.id.clone())),
             session_id: sid,
             message,
@@ -151,7 +151,7 @@ fn join(
         p,
         ClientMessage::ClientHello(ClientHello {
             tshirt_colour: Default::default(),
-            protocol_version: ProtocolVersion(3),
+            protocol_version: ProtocolVersion(4),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,
@@ -443,7 +443,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
         p,
         ClientMessage::ClientHello(ClientHello {
             tshirt_colour: Default::default(),
-            protocol_version: ProtocolVersion(3),
+            protocol_version: ProtocolVersion(4),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,
@@ -460,7 +460,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
     t.events.push_back(TransportEvent::Message {
         peer: p,
         message: ClientEnvelope {
-            v: ProtocolVersion(3),
+            v: ProtocolVersion(4),
             world_id: Some(OpaqueId("wrong-boot".into())),
             session_id: w.sessions.peers[&p].id.clone().map(OpaqueId),
             message: ClientMessage::Leave(Empty {}),
@@ -984,6 +984,28 @@ fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
 }
 
 fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
+    if w.players[&w.sessions.peers[&p].player.unwrap().0]
+        .weapon
+        .definition()
+        .automatic
+    {
+        send(
+            w,
+            t,
+            p,
+            ClientMessage::Trigger(Trigger {
+                control_epoch: ControlEpoch(w.sessions.peers[&p].epoch),
+                sequence: request,
+                held: true,
+                pressed: true,
+                weapon_id: WeaponId::MachineGun,
+                aim_yaw: Yaw(yaw),
+                aim_pitch: Pitch(-0.05),
+            }),
+        );
+        return;
+    }
+
     vehicle_action(
         w,
         t,
@@ -991,13 +1013,16 @@ fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
         request,
         w.sessions.peers[&p].epoch,
         Action::Fire(Fire {
+            weapon_id: w.players[&w.sessions.peers[&p].player.unwrap().0]
+                .weapon
+                .equipped,
             aim_yaw: Yaw(yaw),
             aim_pitch: Pitch(-0.05),
         }),
     );
 }
 #[test]
-fn shots_ignore_players_and_do_not_damage_another_guests_occupied_car() {
+fn shots_hit_players_and_do_not_damage_another_guests_occupied_car() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(0);
     let q = peer(1);
@@ -1009,14 +1034,15 @@ fn shots_ignore_players_and_do_not_damage_another_guests_occupied_car() {
     let pos = w.vehicles[&car].state.motor.position.0.map(|v| v.0);
     let shooter = w.sessions.peers[&p].player.unwrap().0;
     let other = w.sessions.peers[&q].player.unwrap().0;
+    w.players.get_mut(&other).unwrap().lifecycle.protected_until = None;
     w.players.get_mut(&shooter).unwrap().state.motor =
         sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
     w.players.get_mut(&other).unwrap().state.motor =
         sim_core::spawn_character([pos[0], 0.02, pos[2] + 5.0], 0.0).unwrap();
     fire(&w, &mut t, p, 1, 0.0);
     step(&mut w, &mut a, &mut t);
-    assert_eq!(w.players[&other].state.health.0, 100);
-    assert_eq!(w.vehicles[&car].state.health.0, 75);
+    assert_eq!(w.players[&other].state.health.0, 75);
+    assert_eq!(w.vehicles[&car].state.health.0, 100);
     at_door(&mut w, q, car);
     vehicle_action(
         &w,
@@ -1034,8 +1060,8 @@ fn shots_ignore_players_and_do_not_damage_another_guests_occupied_car() {
     }
     fire(&w, &mut t, p, 2, 0.0);
     step(&mut w, &mut a, &mut t);
-    assert_eq!(w.vehicles[&car].state.health.0, 75);
-    assert_eq!(w.players[&other].state.health.0, 100);
+    assert_eq!(w.vehicles[&car].state.health.0, 100);
+    assert_eq!(w.players[&other].state.health.0, 75);
 }
 
 #[test]
@@ -1357,4 +1383,481 @@ fn public_admission_requires_configured_origin_and_issues_secure_same_origin_ws(
     );
     assert_eq!(ticket.code, 200);
     assert_eq!(ticket.body["ws_url"], "wss://game.example.test/ws");
+}
+
+#[test]
+fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
+    for definition in weapon_catalogue() {
+        let (mut w, mut a, mut t) = setup();
+        let p = peer(0);
+        let q = peer(1);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        join(&mut w, &mut a, &mut t, q, None);
+        ready(&mut w, &mut a, &mut t, q);
+        let car = 1;
+        let pos = w.vehicles[&car].state.motor.position.0.map(|v| v.0);
+        let shooter = w.sessions.peers[&p].player.unwrap().0;
+        let other = w.sessions.peers[&q].player.unwrap().0;
+        w.players.get_mut(&other).unwrap().lifecycle.protected_until = None;
+        {
+            let weapon = &mut w.players.get_mut(&shooter).unwrap().weapon;
+            weapon.slots[definition.id.index()].owned = true;
+            weapon.slots[definition.id.index()].magazine = definition.capacity;
+            weapon.equipped = definition.id;
+        }
+        w.players.get_mut(&shooter).unwrap().state.motor =
+            sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
+        w.players.get_mut(&other).unwrap().state.motor =
+            sim_core::spawn_character([pos[0], 0.02, pos[2] + 5.0], 0.0).unwrap();
+        fire(&w, &mut t, p, 1, 0.0);
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.players[&other].state.health.0, 100 - definition.damage);
+        assert_eq!(w.vehicles[&car].state.health.0, 100);
+        assert_eq!(w.players[&shooter].state.health.0, 100);
+        assert!(t.sent.iter().any(|(_, _, envelope)| matches!(
+            &envelope.message,
+            ServerMessage::WorldEvent(WorldEvent::Shot(shot))
+                if shot.shooter_id.0 == shooter && shot.hit_entity_id == Some(EntityId(other))
+        )));
+        w.players.get_mut(&shooter).unwrap().weapon.trigger = None;
+        at_door(&mut w, q, car);
+        vehicle_action(
+            &w,
+            &mut t,
+            q,
+            1,
+            1,
+            Action::EnterVehicle(EnterVehicle {
+                vehicle_id: EntityId(car),
+            }),
+        );
+        step(&mut w, &mut a, &mut t);
+        for _ in 0..9 {
+            step(&mut w, &mut a, &mut t);
+        }
+        fire(&w, &mut t, p, 2, 0.0);
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.vehicles[&car].state.health.0, 100);
+        assert_eq!(w.players[&other].state.health.0, 100 - definition.damage);
+    }
+}
+
+#[test]
+fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let id = w.sessions.peers[&p].player.unwrap().0;
+    {
+        let slot = &mut w.players.get_mut(&id).unwrap().weapon.slots[1];
+        slot.owned = true;
+        slot.magazine = 20;
+        slot.reserve = 40;
+    }
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        1,
+        Action::EquipWeapon(EquipWeapon {
+            weapon_id: WeaponId::Rifle,
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.equipped, WeaponId::Rifle);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        1,
+        Action::EquipWeapon(EquipWeapon {
+            weapon_id: WeaponId::Pistol,
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.equipped, WeaponId::Rifle);
+    fire(&w, &mut t, p, 2, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.magazine, 20);
+    for _ in 0..15 {
+        step(&mut w, &mut a, &mut t);
+    }
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        3,
+        1,
+        Action::Fire(Fire {
+            weapon_id: WeaponId::Pistol,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        4,
+        2,
+        Action::Fire(Fire {
+            weapon_id: WeaponId::Rifle,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.magazine, 20);
+    fire(&w, &mut t, p, 5, 0.0);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.magazine, 19);
+    assert_eq!(w.players[&id].weapon.shot_sequence, 1);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        5,
+        1,
+        Action::Fire(Fire {
+            weapon_id: WeaponId::Rifle,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&id].weapon.magazine, 19);
+    send(
+        &w,
+        &mut t,
+        p,
+        ClientMessage::ResyncRequest(ResyncRequest {
+            reason: ResyncReason::Stale,
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    ready(&mut w, &mut a, &mut t, p);
+    assert_eq!(w.players[&id].weapon.magazine, 19);
+    assert_eq!(w.players[&id].weapon.reserve, 40);
+    assert_eq!(
+        w.players[&id].public_state().equipment.unwrap().weapon_id,
+        WeaponId::Rifle
+    );
+    assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message, ServerMessage::PlayerStatus(status) if status.equipped_weapon==WeaponId::Rifle && status.inventory[1].magazine.0==19 && status.inventory[1].reserve==40)));
+}
+
+#[test]
+fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let id = w.sessions.peers[&p].player.unwrap().0;
+    {
+        let weapon = &mut w.players.get_mut(&id).unwrap().weapon;
+        weapon.slots[2].owned = true;
+        weapon.slots[2].magazine = 50;
+        weapon.equipped = WeaponId::MachineGun;
+    }
+    fire(&w, &mut t, p, 1, 0.0);
+    for _ in 0..15 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.players[&id].weapon.magazine, 45);
+    for _ in 0..15 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.players[&id].weapon.magazine, 45);
+    fire(&w, &mut t, p, 2, 0.0);
+    step(&mut w, &mut a, &mut t);
+    send(
+        &w,
+        &mut t,
+        p,
+        ClientMessage::Trigger(Trigger {
+            control_epoch: ControlEpoch(1),
+            sequence: 3,
+            held: false,
+            pressed: false,
+            weapon_id: WeaponId::MachineGun,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    let ammo = w.players[&id].weapon.magazine;
+    for _ in 0..10 {
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.players[&id].weapon.magazine, ammo);
+}
+
+#[test]
+#[ignore = "measured synthetic 16-player weapon load; run in release with --nocapture"]
+fn weapon_presentation_load_16_players() {
+    let (mut w, mut a, mut t) = setup();
+    let peers: Vec<_> = (0..16).map(peer).collect();
+    for &p in &peers {
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        let id = w.sessions.peers[&p].player.unwrap().0;
+        let player = w.players.get_mut(&id).unwrap();
+        player.state.motor.position = Vec3([
+            Scalar(-184.0 + (p.id % 4) as f32 * 2.0),
+            Scalar(0.0),
+            Scalar(180.0 + (p.id / 4) as f32 * 2.0),
+        ]);
+        player.weapon.slots[2].owned = true;
+        player.weapon.equipped = WeaponId::MachineGun;
+        player.lifecycle.protected_until = None;
+    }
+    t.sent.clear();
+    let mut times = Vec::new();
+    let mut bytes = 0usize;
+    let mut shots = BTreeSet::new();
+    for frame in 0..90 {
+        // Test-only replenishment sustains the advertised peak, excluding reload downtime.
+        for player in w.players.values_mut() {
+            player.weapon.slots[2].magazine = 50;
+        }
+        if frame % 3 == 0 {
+            for &p in &peers {
+                send(
+                    &w,
+                    &mut t,
+                    p,
+                    ClientMessage::Trigger(Trigger {
+                        control_epoch: ControlEpoch(1),
+                        sequence: frame / 3 + 1,
+                        held: true,
+                        pressed: frame == 0,
+                        weapon_id: WeaponId::MachineGun,
+                        aim_yaw: Yaw(0.0),
+                        aim_pitch: Pitch(0.3),
+                    }),
+                );
+            }
+        }
+        let started = std::time::Instant::now();
+        step(&mut w, &mut a, &mut t);
+        times.push(started.elapsed().as_secs_f64() * 1000.0);
+        for (_, _, message) in t.sent.drain(..) {
+            bytes += serde_json::to_vec(&message).unwrap().len();
+            if let ServerMessage::WorldEvent(WorldEvent::Shot(shot)) = message.message {
+                shots.insert((shot.shooter_id.0, shot.shot_sequence));
+            }
+        }
+    }
+    times.sort_by(f64::total_cmp);
+    assert!(t.closed.is_empty());
+    assert_eq!(shots.len(), 480);
+    println!(
+        "WEAPON_LOAD players=16 ticks=90 shots={} shots_per_second={} tick_p50_ms={:.3} tick_p95_ms={:.3} tick_max_ms={:.3} aggregate_json_egress_bytes_per_second={:.0}",
+        shots.len(),
+        shots.len() / 3,
+        times[45],
+        times[85],
+        times[89],
+        bytes as f64 / 3.0
+    );
+}
+
+#[test]
+fn player_shots_respect_vehicle_cover_and_skip_dead_or_downed_targets() {
+    for (health, mode, behind_car) in [
+        (100, CharacterMode::OnFoot, true),
+        (0, CharacterMode::OnFoot, false),
+        (100, CharacterMode::Downed, false),
+        (10, CharacterMode::OnFoot, false),
+    ] {
+        let (mut w, mut a, mut t) = setup();
+        let p = peer(0);
+        let q = peer(1);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        join(&mut w, &mut a, &mut t, q, None);
+        ready(&mut w, &mut a, &mut t, q);
+        let pos = w.vehicles[&1].state.motor.position.0.map(|v| v.0);
+        let shooter = w.sessions.peers[&p].player_id();
+        let other = w.sessions.peers[&q].player_id();
+        place(&mut w, p, [pos[0], 0.02, pos[2] + 10.0]);
+        place(
+            &mut w,
+            q,
+            [pos[0], 0.02, pos[2] + if behind_car { -5.0 } else { 5.0 }],
+        );
+        let target = w.players.get_mut(&other).unwrap();
+        target.lifecycle.protected_until = None;
+        target.state.health = CharacterHealth(health);
+        target.state.mode = mode;
+        fire(&w, &mut t, p, 1, 0.0);
+        step(&mut w, &mut a, &mut t);
+        let eligible = !behind_car && health > 0 && mode == CharacterMode::OnFoot;
+        assert_eq!(
+            w.players[&other].state.health.0,
+            if eligible { 0 } else { health }
+        );
+        assert_eq!(
+            w.vehicles[&1].state.health.0,
+            if eligible { 100 } else { 75 }
+        );
+        assert_eq!(w.players[&shooter].state.health.0, 100);
+    }
+}
+
+#[test]
+fn walls_block_player_shots() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
+    let mut w = World::new(WorldContent::load_index(&root, "city.json").unwrap()).unwrap();
+    let mut a = Profiles::default();
+    let mut t = FakeTransport::default();
+    let p = peer(0);
+    let q = peer(1);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    place(&mut w, p, [-222.0, 0.02, 115.0]);
+    place(&mut w, q, [-222.0, 0.02, 65.0]);
+    vehicle_action(
+        &w,
+        &mut t,
+        p,
+        1,
+        w.sessions.peers[&p].epoch,
+        Action::Fire(Fire {
+            weapon_id: WeaponId::Pistol,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    let other = w.sessions.peers[&q].player_id();
+    assert_eq!(w.players[&other].state.health.0, 100);
+    assert!(
+        t.sent
+            .iter()
+            .any(|(_, _, envelope)| matches!(&envelope.message,
+        ServerMessage::WorldEvent(WorldEvent::Shot(shot))
+        if shot.hit_entity_id.is_none() && shot.end.0[2].0 > 65.0))
+    );
+}
+
+#[test]
+fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    let q = peer(1);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    let other = w.sessions.peers[&q].player_id();
+    let pos = w.vehicles[&1].state.motor.position.0.map(|v| v.0);
+    place(&mut w, p, [pos[0], 0.02, pos[2] + 10.0]);
+    place(&mut w, q, [pos[0], 0.02, pos[2] + 5.0]);
+    let epoch = w.sessions.peers[&q].epoch;
+    let target = w.players.get_mut(&other).unwrap();
+    target.lifecycle.protected_until = None;
+    target.state.health = CharacterHealth(10);
+    target.weapon.reload_end = Some(u32::MAX);
+    target.weapon.equip_end = Some(u32::MAX);
+    fire(&w, &mut t, p, 1, 0.0);
+    step(&mut w, &mut a, &mut t);
+    let target = &w.players[&other];
+    assert_eq!(target.state.mode, CharacterMode::Downed);
+    assert_eq!(target.state.health.0, 0);
+    assert!(target.weapon.reload_end.is_none());
+    assert!(target.weapon.equip_end.is_none());
+    assert!(target.weapon.trigger.is_none());
+    assert_eq!(w.sessions.peers[&q].epoch, epoch + 1);
+    let until = target.lifecycle.respawn.unwrap();
+    let position = target.state.motor.position.clone();
+    for recipient in [p, q] {
+        let notices: Vec<_> = t.sent.iter().filter(|(peer, delivery, message)|
+            *peer == recipient && *delivery == Delivery::Reliable && matches!(
+                &message.message, ServerMessage::Chat(line)
+                if line.system == Some(true) && line.text.0 == "Test Guest eliminated Test Guest"
+            )).collect();
+        assert_eq!(notices.len(), 1);
+    }
+
+    while w.tick < until - 1 {
+        batch(&w, &mut t, q, w.tick + 1, 32767, 32767, epoch + 1);
+        step(&mut w, &mut a, &mut t);
+    }
+    assert_eq!(w.players[&other].state.motor.position, position);
+    assert_eq!(w.players[&other].lifecycle.respawn, Some(until));
+    step(&mut w, &mut a, &mut t);
+    let target = &w.players[&other];
+    assert_eq!(target.state.mode, CharacterMode::OnFoot);
+    assert_eq!(target.state.health.0, 100);
+    assert_eq!(target.lifecycle.protected_until, Some(w.tick + 90));
+    assert!(target.lifecycle.respawn.is_none());
+    assert_eq!(target.weapon.equipped, WeaponId::Pistol);
+    for definition in weapon_catalogue() {
+        let slot = &target.weapon.slots[definition.id.index()];
+        assert!(slot.owned);
+        assert_eq!(slot.magazine, definition.capacity);
+        assert_eq!(slot.reserve, definition.max_reserve);
+    }
+    assert_eq!(w.sessions.peers[&q].epoch, epoch + 2);
+    assert_eq!(
+        t.sent
+            .iter()
+            .filter(|(_, _, message)| matches!(&message.message,
+        ServerMessage::Chat(line) if line.text.0.contains(" eliminated ")))
+            .count(),
+        2
+    );
+
+    // Stale pre-death input cannot move the newly respawned character.
+    let position = w.players[&other].state.motor.position.clone();
+    batch(&w, &mut t, q, w.tick + 1, 32767, 32767, epoch);
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(w.players[&other].state.motor.position.0[0], position.0[0]);
+    assert_eq!(w.players[&other].state.motor.position.0[2], position.0[2]);
+}
+
+#[test]
+fn spawn_protection_blocks_shots_until_expiry_or_firing() {
+    for ends_by_firing in [false, true] {
+        let (mut w, mut a, mut t) = setup();
+        let p = peer(0);
+        let q = peer(1);
+        join(&mut w, &mut a, &mut t, p, None);
+        ready(&mut w, &mut a, &mut t, p);
+        join(&mut w, &mut a, &mut t, q, None);
+        ready(&mut w, &mut a, &mut t, q);
+        let other = w.sessions.peers[&q].player_id();
+        let pos = w.vehicles[&1].state.motor.position.0.map(|v| v.0);
+        place(&mut w, p, [pos[0], 0.02, pos[2] + 10.0]);
+        place(&mut w, q, [pos[0], 0.02, pos[2] + 5.0]);
+        let expiry = w.players[&other].lifecycle.protected_until.unwrap();
+        fire(&w, &mut t, p, 1, 0.0);
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.players[&other].state.health.0, 100);
+        assert_eq!(w.vehicles[&1].state.health.0, 100);
+        if ends_by_firing {
+            fire(&w, &mut t, q, 1, std::f32::consts::FRAC_PI_2);
+            step(&mut w, &mut a, &mut t);
+            assert!(w.tick < expiry);
+        } else {
+            while w.tick < expiry {
+                step(&mut w, &mut a, &mut t);
+            }
+        }
+        assert!(w.players[&other].lifecycle.protected_until.is_none());
+        for _ in 0..9 {
+            step(&mut w, &mut a, &mut t);
+        }
+        fire(&w, &mut t, p, 2, 0.0);
+        step(&mut w, &mut a, &mut t);
+        assert_eq!(w.players[&other].state.health.0, 75);
+        assert_eq!(w.vehicles[&1].state.health.0, 100);
+    }
 }

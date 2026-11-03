@@ -17,7 +17,7 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
             t.events.push_back(TransportEvent::Message {
                 peer: previous,
                 message: ClientEnvelope {
-                    v: ProtocolVersion(3),
+                    v: ProtocolVersion(4),
                     world_id: Some(OpaqueId(w.id.clone())),
                     session_id: Some(OpaqueId("old-session".into())),
                     message: ClientMessage::Leave(Empty {}),

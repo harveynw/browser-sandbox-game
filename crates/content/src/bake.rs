@@ -328,6 +328,7 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         }
         visuals.push(shell);
     }
+
     let road_half = source.roads.carriageway_width / 2.0;
     let pavement_half = road_half + source.roads.sidewalk_width;
     for (axis, lines) in [(0, &source.roads.x), (2, &source.roads.z)] {
@@ -530,6 +531,7 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
     };
     let debug_sha256 = asset(&mut files, "debug.json", &debug)?;
     let mut manifest = WorldManifest {
+        weapons: protocol::weapon_catalogue(),
         schema_version: 1,
         world_asset_id: source.world_asset_id.clone(),
         content_hash: String::new(),

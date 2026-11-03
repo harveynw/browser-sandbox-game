@@ -80,6 +80,22 @@
         {
           "properties": {
             "data": {
+              "$ref": "#/$defs/EquipWeapon"
+            },
+            "kind": {
+              "const": "equip_weapon",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
               "$ref": "#/$defs/AcceptMission"
             },
             "kind": {
@@ -256,6 +272,22 @@
         {
           "properties": {
             "data": {
+              "$ref": "#/$defs/Trigger"
+            },
+            "kind": {
+              "const": "trigger",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
               "$ref": "#/$defs/ActionRequest"
             },
             "kind": {
@@ -382,6 +414,17 @@
       "minimum": 1,
       "type": "integer"
     },
+    "EquipWeapon": {
+      "properties": {
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
+        }
+      },
+      "required": [
+        "weapon_id"
+      ],
+      "type": "object"
+    },
     "Fire": {
       "properties": {
         "aim_pitch": {
@@ -389,9 +432,13 @@
         },
         "aim_yaw": {
           "$ref": "#/$defs/Yaw"
+        },
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
         }
       },
       "required": [
+        "weapon_id",
         "aim_yaw",
         "aim_pitch"
       ],
@@ -489,8 +536,8 @@
       "type": "number"
     },
     "ProtocolVersion": {
-      "maximum": 3,
-      "minimum": 3,
+      "maximum": 4,
+      "minimum": 4,
       "type": "integer"
     },
     "Repair": {
@@ -534,10 +581,55 @@
       "pattern": "^[A-Za-z0-9_.:-]+$",
       "type": "string"
     },
+    "Trigger": {
+      "properties": {
+        "aim_pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "aim_yaw": {
+          "$ref": "#/$defs/Yaw"
+        },
+        "control_epoch": {
+          "$ref": "#/$defs/ControlEpoch"
+        },
+        "held": {
+          "type": "boolean"
+        },
+        "pressed": {
+          "type": "boolean"
+        },
+        "sequence": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
+        }
+      },
+      "required": [
+        "control_epoch",
+        "sequence",
+        "held",
+        "pressed",
+        "weapon_id",
+        "aim_yaw",
+        "aim_pitch"
+      ],
+      "type": "object"
+    },
     "TshirtColour": {
       "maximum": 16777215,
       "minimum": 0,
       "type": "integer"
+    },
+    "WeaponId": {
+      "enum": [
+        "pistol",
+        "rifle",
+        "machine_gun"
+      ],
+      "type": "string"
     },
     "Yaw": {
       "maximum": 3.1415927410125732,

@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { attachments, type WeaponModels, type WeaponModel } from "./weapons";
+import type { WeaponId } from "@port-meridian/protocol";
 import type { CharacterMotor } from "@port-meridian/protocol";
 export type Clip =
   | "idle"
@@ -17,9 +19,14 @@ export interface AnimationInput {
   motor: CharacterMotor;
   driving?: boolean;
   incapacitated?: boolean;
-  aiming?: boolean;
+  aiming?: boolean | undefined;
   reloading?: boolean;
   fired?: boolean;
+  weapon?: WeaponId | undefined;
+  pitch?: number | undefined;
+  obstructed?: boolean;
+  reloadProgress?: number | null;
+  equipProgress?: number | null;
 }
 export class AnimationStateMachine {
   clip: Clip = "idle";
@@ -80,6 +87,28 @@ export class CharacterRig {
   fire(): void {
     this.pendingFire = true;
   }
+  private weapon?: WeaponModel;
+  private weaponId?: WeaponId;
+  private readonly weaponHand = new THREE.Group();
+  private readonly forearms: THREE.Mesh[] = [];
+  private readonly upperArms: THREE.Mesh[] = [];
+  private readonly handTarget = new THREE.Vector3();
+  private readonly supportTarget = new THREE.Vector3();
+  private readonly elbow = new THREE.Vector3();
+  private readonly down = new THREE.Vector3(0, -1, 0);
+  private readonly direction = new THREE.Vector3();
+  private recoilUntil = 0;
+  private raised = 0;
+  headTop(target: THREE.Vector3): void {
+    this.head.updateWorldMatrix(true, false);
+    this.head.localToWorld(target.set(0, 0.185, 0));
+  }
+  muzzle(target: THREE.Vector3): boolean {
+    if (!this.weapon?.root.visible) return false;
+    this.root.updateWorldMatrix(true, true);
+    this.weapon.muzzle.getWorldPosition(target);
+    return true;
+  }
   readonly animation = new AnimationStateMachine();
   private torso = new THREE.Group();
   private head = new THREE.Group();
@@ -95,6 +124,7 @@ export class CharacterRig {
     cube: THREE.BoxGeometry,
     private readonly material: (color: string) => THREE.MeshStandardMaterial,
     palette = 0,
+    private readonly weapons?: WeaponModels,
   ) {
     const shirt = clothing[palette % 4] ?? "#e4a25b",
       skin =
@@ -114,6 +144,7 @@ export class CharacterRig {
     };
     this.torso.position.y = 1.05;
     this.root.add(this.torso);
+    this.torso.add(this.weaponHand);
     part(this.torso, shirt, [0.48, 0.55, 0.3], [0, 0, 0]);
     this.head.position.y = 0.43;
     this.torso.add(this.head);
@@ -123,8 +154,8 @@ export class CharacterRig {
     this.arms.forEach((arm, i) => {
       arm.position.set(i === 0 ? -0.31 : 0.31, 0.19, 0);
       this.torso.add(arm);
-      part(arm, shirt, [0.17, 0.3, 0.2], [0, -0.13, 0]);
-      part(arm, skin, [0.14, 0.27, 0.16], [0, -0.4, 0]);
+      this.upperArms.push(part(arm, shirt, [0.17, 0.3, 0.2], [0, -0.13, 0]));
+      this.forearms.push(part(arm, skin, [0.14, 0.27, 0.16], [0, -0.4, 0]));
     });
     this.legs.forEach((leg, i) => {
       leg.position.set(i === 0 ? -0.13 : 0.13, 0.8, 0);
@@ -148,12 +179,23 @@ export class CharacterRig {
       swing = moving
         ? Math.sin(this.animation.phase) * (clip === "run" ? 0.85 : 0.5)
         : 0;
+    if (this.pendingFire || input.fired) this.recoilUntil = time + 0.12;
     this.pendingFire = false;
     this.root.position.y = input.driving ? -0.77 : 0;
     this.root.rotation.z = clip === "incapacitated" ? Math.PI / 2 : 0;
     this.torso.rotation.set(0, 0, 0);
     this.head.rotation.set(0, 0, 0);
     this.torso.position.y = 1.05;
+    this.upperArms.forEach((m) => {
+      m.position.set(0, -0.13, 0);
+      m.quaternion.identity();
+      m.scale.y = 0.3;
+    });
+    this.forearms.forEach((m) => {
+      m.position.set(0, -0.4, 0);
+      m.quaternion.identity();
+      m.scale.y = 0.27;
+    });
     this.arms.forEach((arm, i) => {
       arm.rotation.set(
         (i === 0 ? 1 : -1) * swing * 0.8,
@@ -189,6 +231,94 @@ export class CharacterRig {
       this.torso.position.y -= 0.1;
       this.legs.forEach((a) => (a.rotation.x = 0.18));
     }
+    if (input.weapon && this.weapons && input.weapon !== this.weaponId) {
+      if (this.weapon) this.weaponHand.remove(this.weapon.root);
+      this.weapon = this.weapons.create(input.weapon);
+      this.weaponId = input.weapon;
+      this.weaponHand.add(this.weapon.root);
+    }
+    if (!this.weapon || !this.weaponId) return;
+    this.weapon.root.visible =
+      !!input.weapon && !input.driving && !input.incapacitated;
+    if (!this.weapon.root.visible) return;
+    const reload = input.reloadProgress ?? null,
+      equip = input.equipProgress ?? null;
+    const wanted =
+      !input.obstructed && (input.aiming || time < this.recoilUntil) ? 1 : 0;
+    this.raised = reduced
+      ? wanted
+      : THREE.MathUtils.lerp(this.raised, wanted, 1 - Math.exp(-dt * 15));
+    const kick = reduced ? 0 : Math.max(0, (this.recoilUntil - time) / 0.12);
+    this.weaponHand.position.set(
+      0.22,
+      0.02 + this.raised * 0.16,
+      -0.3 - this.raised * 0.12 + kick * 0.035,
+    );
+    this.weaponHand.rotation.set(
+      -0.75 * (1 - this.raised) +
+        (input.pitch ?? 0) * this.raised +
+        kick * 0.08,
+      0,
+      0,
+    );
+    if (equip !== null) {
+      this.weaponHand.position.y -= (1 - equip) * 0.45;
+      this.weaponHand.rotation.x -= 1 - equip;
+    }
+    this.weapon.magazine.position.y =
+      reload === null
+        ? 0
+        : -Math.sin(Math.PI * Math.min(1, reload / 0.72)) * 0.24;
+    this.weapon.slide.position.z =
+      reload !== null && reload > 0.78
+        ? Math.sin(((reload - 0.78) / 0.22) * Math.PI) * 0.055
+        : kick * 0.025;
+    if (reload !== null) {
+      this.weaponHand.rotation.z = -0.25;
+      this.weaponHand.rotation.x = -0.3;
+    }
+    this.weaponHand.updateMatrix();
+    // Two articulated segments terminate exactly at the grip/support attachment.
+    const weapon = this.weapon,
+      weaponId = this.weaponId;
+    this.arms.forEach((arm, i) => {
+      arm.rotation.set(0, 0, 0);
+      this.handTarget.set(
+        ...(i === 1
+          ? ([0, 0, 0] as [number, number, number])
+          : attachments[weaponId].support),
+      );
+      if (i === 0 && reload !== null) {
+        this.handTarget.set(-0.04, -0.14 + weapon.magazine.position.y, -0.12);
+        if (reload > 0.78 && this.weaponId === "pistol")
+          this.handTarget.set(-0.04, 0.12, -0.07 + weapon.slide.position.z);
+      }
+      if (i === 0 && reload !== null && reload > 0.9)
+        this.handTarget.lerp(
+          this.supportTarget.set(...attachments[weaponId].support),
+          (reload - 0.9) / 0.1,
+        );
+      this.handTarget.applyMatrix4(this.weaponHand.matrix).sub(arm.position);
+      this.elbow.copy(this.handTarget).multiplyScalar(0.48);
+      this.elbow.x += i === 0 ? -0.1 : 0.1;
+      this.elbow.y -= 0.1;
+      const upper = this.upperArms[i],
+        lower = this.forearms[i];
+      if (!upper || !lower) return;
+      upper.position.copy(this.elbow).multiplyScalar(0.5);
+      upper.scale.y = this.elbow.length();
+      upper.quaternion.setFromUnitVectors(
+        this.down,
+        this.direction.copy(this.elbow).normalize(),
+      );
+      lower.position.copy(this.elbow).add(this.handTarget).multiplyScalar(0.5);
+      this.direction.copy(this.handTarget).sub(this.elbow);
+      lower.scale.y = this.direction.length();
+      lower.quaternion.setFromUnitVectors(
+        this.down,
+        this.direction.normalize(),
+      );
+    });
   }
 }
 /** Batch all remote rig/car parts by shared geometry/material to keep draw calls bounded. */

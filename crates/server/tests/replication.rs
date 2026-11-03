@@ -6,6 +6,7 @@ fn record(id: u32, visibility: u32) -> StateRecord {
         entity_id: EntityId(id),
         visibility_id: VisibilityId(visibility),
         state: EntityState::Character(CharacterState {
+            equipment: None,
             motor: sim_core::spawn_character([id as f32, 0.0, 0.0], 0.0).unwrap(),
             health: CharacterHealth(100),
             mode: CharacterMode::OnFoot,

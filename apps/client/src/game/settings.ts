@@ -11,6 +11,9 @@ export const defaults = {
   reload: "KeyR",
   map: "KeyM",
   fire: "KeyX",
+  weapon1: "Digit1",
+  weapon2: "Digit2",
+  weapon3: "Digit3",
 } as const;
 export type Control = keyof typeof defaults;
 export type Bindings = Record<Control, string>;
@@ -120,17 +123,39 @@ export function readSettings(
     if (v.quality === "low") base.quality = "low";
     if (typeof v.name === "string" && /^[A-Za-z0-9 _-]{1,24}$/.test(v.name))
       base.name = v.name;
-    if (
-      v.bindings &&
-      Object.keys(v.bindings).length === Object.keys(defaults).length &&
-      Object.keys(defaults).every(
-        (a) =>
-          typeof v.bindings?.[a as Control] === "string" &&
-          validKey(v.bindings[a as Control]),
-      ) &&
-      new Set(Object.values(v.bindings)).size === Object.keys(defaults).length
-    )
-      base.bindings = { ...v.bindings };
+    if (v.bindings) {
+      const merged = { ...defaults, ...v.bindings };
+      for (const action of ["weapon1", "weapon2", "weapon3"] as const) {
+        if (v.bindings[action] !== undefined) continue;
+        const used = new Set(
+          Object.entries(merged)
+            .filter(([k]) => k !== action)
+            .map(([, v]) => v),
+        );
+        if (used.has(merged[action]))
+          merged[action] =
+            [
+              "Digit1",
+              "Digit2",
+              "Digit3",
+              "Digit4",
+              "Digit5",
+              "Digit6",
+              "Digit7",
+              "Digit8",
+              "Digit9",
+            ].find((k) => !used.has(k)) ?? defaults[action];
+      }
+      if (
+        Object.keys(defaults).every(
+          (a) =>
+            typeof merged[a as Control] === "string" &&
+            validKey(merged[a as Control]),
+        ) &&
+        new Set(Object.values(merged)).size === Object.keys(defaults).length
+      )
+        base.bindings = merged;
+    }
   } catch {
     /* Storage may be disabled or contain an older/corrupt value. */
   }

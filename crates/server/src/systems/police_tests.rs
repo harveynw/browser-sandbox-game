@@ -188,10 +188,12 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         crate::entities::player::Player {
             tshirt_colour: Default::default(),
             weapon: Default::default(),
+            lifecycle: Default::default(),
             id: EntityId(player),
             display_name: DisplayName("fixture".into()),
             slot: 0,
             state: CharacterState {
+                equipment: None,
                 motor: sim_core::spawn_character(right, 0.0).unwrap(),
                 health: CharacterHealth(100),
                 mode: CharacterMode::OnFoot,

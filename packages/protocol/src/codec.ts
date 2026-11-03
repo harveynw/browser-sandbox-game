@@ -17,7 +17,7 @@ function decoded(bytes: Uint8Array, limit: number): unknown {
       maxBinLength: 0,
       maxExtLength: 0,
     });
-    if (!value || typeof value !== "object" || !("v" in value) || value.v !== 3)
+    if (!value || typeof value !== "object" || !("v" in value) || value.v !== 4)
       throw new ProtocolError("unsupported protocol version");
     return value;
   } catch (error) {

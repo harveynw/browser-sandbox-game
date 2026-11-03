@@ -11,6 +11,31 @@ export class InputState {
   active = false;
   aiming = false;
   private fire = false;
+  private held = false;
+  private blocked = false;
+  private weaponSelection: number | null = null;
+  private cycle = 0;
+  get triggerHeld(): boolean {
+    return this.active && this.aiming && this.held && !this.blocked;
+  }
+  stopFiring(): void {
+    this.held = false;
+    this.fire = false;
+    this.blocked = true;
+  }
+  consumeWeapon(): number | null {
+    const n = this.weaponSelection;
+    this.weaponSelection = null;
+    return this.active ? n : null;
+  }
+  consumeCycle(): number {
+    const n = this.cycle;
+    this.cycle = 0;
+    return this.active ? n : 0;
+  }
+  wheel(delta: number): void {
+    if (this.active) this.cycle = delta > 0 ? 1 : -1;
+  }
   private reload = false;
   private jump = false;
   private interact = false;
@@ -20,8 +45,16 @@ export class InputState {
     const action = this.action(code);
     this.keys.add(code);
     if (action === "map" && !repeat) this.map = true;
-    if (action === "fire" && !repeat && this.aiming) this.fire = true;
-    if (action === "aim" && !repeat) this.aiming = !this.aiming;
+    if (action === "fire" && !repeat && this.aiming && !this.blocked) {
+      this.fire = true;
+      this.held = true;
+    }
+    if (action?.startsWith("weapon") && !repeat)
+      this.weaponSelection = Number(action.slice(-1)) - 1;
+    if (action === "aim" && !repeat) {
+      this.aiming = !this.aiming;
+      if (!this.aiming) this.stopFiring();
+    }
     if (action === "reload" && !repeat) this.reload = true;
     if (action === "jump" && !repeat) this.jump = true;
     if (action === "interact" && !repeat) this.interact = true;
@@ -54,9 +87,17 @@ export class InputState {
     return map;
   }
   release(code: string): void {
+    if (this.action(code) === "fire") {
+      this.held = false;
+      this.blocked = false;
+    }
     this.keys.delete(code);
   }
   clear(): void {
+    this.stopFiring();
+    this.blocked = false;
+    this.weaponSelection = null;
+    this.cycle = 0;
     this.keys.clear();
     this.aiming = false;
     this.fire = false;
@@ -84,8 +125,18 @@ export class InputState {
   }
   mouseButton(button: number, down: boolean): void {
     if (!this.active) return;
-    if (button === 2) this.aiming = down;
-    if (button === 0 && down && this.aiming) this.fire = true;
+    if (button === 2) {
+      this.aiming = down;
+      if (!down) this.stopFiring();
+    }
+    if (button === 0 && !down) {
+      this.held = false;
+      this.blocked = false;
+    }
+    if (button === 0 && down && this.aiming && !this.blocked) {
+      this.fire = true;
+      this.held = true;
+    }
   }
   consumeFire(): boolean {
     const fire = this.active && this.aiming && this.fire;
@@ -232,6 +283,16 @@ export function bindInput(
       }
     },
     options,
+  );
+  canvas.addEventListener(
+    "wheel",
+    (event) => {
+      if (state.active && ownsFocus()) {
+        event.preventDefault();
+        state.wheel(event.deltaY);
+      }
+    },
+    { ...options, passive: false },
   );
   canvas.addEventListener(
     "contextmenu",

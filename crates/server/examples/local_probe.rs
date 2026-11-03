@@ -83,7 +83,7 @@ async fn send(
     peer.send(
         reliable,
         encode_client(&ClientEnvelope {
-            v: ProtocolVersion(3),
+            v: ProtocolVersion(4),
             world_id: world.clone(),
             session_id: session.clone(),
             message,

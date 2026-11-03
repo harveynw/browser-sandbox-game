@@ -38,7 +38,7 @@ macro_rules! integer {
     };
 }
 
-integer!(ProtocolVersion, u16, 3, 3, "3");
+integer!(ProtocolVersion, u16, 4, 4, "4");
 integer!(TickRate, u8, 30, 30, "30");
 integer!(SnapshotRate, u8, 10, 10, "10");
 integer!(EntityId, u32, 1, u32::MAX, "number");
@@ -59,7 +59,7 @@ integer!(Credits, u32, 0, 1_000_000_000, "number");
 integer!(InputAxis, i16, -32767, 32767, "number");
 integer!(Buttons, u8, 0, 15, "number");
 integer!(Heat, u8, 0, 3, "number");
-integer!(Magazine, u8, 0, 12, "number");
+integer!(Magazine, u8, 0, 50, "number");
 integer!(InputLead, u8, 2, 6, "number");
 integer!(EntityCount, u16, 0, 96, "number");
 integer!(CharacterHealth, u16, 0, 100, "number");
@@ -208,7 +208,7 @@ wire_struct!(ServerEnvelope {
 });
 wire_enum!(ClientMessage {
     ClientHello(ClientHello), ClientReady(ClientReady), InputBatch(InputBatch),
-    Action(ActionRequest), Chat(ChatText), Ping(Ping), ResyncRequest(ResyncRequest), Leave(Empty),
+    Trigger(Trigger), Action(ActionRequest), Chat(ChatText), Ping(Ping), ResyncRequest(ResyncRequest), Leave(Empty),
 });
 wire_struct!(ClientHello {
     protocol_version: ProtocolVersion,
@@ -236,19 +236,121 @@ wire_struct!(InputFrame {
     look_pitch: Pitch,
     buttons: Buttons,
 });
+wire_struct!(Trigger {
+    control_epoch: ControlEpoch,
+    sequence: u32,
+    held: bool,
+    pressed: bool,
+    weapon_id: WeaponId,
+    aim_yaw: Yaw,
+    aim_pitch: Pitch
+});
 wire_struct!(ActionRequest {
     request_id: RequestId,
     control_epoch: ControlEpoch,
     action: Action
 });
 wire_enum!(Action {
-    EnterVehicle(EnterVehicle), ExitVehicle(Empty), Fire(Fire), Reload(Empty),
+    EnterVehicle(EnterVehicle), ExitVehicle(Empty), Fire(Fire), Reload(Empty), EquipWeapon(EquipWeapon),
     AcceptMission(AcceptMission), CancelMission(Empty), Repair(Repair),
 });
 wire_struct!(EnterVehicle {
     vehicle_id: EntityId
 });
+string_enum!(WeaponId {
+    Pistol,
+    Rifle,
+    MachineGun
+});
+impl WeaponId {
+    pub fn index(&self) -> usize {
+        match self {
+            Self::Pistol => 0,
+            Self::Rifle => 1,
+            Self::MachineGun => 2,
+        }
+    }
+}
+wire_struct!(WeaponDefinition {
+    id: WeaponId,
+    capacity: u8,
+    max_reserve: u16,
+    fire_ticks: u32,
+    reload_ticks: u32,
+    equip_ticks: u32,
+    damage: u16,
+    range: f64,
+    automatic: bool,
+    spread_degrees: f64,
+    moving_multiplier: f64,
+    bloom_per_shot: f64,
+    bloom_max: f64,
+    bloom_recovery: f64
+});
+pub fn weapon_catalogue() -> [WeaponDefinition; 3] {
+    [
+        WeaponDefinition {
+            id: WeaponId::Pistol,
+            capacity: 12,
+            max_reserve: 72,
+            fire_ticks: 9,
+            reload_ticks: 45,
+            equip_ticks: 9,
+            damage: 25,
+            range: 80.0,
+            automatic: false,
+            spread_degrees: 0.6,
+            moving_multiplier: 1.6,
+            bloom_per_shot: 0.1,
+            bloom_max: 0.6,
+            bloom_recovery: 2.0,
+        },
+        WeaponDefinition {
+            id: WeaponId::Rifle,
+            capacity: 20,
+            max_reserve: 80,
+            fire_ticks: 12,
+            reload_ticks: 60,
+            equip_ticks: 12,
+            damage: 40,
+            range: 120.0,
+            automatic: false,
+            spread_degrees: 0.2,
+            moving_multiplier: 2.5,
+            bloom_per_shot: 0.05,
+            bloom_max: 0.3,
+            bloom_recovery: 1.5,
+        },
+        WeaponDefinition {
+            id: WeaponId::MachineGun,
+            capacity: 50,
+            max_reserve: 150,
+            fire_ticks: 3,
+            reload_ticks: 90,
+            equip_ticks: 15,
+            damage: 15,
+            range: 70.0,
+            automatic: true,
+            spread_degrees: 1.2,
+            moving_multiplier: 1.8,
+            bloom_per_shot: 0.25,
+            bloom_max: 3.0,
+            bloom_recovery: 2.0,
+        },
+    ]
+}
+wire_struct!(WeaponSlotView {
+    weapon_id: WeaponId,
+    owned: bool,
+    magazine: Magazine,
+    reserve: u16
+});
+wire_struct!(EquipmentView { weapon_id: WeaponId, reload_end_tick: Option<Tick>, equip_end_tick: Option<Tick>, aiming: bool, aim_pitch: Pitch });
+wire_struct!(EquipWeapon {
+    weapon_id: WeaponId
+});
 wire_struct!(Fire {
+    weapon_id: WeaponId,
     aim_yaw: Yaw,
     aim_pitch: Pitch
 });
@@ -377,6 +479,9 @@ wire_struct!(VehicleMotor {
     velocity: Vec3,
 });
 wire_struct!(CharacterState {
+    #[serde(default)]
+    #[ts(optional)]
+    equipment: Option<EquipmentView>,
     motor: CharacterMotor, health: CharacterHealth, mode: CharacterMode,
     vehicle_id: Option<EntityId>,
 });
@@ -444,6 +549,7 @@ string_enum!(MissionPhase {
     Failed
 });
 wire_struct!(PlayerStatus {
+    equipped_weapon: WeaponId, inventory: [WeaponSlotView; 3], equip_end_tick: Option<Tick>,
     revision: Revision, server_tick: Tick, credits: Credits, completed_jobs: u32,
     heat: Heat, pursuit: Pursuit, magazine: Magazine,
     repair: Option<RepairView>,
@@ -477,6 +583,7 @@ string_enum!(Pursuit {
 });
 wire_enum!(WorldEvent { Shot(Shot), Impact(Impact) });
 wire_struct!(Shot {
+    weapon_id: WeaponId, shot_sequence: u32,
     event_id: EventId, server_tick: Tick, shooter_id: EntityId, origin: Vec3, end: Vec3,
     hit_entity_id: Option<EntityId>,
 });
@@ -499,6 +606,9 @@ wire_struct!(Disconnect {
 });
 
 wire_struct!(ChatLine {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    system: Option<bool>,
     id: EventId,
     username: DisplayName,
     text: ChatText,

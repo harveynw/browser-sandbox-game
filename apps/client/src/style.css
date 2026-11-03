@@ -1230,3 +1230,18 @@ select {
     overflow: auto;
   }
 }
+
+/* Brief, static damage cue: no camera shake or flashing animation. */
+.game-hud.taking-damage::after {
+  content: "Taking damage";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 70px #bc243b80;
+  border: 3px solid #f16e7c99;
+  color: #fff;
+  text-shadow: 0 1px 4px #000;
+  text-align: center;
+  padding-top: 18vh;
+  font-weight: 700;
+}

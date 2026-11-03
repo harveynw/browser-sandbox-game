@@ -23,6 +23,7 @@ import type { PredictionWorld } from "../simulation/bridge";
 import { GameSession } from "../net/session";
 import { InputState, bindInput, type InputBinding } from "../input/input";
 import { GameRenderer } from "../render/renderer";
+import { crosshairAim } from "../render/aim";
 import { FollowCamera } from "../render/camera";
 export type AppPhase =
   | "boot"
@@ -57,9 +58,11 @@ export class GameApp {
   private respawnTick: number | null = null;
   private protectedUntil: number | null = null;
   private hitUntil = 0;
+  private damageUntil = 0;
   private readonly cross = document.createElement("div");
   private readonly hud = new GameHud();
   private readonly audio = new GameAudio();
+  private readonly remoteReloads = new Map<number, number | null>();
   private readonly tutorial = new Tutorial();
   private readonly controls = new ControlsPanel();
   private readonly chat = new ChatPanel(
@@ -384,7 +387,7 @@ export class GameApp {
       this.settings.bindings,
     );
     this.note.textContent = controlText(
-      "Cyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads.",
+      "All three weapons are available from login. Cyan circles: F choose a job. E enters/exits a car. Green repair zone: stop, then F · 50 credits. M opens the city map. LMB fires while aiming with RMB / Q. R reloads. 1 / 2 / 3 select weapons; mouse wheel cycles owned weapons.",
       this.settings.bindings,
     );
     this.mapButton.textContent = controlText(
@@ -518,6 +521,8 @@ export class GameApp {
           }
           this.ownerTick = owner.server_tick;
           this.motor = owner.player_state.motor;
+          if (owner.player_state.health < this.health)
+            this.damageUntil = performance.now() + 600;
           this.health = owner.player_state.health;
           if (
             (this.mode === "driving") !==
@@ -536,25 +541,28 @@ export class GameApp {
         tshirtColour: (colour) => {
           if (this.session === session) this.renderer?.tshirtColour(colour);
         },
+        dryFire: (weapon) => this.audio.cue("dry", undefined, 3, weapon),
         worldEvent: (event, own) => {
-          this.renderer?.effect(event, own);
+          this.renderer?.effect(event, own, this.queries);
           this.audio.cue(
             event.kind === "shot" ? "shot" : "impact",
             event.kind === "shot" ? event.data.origin : event.data.position,
             own ? 3 : 1,
+            event.kind === "shot" ? event.data.weapon_id : undefined,
           );
           if (own && event.kind === "shot" && event.data.hit_entity_id !== null)
             this.hitUntil = performance.now() + 300;
         },
         playerStatus: (status) => {
           if (this.session === session) {
+            this.renderer?.equipmentStatus(status);
             this.credits = status.credits;
             this.completedJobs = status.completed_jobs;
             if (
               status.reload_end_tick !== null &&
               status.reload_end_tick !== this.reloadEnd
             )
-              this.audio.cue("reload");
+              this.audio.cue("reload", undefined, 3, status.equipped_weapon);
             const missionSound = status.mission
               ? `${status.mission.instance_id}:${status.mission.phase}`
               : "";
@@ -621,6 +629,8 @@ export class GameApp {
       this.session?.takePredictionWork() ?? 0,
       this.phase === "playing" && !document.hidden,
     );
+    if (!this.input.triggerHeld || this.phase !== "playing" || this.contextLost)
+      this.session?.updateTrigger(false);
     const dt = Math.max(0, Math.min((now - this.previous) / 1000, 0.1));
     this.previous = now;
     try {
@@ -639,10 +649,17 @@ export class GameApp {
             this.status.textContent = "Choose a nearby job.";
           } else this.session?.useTerminal();
         }
-        if (this.input.consumeFire() && this.health > 0)
-          this.session?.fire(this.input.yaw, this.input.pitch);
-        if (this.input.consumeReload() && this.health > 0)
+        const selection = this.input.consumeWeapon();
+        const cycle = this.input.consumeCycle();
+        if (selection !== null || cycle !== 0) {
+          this.input.stopFiring();
+          if (selection !== null) this.session?.selectWeapon(selection);
+          else this.session?.cycleWeapon(cycle);
+        }
+        if (this.input.consumeReload() && this.health > 0) {
+          this.input.stopFiring();
           this.session?.reload();
+        }
         this.session?.advance(now, () =>
           this.health > 0
             ? this.input.sample(this.session?.isDriving)
@@ -676,8 +693,31 @@ export class GameApp {
           this.reloadEnd !== null,
           this.health <= 0 || this.mode === "arrested",
           this.input.down("jump"),
+          this.session?.estimatedTick(now) ?? 0,
+          this.input.pitch,
+          this.queries,
         );
         this.renderer.remotes(remotes);
+        for (const id of this.remoteReloads.keys())
+          if (!remotes.some((a) => a.id === id)) this.remoteReloads.delete(id);
+        for (const actor of remotes) {
+          if (actor.state.kind !== "character") continue;
+          const equipment = actor.state.data.equipment,
+            end = equipment?.reload_end_tick ?? null;
+          if (
+            equipment &&
+            end !== null &&
+            end > (this.session?.estimatedTick(now) ?? 0) &&
+            this.remoteReloads.get(actor.id) !== end
+          )
+            this.audio.cue(
+              "reload",
+              actor.motor.position,
+              1,
+              equipment.weapon_id,
+            );
+          this.remoteReloads.set(actor.id, end);
+        }
         const mission = this.session?.currentMission;
         const objective = selectedMissionTemplate(
           this.assets?.manifest.mission_templates.find(
@@ -714,7 +754,25 @@ export class GameApp {
           aiming,
         );
         this.cameraDistance = distance;
-        this.renderer.render(distance, aiming);
+        const aim = crosshairAim(
+          this.renderer.camera,
+          localMotor.position,
+          this.queries,
+          remotes,
+          (template) =>
+            this.assets?.manifest.vehicle_templates.find(
+              (v) => v.id === template,
+            )?.dimensions,
+        );
+        this.session?.updateTrigger(
+          aiming && this.input.triggerHeld,
+          aim.yaw,
+          aim.pitch,
+          now,
+        );
+        if (this.input.consumeFire() && aiming)
+          this.session?.fire(aim.yaw, aim.pitch);
+        this.renderer.render(distance);
         const siren =
           this.heat > 0
             ? remotes
@@ -753,7 +811,16 @@ export class GameApp {
       }
       if (now - this.lastHud > 100) {
         this.lastHud = now;
+        this.hud.element.classList.toggle(
+          "taking-damage",
+          now < this.damageUntil,
+        );
         this.cross.style.color = now < this.hitUntil ? "#ffcf68" : "";
+        const crossSize = `${20 + Math.min(24, (this.session?.spreadDegrees(Math.hypot(...(this.motor?.velocity ?? [0, 0, 0])) > 0.5, now) ?? 0.6) * 4)}px`;
+        this.cross.style.fontSize = crossSize;
+        this.cross.style.width = crossSize;
+        this.cross.style.height = crossSize;
+        this.cross.style.lineHeight = crossSize;
         this.cross.textContent = now < this.hitUntil ? "×" : "+";
         this.cross.hidden = this.phase !== "playing" || !this.input.active;
         const net = this.session?.metrics(now);
@@ -948,7 +1015,8 @@ export class GameApp {
                 : this.pursuit === "searching"
                   ? "Searching · stay hidden"
                   : "Pursuit · break sight",
-          ammo: controlText(combat, this.settings.bindings),
+          ammo: `${this.session?.weaponSummary(now) ?? "Pistol"} · ${controlText(combat, this.settings.bindings)}`,
+          capacity: this.session?.weaponCapacity ?? 12,
           magazine: this.magazine,
           vehicle: drivingStatus.replace(/^ · /, ""),
           vehicleHealth:
@@ -978,6 +1046,9 @@ export class GameApp {
     this.frame = requestAnimationFrame((t) => this.animate(t));
   }
   private cleanupScene(): void {
+    this.damageUntil = 0;
+    this.health = 100;
+    this.hud.element.classList.remove("taking-damage");
     this.input.clear();
     this.audio.pause(true);
     this.cityMap?.dispose();

@@ -17,7 +17,7 @@ use std::{
 };
 fn ping(nonce: u32) -> Vec<u8> {
     encode_client(&ClientEnvelope {
-        v: ProtocolVersion(3),
+        v: ProtocolVersion(4),
         world_id: Some(OpaqueId("diagnostic".into())),
         session_id: Some(OpaqueId("session".into())),
         message: ClientMessage::Ping(Ping {
@@ -38,6 +38,7 @@ fn probe_snapshot(nonce: u32) -> ServerEnvelope {
             entity_id: EntityId(nonce),
             visibility_id: VisibilityId(1),
             state: EntityState::Character(CharacterState {
+                equipment: None,
                 motor: sim_core::spawn_character([0.0, 0.0, 0.0], 0.0).unwrap(),
                 health: CharacterHealth(100),
                 mode: CharacterMode::OnFoot,
@@ -118,7 +119,7 @@ async fn run_transport(profile: LossProfile) -> Result {
             transport.poll();
             while let Ok((old, ack)) = command_rx.try_recv() {
                 let message = ServerEnvelope {
-                    v: ProtocolVersion(3),
+                    v: ProtocolVersion(4),
                     world_id: Some(OpaqueId("diagnostic".into())),
                     session_id: Some(OpaqueId("session".into())),
                     message: ServerMessage::Pong(Pong {
@@ -143,7 +144,7 @@ async fn run_transport(profile: LossProfile) -> Result {
                                 received.fetch_add(1, Ordering::Relaxed);
                             }
                             let reply = ServerEnvelope {
-                                v: ProtocolVersion(3),
+                                v: ProtocolVersion(4),
                                 world_id: Some(OpaqueId("diagnostic".into())),
                                 session_id: Some(OpaqueId("session".into())),
                                 message: ServerMessage::Pong(Pong {

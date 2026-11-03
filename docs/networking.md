@@ -32,8 +32,8 @@ Egress uses **60 KiB/s** with a **120 KiB** burst per peer. Snapshot admission r
 
 | Bound | Policy |
 |---|---|
-| Peers | 16 |
-| Lifecycle events | 32; overflow fails the boundary |
+| Peers | 64 |
+| Lifecycle events | 128; overflow fails the boundary |
 | Per-peer control ingress | 128 |
 | Per-peer action ingress | 32 |
 | Per-peer reliable output | 256 messages / 512 KiB |

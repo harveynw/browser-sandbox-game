@@ -7,7 +7,8 @@ use std::{
     time::Instant,
 };
 
-const MAX_PEERS: usize = 16;
+const MAX_PEERS: usize = 64;
+const LIFECYCLE_EVENTS: usize = MAX_PEERS * 2;
 const RELIABLE_MESSAGES: usize = 256;
 const RELIABLE_BYTES: usize = 512 * 1024;
 const CONTROLS: usize = 128;
@@ -181,7 +182,7 @@ impl Network {
     fn open(&mut self, id: u32) -> bool {
         if self.peers.contains_key(&id)
             || self.peers.len() >= MAX_PEERS
-            || self.lifecycle.len() >= 32
+            || self.lifecycle.len() >= LIFECYCLE_EVENTS
         {
             return false;
         }
@@ -209,7 +210,7 @@ impl Network {
         eprintln!("Local peer {} closed: {reason}", key.id);
         self.peers.remove(&key.id);
         // Never silently lose a terminal event: fail the boundary if consumer stalls.
-        if self.lifecycle.len() >= 32 {
+        if self.lifecycle.len() >= LIFECYCLE_EVENTS {
             self.failed = true;
         } else {
             self.lifecycle
@@ -231,11 +232,20 @@ impl Network {
         }
         match decode_client(bytes) {
             Ok(message) => {
-                let action = matches!(message.message, protocol::ClientMessage::Action(_));
+                let action = matches!(
+                    message.message,
+                    protocol::ClientMessage::Action(_) | protocol::ClientMessage::Trigger(_)
+                );
                 let count = peer
                     .ingress
                     .iter()
-                    .filter(|m| matches!(m.message, protocol::ClientMessage::Action(_)) == action)
+                    .filter(|m| {
+                        matches!(
+                            m.message,
+                            protocol::ClientMessage::Action(_)
+                                | protocol::ClientMessage::Trigger(_)
+                        ) == action
+                    })
                     .count();
                 if count >= if action { ACTIONS } else { CONTROLS } {
                     peer.close = Some("ingress full");
@@ -573,7 +583,7 @@ mod tests {
     #[test]
     fn stalled_ingress_is_bounded_and_stale_sends_cannot_reach_reconnect() {
         let (mut transport, key) = boundary();
-        let bytes = protocol::encode_client(&serde_json::from_value(serde_json::json!({"v":3,"world_id":"diagnostic","session_id":"session","message":{"kind":"ping","data":{"nonce":1,"client_time_ms":0}}})).unwrap()).unwrap();
+        let bytes = protocol::encode_client(&serde_json::from_value(serde_json::json!({"v":4,"world_id":"diagnostic","session_id":"session","message":{"kind":"ping","data":{"nonce":1,"client_time_ms":0}}})).unwrap()).unwrap();
         {
             let q = &mut transport;
             for _ in 0..=CONTROLS {
@@ -607,11 +617,26 @@ mod tests {
         assert!(q.peer(old).is_none());
         assert_eq!(q.lifecycle.len(), 3);
     }
-    // Checks that the lifecycle queue stops at 32 events and rejects further connections.
+    #[test]
+    fn admits_64_peers_and_rejects_the_next_until_a_slot_is_freed() {
+        let mut q = Network::default();
+        for id in 0..64 {
+            assert!(q.open(id));
+        }
+        assert!(!q.open(64));
+        let key = PeerKey {
+            id: 0,
+            generation: q.peers[&0].generation,
+        };
+        assert!(q.remove(key, "test"));
+        assert!(q.open(64));
+        assert_eq!(q.peers.len(), 64);
+    }
+    // Checks that the lifecycle queue stays bounded and rejects further connections.
     #[test]
     fn stalled_lifecycle_fails_without_unbounded_growth() {
         let mut q = Network::default();
-        for _ in 0..16 {
+        for _ in 0..MAX_PEERS {
             assert!(q.open(0));
             let key = PeerKey {
                 id: 0,
@@ -619,7 +644,7 @@ mod tests {
             };
             q.remove(key, "test");
         }
-        assert_eq!(q.lifecycle.len(), 32);
+        assert_eq!(q.lifecycle.len(), LIFECYCLE_EVENTS);
         assert!(!q.open(0));
     }
     // Checks that malformed input marks the peer for closure without queuing the payload.
@@ -678,6 +703,7 @@ mod tests {
     fn split_snapshot_output_retains_every_entity_and_baseline_clears_stale_pending_state() {
         let (mut transport, key) = boundary();
         let state = protocol::EntityState::Character(protocol::CharacterState {
+            equipment: None,
             motor: sim_core::spawn_character([0.0, 0.0, 0.0], 0.0).unwrap(),
             health: protocol::CharacterHealth(100),
             mode: protocol::CharacterMode::OnFoot,
@@ -742,6 +768,7 @@ mod tests {
     fn loss_probes_need_independent_records_instead_of_the_latest_pong_stream() {
         let (mut transport, key) = boundary();
         let state = protocol::EntityState::Character(protocol::CharacterState {
+            equipment: None,
             motor: sim_core::spawn_character([0.0, 0.0, 0.0], 0.0).unwrap(),
             health: protocol::CharacterHealth(100),
             mode: protocol::CharacterMode::OnFoot,

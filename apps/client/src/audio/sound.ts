@@ -1,3 +1,4 @@
+import type { WeaponId } from "@port-meridian/protocol";
 /** Original procedural audio; a shared bus and bounded voices, with no downloaded media. */
 export type Cue =
   | "step"
@@ -7,6 +8,7 @@ export type Cue =
   | "success"
   | "failure"
   | "reload"
+  | "dry"
   | "skid";
 export class VoicePool {
   private readonly slots: { priority: number; until: number }[] = [];
@@ -34,6 +36,7 @@ type Voice = {
   source: AudioScheduledSourceNode;
   gain: GainNode;
   panner?: PannerNode;
+  filter?: BiquadFilterNode;
 };
 export class GameAudio {
   private context: AudioContext | undefined;
@@ -144,12 +147,14 @@ export class GameAudio {
     v.source.disconnect();
     v.gain.disconnect();
     v.panner?.disconnect();
+    v.filter?.disconnect();
     this.pool.release(slot);
   }
   cue(
     cue: Cue,
     position: readonly number[] = this.listener,
     priority = 3,
+    weapon: WeaponId = "pistol",
   ): void {
     const c = this.context,
       effects = this.effects;
@@ -167,11 +172,12 @@ export class GameAudio {
     const durations: Record<Cue, number> = {
       step: 0.09,
       door: 0.16,
-      shot: 0.17,
+      shot: weapon === "rifle" ? 0.26 : weapon === "machine_gun" ? 0.13 : 0.17,
       impact: 0.2,
       success: 0.6,
       failure: 0.4,
-      reload: 0.3,
+      reload: weapon === "pistol" ? 0.3 : 0.45,
+      dry: 0.065,
       skid: 0.18,
     };
     const duration = durations[cue],
@@ -188,6 +194,7 @@ export class GameAudio {
       old.source.disconnect();
       old.gain.disconnect();
       old.panner?.disconnect();
+      old.filter?.disconnect();
     }
     const gain = c.createGain(),
       panner = this.spatial(position, c);
@@ -200,9 +207,26 @@ export class GameAudio {
       source = s;
     } else {
       const s = c.createOscillator();
-      s.type = cue === "door" ? "triangle" : "sine";
+      s.type =
+        cue === "door"
+          ? "triangle"
+          : cue === "reload" || cue === "dry"
+            ? "square"
+            : "sine";
       s.frequency.setValueAtTime(
-        cue === "success" ? 440 : cue === "failure" ? 220 : 160,
+        cue === "success"
+          ? 440
+          : cue === "failure"
+            ? 220
+            : cue === "dry"
+              ? weapon === "pistol"
+                ? 260
+                : 180
+              : weapon === "rifle"
+                ? 210
+                : weapon === "machine_gun"
+                  ? 110
+                  : 160,
         c.currentTime,
       );
       s.frequency.exponentialRampToValueAtTime(
@@ -211,14 +235,27 @@ export class GameAudio {
       );
       source = s;
     }
-    const peak = cue === "shot" ? 0.12 : cue === "step" ? 0.025 : 0.07;
+    const peak =
+      cue === "shot" ? 0.12 : cue === "step" || cue === "dry" ? 0.025 : 0.07;
     gain.gain.setValueAtTime(0, c.currentTime);
     gain.gain.linearRampToValueAtTime(peak, c.currentTime + 0.006);
     gain.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + duration);
-    source.connect(gain);
+    const filter = c.createBiquadFilter();
+    filter.type = cue === "shot" ? "lowpass" : "bandpass";
+    filter.frequency.value =
+      cue === "shot"
+        ? weapon === "rifle"
+          ? 1800
+          : weapon === "machine_gun"
+            ? 1100
+            : 3200
+        : 900;
+    filter.Q.value = 0.7;
+    source.connect(filter);
+    filter.connect(gain);
     gain.connect(panner);
     panner.connect(effects);
-    const voice = { source, gain, panner };
+    const voice = { source, gain, panner, filter };
     this.voices.set(slot, voice);
     source.onended = () => {
       if (this.voices.get(slot) === voice) {
@@ -227,6 +264,7 @@ export class GameAudio {
         source.disconnect();
         gain.disconnect();
         panner.disconnect();
+        filter.disconnect();
       }
     };
     source.start();
@@ -255,6 +293,7 @@ export class GameAudio {
         old.source.disconnect();
         old.gain.disconnect();
         old.panner?.disconnect();
+        old.filter?.disconnect();
       }
       const source = c.createOscillator(),
         gain = c.createGain(),

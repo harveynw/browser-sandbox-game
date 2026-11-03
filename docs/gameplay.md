@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md#documentation)
 
-Port Meridian is a local multiplayer driving and exploration game with an authoritative Rust world, a procedural coastal city, ambient traffic and pedestrians, jobs, a pistol and police pursuit. One world supports up to sixteen guests. Players can share the city, see each other move and drive, and take turns using cars. Missions, heat and money belong to individual guests. PvP damage is disabled.
+Port Meridian is a local multiplayer driving and exploration game with an authoritative Rust world, a procedural coastal city, ambient traffic and pedestrians, jobs, a pistol and police pursuit. One world supports up to 64 guests. Players can share the city, see each other move and drive, and take turns using cars. Missions, heat and money belong to individual guests. On-foot players can take weapon damage, become downed and respawn.
 
 ## City and presentation
 
@@ -71,9 +71,9 @@ Empty traffic cars can retire after thirty seconds beyond 220 m from all guests 
 
 ## Pistol, damage and recovery
 
-The pistol has **12 rounds**, a **9-tick** fire cooldown and **45-tick** reload. Server action IDs prevent duplicate spending/hits. Only live, eligible on-foot actors can fire. Entering a car or becoming downed cancels reload. Initial readiness/respawn grants three seconds of protection, ending on firing, car entry or job acceptance.
+The pistol starts with **12 loaded rounds and 72 reserve rounds**, a **9-tick** fire cooldown and **45-tick** reload. Reloading transfers available reserve rounds only when it completes. Server action IDs prevent duplicate spending/hits. Use 1/2/3 (rebindable) to select owned weapons or scroll the mouse wheel while controlling the game. The HUD shows loaded/reserve ammunition and reload/equip progress. The rifle fires once per press; the machine gun fires while aiming and holding the trigger. Normal sessions equip the pistol and own all three weapons with full ammunition. Automatic fire stops when control is interrupted and requires a fresh press after switching or reloading. Only live, eligible on-foot actors can fire. Entering a car or becoming downed cancels reload. Initial readiness/respawn grants three seconds of protection, ending on firing, car entry or job acceptance.
 
-Fire originates at authoritative feet +1.45 m, follows bounded requested yaw/pitch and tests the chest-to-muzzle path and an **80 m** ray. Static blockers/ground stop it; exact vehicle boxes and pedestrian capsules determine the nearest damage target. Hits apply **25 damage**. Players neither absorb nor take pistol damage. Another guest's occupied car blocks the ray but is protected from player-caused damage. Authoritative Shot/Impact events drive hit feedback and pooled visual/audio effects.
+The client selects the nearest static surface, vehicle box or living character capsule under the centre camera ray, then aims from the local chest toward that point. This corrects shoulder-camera parallax without aim attraction; empty-space aim uses a 120 m camera ray. Fire originates at authoritative feet +1.45 m, follows bounded requested yaw/pitch and tests the chest-to-muzzle path and a weapon-specific ray (**80/120/70 m** for pistol/rifle/machine gun). Static blockers/ground stop it; exact vehicle boxes and NPC/player capsules determine the nearest damage target. Hits apply **25/40/15 damage** respectively. Living, on-foot players other than the shooter absorb shots and take weapon damage. At zero health, players become downed, stop moving/firing, cancel reloads/equipping and active jobs, and respawn safely after 150 ticks with full health and all weapons/ammunition. Joining and respawning grant 90 ticks of protection: players still block shots but take no damage. Firing ends protection early. Control epochs advance on death and respawn so old input cannot regain control. Another guest's occupied car blocks the ray but is protected from player-caused damage. Authoritative Shot/Impact events drive hit feedback and pooled visual/audio effects. Confirmed damage highlights the shooter’s crosshair; health loss shows a brief red screen-edge indicator. Each PvP death broadcasts a system chat elimination message naming both players.
 
 Crash damage is `clamp((speed_loss − 6) × 5, 0, 50)`, once per counterpart per fifteen ticks. Pedestrian impacts above 4 m/s apply `min(100, speed × 8)`, with swept relative-motion queries and the same pair cooldown. Vehicle impacts do not target player capsules; indirect PvP vehicle damage is suppressed.
 
@@ -91,7 +91,7 @@ Arrest requires an assigned live unit's front anchor within **3 m**, static sigh
 
 ## Scope
 
-This is a localhost, single-world game with original procedural art and synthesized effects. Public hosting, PvP/rewind shooting, explosions, additional weapons, on-foot police, distributed worlds and realistic suspension dynamics are outside the implemented rules. Browser compatibility and performance qualifications are listed in [testing](testing.md) and [performance](performance.md).
+This is a localhost, single-world game with original procedural art and synthesized effects. Rewind shooting, explosions, on-foot police, distributed worlds and realistic suspension dynamics are outside the implemented rules. Browser compatibility and performance qualifications are listed in [testing](testing.md) and [performance](performance.md).
 
 ### Player T-shirt colour
 
@@ -99,4 +99,11 @@ The join menu offers an RGB colour picker. The selected colour is committed with
 
 ### Player chat
 
-Press T to type above the minimap; Enter sends, Shift+Enter adds a line break, and Escape closes the composer. Gameplay input stays released until the canvas is clicked again. Messages use `username: message` with safe `*bold*` / `**bold**`, `_italic_`, `~strike~` / `~~strike~~`, and backtick code formatting. Recent messages fade after 12 seconds; focusing chat reveals the bounded 32-message history. ChatSystem authenticates the author from the player entity, limits sends to one per second, and delivers messages/history reliably to connected players. History lives only for the current server process.
+Press T to type above the minimap; Enter sends, Shift+Enter adds a line break, and Escape closes the composer. Gameplay input stays released until the canvas is clicked again. Messages use `username: message` with safe `*bold*` / `**bold**`, `_italic_`, `~strike~` / `~~strike~~`, and backtick code formatting. Recent messages fade after 12 seconds; focusing chat reveals the bounded 32-message history. ChatSystem authenticates the author from the player entity, limits sends to one per second, and delivers messages/history reliably to connected players. History lives only for the current server process. Server-generated “Name has joined the game” and “Name has left the game” notices are broadcast to every connected chat window and retained in the same bounded history. Joining is announced after initial loading completes; resyncs and players who never finish loading do not produce extra notices.
+
+
+## Weapon loadout
+
+Every player joins and respawns with all three weapons: pistol (12 loaded, 72 reserve), rifle (20 loaded, 80 reserve), and machine gun (50 loaded, 150 reserve). Select with 1/2/3 or the mouse wheel. Ammunition remains finite and reloads consume reserves. There are no world supply drops.
+
+Weapon models now attach to local and remote character hands. Aiming uses a collision-aware shoulder camera. Carry, recoil, magazine exchange, equip and stow follow authoritative equipment state. Low quality removes shell casings; reduced motion reduces flashes and suppresses recoil/bobbing/tracers. Firing, reloading and dry clicks have distinct synthesized sounds per weapon.

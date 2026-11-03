@@ -697,12 +697,12 @@ impl PoliceSystem {
                     .get_mut(&s.player_id())
                     .expect("player equipment")
                     .weapon
-                    .reload_end = None;
+                    .cancel();
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .protected_until = None;
                 if let Some(m) = missions.mission_mut(s.player_id())
                     && m.phase == crate::systems::missions::Phase::Active
@@ -736,18 +736,18 @@ impl PoliceSystem {
             .get_mut(&s.player_id())
             .expect("player equipment")
             .weapon
-            .reload_end = None;
+            .cancel();
         world
             .players
             .get_mut(&s.player_id())
             .expect("player equipment")
-            .weapon
+            .lifecycle
             .protected_until = None;
         world
             .players
             .get_mut(&s.player_id())
             .expect("player equipment")
-            .weapon
+            .lifecycle
             .respawn = Some(world.tick.saturating_add(150));
         *self.wanted_mut(s.player_id()) = Wanted::default();
         self.release(id.0);

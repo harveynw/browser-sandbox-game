@@ -87,7 +87,7 @@ function receive(
     channel,
     encodeServer(
       {
-        v: 3,
+        v: 4,
         world_id: world,
         session_id: message.kind === "server_hello" ? null : session,
         message,
@@ -119,7 +119,7 @@ async function connect() {
     {
       kind: "server_hello",
       data: {
-        protocol_version: 3,
+        protocol_version: 4,
         build_id: "protocol-simple-local",
         content_hash: hash,
         sim_config_hash: hash,
@@ -189,6 +189,9 @@ beforeEach(() => {
   );
   vi.mocked(loadPackage).mockResolvedValue({
     manifest: {
+      weapons: [],
+      zones: [],
+      mission_templates: [],
       content_hash: hash,
       sim_config_hash: hash,
       vehicle_templates: [],
@@ -249,7 +252,7 @@ it("accepts ordered baseline once, discards early snapshots and ignores old scop
     "unreliable",
     encodeServer(
       {
-        v: 3,
+        v: 4,
         world_id: "world",
         session_id: "old-session",
         message: { kind: "owner_state", data: owner(101) },
@@ -385,7 +388,7 @@ it("cancels asynchronous asset work before opening transport and ignores capture
     "reliable",
     encodeServer(
       {
-        v: 3,
+        v: 4,
         world_id: "world",
         session_id: "session",
         message: {
@@ -484,4 +487,56 @@ it("sends chat only when ready and receives reliable server-authored messages", 
   };
   receive({ kind: "chat", data: line });
   expect(chat).toHaveBeenCalledWith(line);
+});
+
+it("refreshes automatic intent at 10Hz without consuming the reload action throttle and requires release after reload", async () => {
+  const { game } = await connect();
+  baseline();
+  start();
+  receive({
+    kind: "player_status",
+    data: {
+      revision: 1,
+      server_tick: 10,
+      credits: 0,
+      completed_jobs: 0,
+      heat: 0,
+      pursuit: "clear",
+      magazine: 50,
+      equipped_weapon: "machine_gun",
+      inventory: [
+        { weapon_id: "pistol", owned: true, magazine: 12, reserve: 36 },
+        { weapon_id: "rifle", owned: false, magazine: 0, reserve: 0 },
+        { weapon_id: "machine_gun", owned: true, magazine: 50, reserve: 100 },
+      ],
+      equip_end_tick: null,
+      reload_end_tick: null,
+      mission: null,
+      repair: null,
+      respawn_tick: null,
+      protected_until_tick: null,
+    },
+  });
+  game.updateTrigger(false);
+  game.updateTrigger(true, 0, 0, 0);
+  game.updateTrigger(true, 0, 0, 99);
+  game.updateTrigger(true, 0, 0, 100);
+  let triggers = sent().filter((m) => m.kind === "trigger");
+  expect(triggers).toHaveLength(2);
+  expect(triggers.map((m) => m.data.pressed)).toEqual([true, false]);
+  game.reload();
+  expect(
+    sent().some((m) => m.kind === "action" && m.data.action.kind === "reload"),
+  ).toBe(true);
+  game.updateTrigger(true, 0, 0, 200);
+  triggers = sent().filter((m) => m.kind === "trigger");
+  expect(triggers).toHaveLength(3);
+  expect(triggers[2]?.data.held).toBe(false);
+  game.updateTrigger(false);
+  game.updateTrigger(true, 0, 0, 300);
+  expect(
+    sent()
+      .filter((m) => m.kind === "trigger")
+      .at(-1)?.data.pressed,
+  ).toBe(true);
 });

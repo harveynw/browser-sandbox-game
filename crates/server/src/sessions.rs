@@ -44,6 +44,7 @@ pub struct Session {
     pub(crate) egress_budget: Budget,
     pub(crate) input_rate: InputRate,
     pub(crate) action_rate: Budget,
+    pub(crate) trigger_rate: Budget,
     pub(crate) last_replicated: BTreeMap<u32, u32>,
 }
 
@@ -55,13 +56,14 @@ pub struct Sessions {
 }
 impl Sessions {
     pub(crate) fn cleanup(
+        &mut self,
         session: &Session,
         profiles: &mut Profiles,
         world: &mut World,
         systems: &mut Systems,
     ) {
         if let Some(id) = session.player {
-            systems.chat.disconnect(id.0);
+            systems.chat.on_left(id.0, world, self);
             systems.missions.release_disconnected_recoveries(
                 id.0,
                 world,
@@ -94,7 +96,7 @@ impl Sessions {
         systems: &mut Systems,
     ) {
         if let Some(session) = self.peers.remove(&peer) {
-            Sessions::cleanup(&session, profiles, world, systems);
+            self.cleanup(&session, profiles, world, systems);
         }
     }
     pub(crate) fn action(
@@ -128,16 +130,22 @@ impl Sessions {
         {
             return ActionCode::Dead;
         }
-        if matches!(action, Action::Fire(_) | Action::Reload(_)) {
+
+        if matches!(
+            action,
+            Action::Fire(_) | Action::Reload(_) | Action::EquipWeapon(_)
+        ) {
             return systems.combat.weapon_action(
                 peer,
                 s,
                 action,
+                false,
                 world,
                 self,
                 &mut systems.population,
                 &mut systems.police,
                 &mut systems.missions,
+                &mut systems.chat,
             );
         }
         if let Action::Repair(request) = action {
@@ -247,12 +255,12 @@ impl Sessions {
                     .get_mut(&s.player_id())
                     .expect("player equipment")
                     .weapon
-                    .reload_end = None;
+                    .cancel();
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .protected_until = None;
                 s.status_dirty = true;
                 car.state.driver_id = Some(id);
@@ -346,7 +354,7 @@ impl Sessions {
                 old,
                 Delivery::Reliable,
                 ServerEnvelope {
-                    v: ProtocolVersion(3),
+                    v: ProtocolVersion(4),
                     world_id: Some(OpaqueId(world.id.clone())),
                     session_id: old_session_id.map(OpaqueId),
                     message: ServerMessage::Disconnect(Disconnect {
@@ -386,10 +394,12 @@ impl Sessions {
             Player {
                 tshirt_colour: profile.tshirt_colour,
                 weapon: Default::default(),
+                lifecycle: Default::default(),
                 id,
                 display_name: profile.display_name.clone(),
                 slot,
                 state: CharacterState {
+                    equipment: None,
                     motor,
                     health: CharacterHealth(100),
                     mode: CharacterMode::OnFoot,
@@ -520,7 +530,7 @@ impl Sessions {
                         .players
                         .get_mut(&s.player_id())
                         .expect("player equipment")
-                        .weapon
+                        .lifecycle
                         .protected_until = Some(world.tick.saturating_add(90));
                 }
                 s.phase = SessionPhase::Playing;
@@ -624,6 +634,7 @@ impl Sessions {
                 s.last_resync = Some(now);
                 s.epoch = s.epoch.checked_add(1).ok_or("epoch exhausted")?;
                 if let Some(p) = s.player.and_then(|id| world.players.get_mut(&id.0)) {
+                    p.weapon.trigger = None;
                     p.state.motor.velocity = Vec3([Scalar(0.0); 3]);
                     if let Some(car) = p.state.vehicle_id {
                         world.vehicles.get_mut(&car.0).ok_or("missing car")?.stop();
@@ -639,6 +650,18 @@ impl Sessions {
                     &mut systems.police,
                 )
                 .map_err(|_| "baseline unavailable")?;
+            }
+            ClientMessage::Trigger(intent) => {
+                if !s.trigger_rate.allow(1, now, 0) {
+                    return Err("trigger rate exceeded");
+                }
+                if s.phase == SessionPhase::Playing && intent.control_epoch.0 == s.epoch {
+                    if let Some(player) = s.player.and_then(|id| world.players.get_mut(&id.0)) {
+                        if player.state.mode == CharacterMode::OnFoot && player.state.health.0 > 0 {
+                            player.weapon.trigger_intent(&intent, world.tick);
+                        }
+                    }
+                }
             }
             ClientMessage::Action(request) => {
                 if !s.action_rate.allow(1, now, 0) {
@@ -801,6 +824,7 @@ impl Sessions {
                             egress_budget: Budget::new(60 * 1024, 120 * 1024),
                             input_rate: InputRate::default(),
                             action_rate: Budget::new(10, 20),
+                            trigger_rate: Budget::new(12, 24),
                             last_replicated: BTreeMap::new(),
                         },
                     );
@@ -838,7 +862,7 @@ impl Sessions {
                     self.peers.insert(peer, s);
                 }
                 Err(reason) => {
-                    Sessions::cleanup(&s, profiles, world, systems);
+                    self.cleanup(&s, profiles, world, systems);
                     self.closing.insert(peer, reason);
                 }
             }
@@ -880,7 +904,7 @@ impl Sessions {
                     )
                     .is_err()
                 {
-                    Sessions::cleanup(&s, profiles, world, systems);
+                    self.cleanup(&s, profiles, world, systems);
                     self.closing.insert(peer, "profile admission failed");
                     continue;
                 }

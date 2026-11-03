@@ -19,6 +19,10 @@ const ajv = new Ajv2020({
   strict: true,
   allErrors: false,
   formats: {
+    uint8: {
+      type: "number",
+      validate: (n: number) => Number.isInteger(n) && n >= 0 && n <= 255,
+    },
     uint32: {
       type: "number",
       validate: (n: number) => Number.isInteger(n) && n >= 0 && n <= 0xffffffff,

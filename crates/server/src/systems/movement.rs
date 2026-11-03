@@ -200,6 +200,7 @@ impl MovementSystem {
         world.collision.exclude_vehicle(None);
         for (id, peer) in std::mem::take(owners) {
             let player = world.players.get_mut(&id).ok_or("player missing")?;
+            player.weapon.aiming = false;
             if let Some(car_id) = player.state.vehicle_id {
                 let car = &world.vehicles[&car_id.0];
                 player.state.motor = sim_core::presentation_motor(&car.state.motor);
@@ -208,6 +209,8 @@ impl MovementSystem {
                 && player.state.mode == CharacterMode::OnFoot
                 && let Some(input) = actor_inputs.get(&id)
             {
+                player.weapon.aiming = input.buttons.0 & 8 != 0;
+                player.weapon.aim_pitch = input.look_pitch;
                 match sim_core::step_character(
                     &player.state.motor,
                     input,

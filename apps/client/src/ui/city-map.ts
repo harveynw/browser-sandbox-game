@@ -355,6 +355,7 @@ export class CityMap {
         y,
       );
     }
+
     if (this.motor) {
       for (const actor of this.actors) {
         if (

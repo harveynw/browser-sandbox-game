@@ -273,7 +273,7 @@ impl MissionSystem {
             .players
             .get_mut(&s.player_id())
             .expect("player equipment")
-            .weapon
+            .lifecycle
             .protected_until = None;
         *self.mission_mut(s.player_id()) = Some(m);
         s.status_dirty = true;
@@ -372,7 +372,7 @@ impl MissionSystem {
                 .get_mut(&s.player_id())
                 .expect("player equipment")
                 .weapon
-                .reload_end = None;
+                .cancel();
             s.status_dirty = true;
             Replication::transition(peer, s, &[id.0, car], world, sessions, population, police)?;
             Replication::reliable(

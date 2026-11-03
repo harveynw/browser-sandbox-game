@@ -19,7 +19,7 @@ fn join_with_colour(
         p,
         ClientMessage::ClientHello(ClientHello {
             tshirt_colour: TshirtColour(colour),
-            protocol_version: ProtocolVersion(3),
+            protocol_version: ProtocolVersion(4),
             build_id: build.build_id,
             content_hash: build.content_hash,
             sim_config_hash: build.sim_config_hash,

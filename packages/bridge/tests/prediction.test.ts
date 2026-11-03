@@ -227,7 +227,7 @@ it.each([
           buffer.delete(tick);
           if (tick % 3 === 0) {
             const envelope = {
-              v: 3,
+              v: 4,
               world_id: "test-world",
               session_id: "test-session",
               message: {
@@ -260,7 +260,7 @@ it.each([
         if (inputs.length) {
           const frames = p.batch();
           const bytes = encodeClient({
-            v: 3,
+            v: 4,
             world_id: "test-world",
             session_id: "test-session",
             message: {

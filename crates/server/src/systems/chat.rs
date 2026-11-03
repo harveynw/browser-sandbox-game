@@ -15,6 +15,7 @@ pub struct ChatSystem {
     last_sent: BTreeMap<u32, u64>,
     /// Monotonic IDs let clients deduplicate history and live messages.
     next_id: u32,
+    announced: BTreeMap<u32, DisplayName>,
 }
 impl ChatSystem {
     /// The sender is temporarily detached from Sessions while its message is handled.
@@ -71,7 +72,7 @@ impl ChatSystem {
     }
     /// Replay recent chat once on initial readiness; resyncs already receive live messages.
     pub(crate) fn on_ready(
-        &self,
+        &mut self,
         peer: PeerKey,
         session: &Session,
         world: &mut World,
@@ -89,6 +90,104 @@ impl ChatSystem {
                 sessions,
             );
         }
+        let id = session.player_id();
+        if let Some(player) = world.players.get(&id) {
+            let name = player.display_name.clone();
+            if self.announced.insert(id, name.clone()).is_none() {
+                self.presence(
+                    name,
+                    true,
+                    Some((peer, session.id.clone())),
+                    world,
+                    sessions,
+                );
+            }
+        }
+    }
+    fn presence(
+        &mut self,
+        username: DisplayName,
+        joined: bool,
+        extra: Option<(PeerKey, Option<String>)>,
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        self.system_message(
+            username.clone(),
+            ChatText(format!(
+                "{} has {} the game",
+                username.0,
+                if joined { "joined" } else { "left" }
+            )),
+            extra,
+            world,
+            sessions,
+        );
+    }
+    pub(crate) fn elimination(
+        &mut self,
+        killer: u32,
+        victim: u32,
+        extra: (PeerKey, Option<String>),
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        let username = world.players[&killer].display_name.clone();
+        let text = ChatText(format!(
+            "{} eliminated {}",
+            username.0, world.players[&victim].display_name.0
+        ));
+        self.system_message(username, text, Some(extra), world, sessions);
+    }
+    fn system_message(
+        &mut self,
+        username: DisplayName,
+        text: ChatText,
+        extra: Option<(PeerKey, Option<String>)>,
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        let Some(id) = self.next_id.checked_add(1) else {
+            return;
+        };
+        self.next_id = id;
+        let line = ChatLine {
+            system: Some(true),
+            id: EventId(id),
+            username: username.clone(),
+            text,
+            server_tick: world.tick,
+        };
+        if self.messages.len() == 32 {
+            self.messages.pop_front();
+        }
+        self.messages.push_back(line.clone());
+        let recipients: Vec<_> = sessions
+            .peers
+            .iter()
+            .filter(|(_, s)| s.player.is_some())
+            .map(|(&p, s)| (p, s.id.clone()))
+            .chain(extra)
+            .collect();
+        for (peer, sid) in recipients {
+            Replication::reliable(
+                peer,
+                sid.as_deref(),
+                ServerMessage::Chat(line.clone()),
+                world,
+                sessions,
+            );
+        }
+    }
+    pub(crate) fn on_left(&mut self, player: u32, world: &mut World, sessions: &mut Sessions) {
+        if let Some(name) = self.announced.remove(&player) {
+            let name = world
+                .players
+                .get(&player)
+                .map_or(name, |p| p.display_name.clone());
+            self.presence(name, false, None, world, sessions);
+        }
+        self.disconnect(player);
     }
     fn send(
         &mut self,
@@ -113,6 +212,7 @@ impl ChatSystem {
             .checked_add(1)
             .ok_or("Chat unavailable: message IDs exhausted.")?;
         let line = ChatLine {
+            system: None,
             id: EventId(self.next_id),
             username,
             text,

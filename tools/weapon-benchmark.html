@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8" /><title>
+  Weapon rendering verification
+</title>
+<style>
+  body {
+    margin: 0;
+    background: #18232c;
+    color: #fff;
+    font: 14px monospace;
+  }
+  #report {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    white-space: pre;
+    pointer-events: none;
+  }
+  canvas {
+    display: block;
+  }
+  button {
+    position: relative;
+    z-index: 2;
+  }
+</style>
+<button id="view">View: lineup</button
+><button id="quality">Quality: high</button
+><button id="motion">Motion: full</button><button id="pose">Pose: aim</button>
+<pre id="report">Measuring…</pre>
+<script type="module" src="./weapon-benchmark.ts"></script>

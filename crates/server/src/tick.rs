@@ -49,6 +49,7 @@ pub fn step(
         &mut systems.population,
         &mut systems.police,
         &mut systems.missions,
+        &mut systems.chat,
     );
     systems.police.finish_tick(
         world,

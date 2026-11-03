@@ -8,6 +8,13 @@ use crate::{
 use protocol::*;
 use sim_core::{CollisionQueries, QueryFilter};
 use std::collections::BTreeMap;
+#[derive(Clone, Copy)]
+enum ShotTarget {
+    Vehicle(u32),
+    Pedestrian(u32),
+    Player(u32),
+}
+
 #[derive(Default)]
 pub struct CombatSystem {
     pub homes: BTreeMap<u32, ([f32; 3], f32)>,
@@ -73,33 +80,55 @@ impl CombatSystem {
         peer: PeerKey,
         s: &mut Session,
         action: &Action,
+        automatic_tick: bool,
         world: &mut World,
         sessions: &mut Sessions,
         population: &mut PopulationSystem,
         police: &mut PoliceSystem,
         missions: &mut MissionSystem,
+        chat: &mut crate::systems::chat::ChatSystem,
     ) -> ActionCode {
         let id = s.player.expect("playing owner");
         if world.players[&id.0].state.mode != CharacterMode::OnFoot {
             return ActionCode::Unavailable;
         }
         match action {
-            Action::Reload(_) => {
-                if world.players[&s.player_id()].weapon.reload_end.is_some()
-                    || world.players[&s.player_id()].weapon.magazine == 12
-                {
-                    return ActionCode::Cooldown;
-                }
-                world
+            Action::EquipWeapon(request) => {
+                let code = world
                     .players
-                    .get_mut(&s.player_id())
-                    .expect("player equipment")
+                    .get_mut(&id.0)
+                    .unwrap()
                     .weapon
-                    .reload_end = Some(world.tick.saturating_add(45));
+                    .equip(request.weapon_id, world.tick);
                 s.status_dirty = true;
-                ActionCode::Ok
+                code
+            }
+            Action::Reload(_) => {
+                let code = world
+                    .players
+                    .get_mut(&id.0)
+                    .unwrap()
+                    .weapon
+                    .reload(world.tick);
+                s.status_dirty = true;
+                code
             }
             Action::Fire(aim) => {
+                let weapon = &world.players[&id.0].weapon;
+                if weapon.definition().automatic && !automatic_tick {
+                    return ActionCode::Unavailable;
+                }
+                if aim.weapon_id != weapon.equipped {
+                    return ActionCode::Unavailable;
+                }
+                if weapon.equip_end.is_some() {
+                    return ActionCode::Cooldown;
+                }
+                if weapon.shot_sequence == u32::MAX {
+                    return ActionCode::Unavailable;
+                }
+                let definition = weapon.definition();
+
                 if world.players[&s.player_id()].weapon.reload_end.is_some()
                     || world.tick < world.players[&s.player_id()].weapon.next_fire
                 {
@@ -119,18 +148,46 @@ impl CombatSystem {
                     .get_mut(&s.player_id())
                     .expect("player equipment")
                     .weapon
-                    .next_fire = world.tick.saturating_add(9);
+                    .next_fire = world.tick.saturating_add(definition.fire_ticks);
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .protected_until = None;
                 s.status_dirty = true;
                 let p = world.players[&id.0].state.motor.position.0.map(|v| v.0);
                 let origin = [p[0], p[1] + 1.45, p[2]];
-                let (sin, cos) = aim.aim_yaw.0.sin_cos();
-                let (sp, cp) = aim.aim_pitch.0.sin_cos();
+                let moving = world.players[&id.0].state.motor.velocity.0[0]
+                    .0
+                    .hypot(world.players[&id.0].state.motor.velocity.0[2].0)
+                    > 0.5;
+                let weapon = &mut world.players.get_mut(&id.0).unwrap().weapon;
+                let spread = (definition.spread_degrees as f32
+                    * if moving {
+                        definition.moving_multiplier as f32
+                    } else {
+                        1.0
+                    }
+                    + weapon.bloom)
+                    .to_radians();
+                let seed = id.0.wrapping_mul(73856093)
+                    ^ weapon.shot_sequence.wrapping_mul(19349663)
+                    ^ world.tick;
+                let mix = |v: u32| {
+                    let v = (v ^ (v >> 16)).wrapping_mul(0x7feb352d);
+                    (v ^ (v >> 15)).wrapping_mul(0x846ca68b)
+                };
+                let u = mix(seed) as f32 / u32::MAX as f32;
+                let angle =
+                    (mix(seed ^ 0x12345678) as f32 / u32::MAX as f32) * std::f32::consts::TAU;
+                let radius = u.sqrt() * spread;
+                weapon.bloom = (weapon.bloom + definition.bloom_per_shot as f32)
+                    .min(definition.bloom_max as f32);
+                let (sin, cos) = (aim.aim_yaw.0 + angle.cos() * radius).sin_cos();
+                let (sp, cp) = (aim.aim_pitch.0 + angle.sin() * radius)
+                    .clamp(-1.5, 1.5)
+                    .sin_cos();
                 let direction = [-sin * cp, sp, -cos * cp];
                 // Query from the chest through the muzzle offset as part of the same
                 // segment: a nearby wall cannot be skipped by the visual muzzle.
@@ -138,10 +195,15 @@ impl CombatSystem {
                 // so static geometry wins equal-distance ties without trusting IDs.
                 let static_hit = world
                     .collision
-                    .raycast(origin, direction, 80.0, QueryFilter::VISION)
+                    .raycast(
+                        origin,
+                        direction,
+                        definition.range as f32,
+                        QueryFilter::VISION,
+                    )
                     .ok()
                     .flatten();
-                let mut nearest = static_hit.map_or(80.0, |h| h.distance);
+                let mut nearest = static_hit.map_or(definition.range as f32, |h| h.distance);
                 // Ground is solid for shots as well.
                 if direction[1] < 0.0 {
                     nearest = nearest.min((-origin[1] / direction[1]).max(0.0));
@@ -154,11 +216,11 @@ impl CombatSystem {
                         car.state.motor.position.0.map(|v| v.0),
                         car.state.motor.yaw.0,
                         car.template.dimensions.map(|v| v as f32),
-                        80.0,
+                        definition.range as f32,
                     ) && d < nearest
                     {
                         nearest = d;
-                        target = Some((car_id, true));
+                        target = Some(ShotTarget::Vehicle(car_id));
                     }
                 }
                 for (&ped_id, ped) in &population.pedestrians {
@@ -169,27 +231,75 @@ impl CombatSystem {
                         origin,
                         direction,
                         ped.state.motor.position.0.map(|v| v.0),
-                        80.0,
+                        definition.range as f32,
                     ) && d < nearest
                     {
                         nearest = d;
-                        target = Some((ped_id, false));
+                        target = Some(ShotTarget::Pedestrian(ped_id));
+                    }
+                }
+                for (&player_id, player) in &world.players {
+                    if player_id == id.0
+                        || player.state.health.0 == 0
+                        || player.state.mode != CharacterMode::OnFoot
+                    {
+                        continue;
+                    }
+                    if let Some(d) = sim_core::collision::ray_character(
+                        origin,
+                        direction,
+                        player.state.motor.position.0.map(|v| v.0),
+                        definition.range as f32,
+                    ) && d < nearest
+                    {
+                        nearest = d;
+                        target = Some(ShotTarget::Player(player_id));
                     }
                 }
                 let hit = match target {
-                    Some((target, true)) => self
-                        .damage_vehicle(target, 25, Some(id), world)
+                    Some(ShotTarget::Vehicle(target)) => self
+                        .damage_vehicle(target, definition.damage, Some(id), world)
                         .then_some(EntityId(target)),
-                    Some((target, false)) => {
-                        self.damage_pedestrian(target, 25, world, population);
+                    Some(ShotTarget::Pedestrian(target)) => {
+                        self.damage_pedestrian(target, definition.damage as u8, world, population);
                         Some(EntityId(target))
+                    }
+                    Some(ShotTarget::Player(target)) => {
+                        let player = world.players.get_mut(&target).unwrap();
+                        if player
+                            .lifecycle
+                            .protected_until
+                            .is_some_and(|end| world.tick < end)
+                        {
+                            None
+                        } else {
+                            player.state.health.0 =
+                                player.state.health.0.saturating_sub(definition.damage);
+                            if player.state.health.0 == 0 {
+                                Self::down_player(
+                                    target, world, sessions, population, police, missions,
+                                );
+                                chat.elimination(
+                                    id.0,
+                                    target,
+                                    (peer, s.id.clone()),
+                                    world,
+                                    sessions,
+                                );
+                            }
+                            Some(EntityId(target))
+                        }
                     }
                     None => None,
                 };
                 let end = std::array::from_fn(|i| origin[i] + direction[i] * nearest);
                 population.frighten(origin, world.tick);
                 population.frighten(end, world.tick);
+                let weapon = &mut world.players.get_mut(&id.0).unwrap().weapon;
+                weapon.shot_sequence += 1;
                 let event = WorldEvent::Shot(Shot {
+                    weapon_id: weapon.equipped,
+                    shot_sequence: weapon.shot_sequence,
                     event_id: self.event_id(),
                     server_tick: world.tick,
                     shooter_id: id,
@@ -207,15 +317,15 @@ impl CombatSystem {
                     origin,
                     world,
                 );
-                if let Some((target, is_car)) = target
+                if let Some(target) = target
                     && hit.is_some()
-                    && (!is_car || police.units.contains_key(&target))
+                    && (!matches!(target, ShotTarget::Vehicle(car) if !police.units.contains_key(&car)))
                 {
                     police.report_crime(
                         id.0,
                         cause,
-                        if is_car {
-                            crate::systems::police::CrimeKind::PoliceCar(target)
+                        if let ShotTarget::Vehicle(car) = target {
+                            crate::systems::police::CrimeKind::PoliceCar(car)
                         } else {
                             crate::systems::police::CrimeKind::Harm
                         },
@@ -231,6 +341,58 @@ impl CombatSystem {
             _ => ActionCode::Unavailable,
         }
     }
+    fn down_player(
+        id: u32,
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        police: &mut PoliceSystem,
+        missions: &mut MissionSystem,
+    ) {
+        let player = world.players.get_mut(&id).expect("shot target");
+        if player.state.mode != CharacterMode::OnFoot || player.lifecycle.respawn.is_some() {
+            return;
+        }
+        player.state.mode = CharacterMode::Downed;
+        player.state.motor.velocity = Vec3([Scalar(0.0); 3]);
+        player.weapon.cancel();
+        player.lifecycle.protected_until = None;
+        player.lifecycle.respawn = Some(world.tick.saturating_add(150));
+        if let Some(mission) = missions.mission_mut(id)
+            && mission.phase == crate::systems::missions::Phase::Active
+        {
+            mission.fail(world.tick);
+        }
+        let peer = sessions
+            .peers
+            .iter()
+            .find_map(|(&peer, s)| (s.player == Some(EntityId(id))).then_some(peer));
+        if let Some(peer) = peer {
+            let mut session = sessions.peers.remove(&peer).expect("target session");
+            session.status_dirty = true;
+            Replication::transition(
+                peer,
+                &mut session,
+                &[id],
+                world,
+                sessions,
+                population,
+                police,
+            )
+            .expect("control epoch available");
+            Replication::reliable(
+                peer,
+                session.id.as_deref(),
+                ServerMessage::ControlChanged(
+                    Replication::owner(&session, world).expect("downed owner"),
+                ),
+                world,
+                sessions,
+            );
+            sessions.peers.insert(peer, session);
+        }
+    }
+
     pub(crate) fn damage_pedestrian(
         &mut self,
         id: u32,
@@ -573,18 +735,18 @@ impl CombatSystem {
                     .get_mut(&s.player_id())
                     .expect("player equipment")
                     .weapon
-                    .reload_end = None;
+                    .cancel();
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .respawn = Some(world.tick.saturating_add(150));
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .protected_until = None;
                 s.status_dirty = true;
             }
@@ -611,19 +773,19 @@ impl CombatSystem {
                     .get_mut(&s.player_id())
                     .expect("player equipment")
                     .weapon
-                    .reload_end = None;
+                    .cancel();
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .respawn
                     .get_or_insert(world.tick.saturating_add(150));
                 world
                     .players
                     .get_mut(&s.player_id())
                     .expect("player equipment")
-                    .weapon
+                    .lifecycle
                     .protected_until = None;
                 s.status_dirty = true;
                 if let Some(m) = missions.mission_mut(s.player_id())
@@ -661,6 +823,7 @@ impl CombatSystem {
         population: &mut PopulationSystem,
         police: &mut PoliceSystem,
         missions: &mut MissionSystem,
+        chat: &mut crate::systems::chat::ChatSystem,
     ) {
         CombatSystem::process_disabled(world, sessions, population, police, missions);
         for id in self
@@ -677,27 +840,45 @@ impl CombatSystem {
         for peer in peers {
             let mut s = sessions.peers.remove(&peer).expect("session");
             if let Some(id) = s.player {
-                if world.players[&s.player_id()]
+                let eligible = world.players[&id.0].state.mode == CharacterMode::OnFoot
+                    && world.players[&id.0].state.health.0 > 0
+                    && !police.wanted(id.0).arrest_pending
+                    && s.phase == crate::sessions::SessionPhase::Playing;
+                if !eligible {
+                    world.players.get_mut(&id.0).unwrap().weapon.trigger = None;
+                }
+                let aim = world
+                    .players
+                    .get_mut(&id.0)
+                    .unwrap()
                     .weapon
-                    .reload_end
-                    .is_some_and(|end| world.tick >= end)
+                    .automatic_aim(world.tick, s.epoch);
+                if let Some(aim) = aim {
+                    self.weapon_action(
+                        peer,
+                        &mut s,
+                        &Action::Fire(aim),
+                        true,
+                        world,
+                        sessions,
+                        population,
+                        police,
+                        missions,
+                        chat,
+                    );
+                }
+
+                if world
+                    .players
+                    .get_mut(&id.0)
+                    .unwrap()
+                    .weapon
+                    .advance(world.tick)
                 {
-                    world
-                        .players
-                        .get_mut(&s.player_id())
-                        .expect("player equipment")
-                        .weapon
-                        .reload_end = None;
-                    world
-                        .players
-                        .get_mut(&s.player_id())
-                        .expect("player equipment")
-                        .weapon
-                        .magazine = 12;
                     s.status_dirty = true;
                 }
                 if world.players[&s.player_id()]
-                    .weapon
+                    .lifecycle
                     .protected_until
                     .is_some_and(|end| world.tick >= end)
                 {
@@ -705,12 +886,12 @@ impl CombatSystem {
                         .players
                         .get_mut(&s.player_id())
                         .expect("player equipment")
-                        .weapon
+                        .lifecycle
                         .protected_until = None;
                     s.status_dirty = true;
                 }
                 if world.players[&s.player_id()]
-                    .weapon
+                    .lifecycle
                     .respawn
                     .is_some_and(|end| world.tick >= end)
                 {
@@ -718,6 +899,7 @@ impl CombatSystem {
                     if let Some(position) =
                         CombatSystem::safe_spawn(near, Some(id.0), world, population)
                     {
+                        let sequence = world.players[&id.0].weapon.shot_sequence;
                         let player = world.players.get_mut(&id.0).expect("respawn player");
                         player.state.motor =
                             sim_core::spawn_character(position, 0.0).expect("safe spawn");
@@ -731,10 +913,15 @@ impl CombatSystem {
                             .players
                             .get_mut(&s.player_id())
                             .expect("player equipment")
-                            .weapon = Weapon {
-                            protected_until: Some(world.tick.saturating_add(90)),
-                            ..Default::default()
-                        };
+                            .weapon = Weapon::default();
+                        world.players.get_mut(&id.0).unwrap().weapon.shot_sequence = sequence;
+                        world
+                            .players
+                            .get_mut(&id.0)
+                            .unwrap()
+                            .lifecycle
+                            .protected_until = Some(world.tick.saturating_add(90));
+                        world.players.get_mut(&id.0).unwrap().lifecycle.respawn = None;
                         s.status_dirty = true;
                         Replication::transition(
                             peer,

@@ -24,6 +24,7 @@ export interface SessionEvents {
   chatError?: (text: string) => void;
   tshirtColour?: (colour: number) => void;
   appearanceError?: () => void;
+  dryFire?: (weapon: "pistol" | "rifle" | "machine_gun") => void;
   worldEvent?: (event: WorldEvent, own: boolean) => void;
   assets?: (assets: LoadedPackage, queries: PredictionWorld) => void;
   owner?: (owner: OwnerState) => void;
@@ -104,6 +105,114 @@ export class GameSession {
   private savedColour: number;
   private savingColour = false;
   private requestId = 0;
+  private readonly weaponBloom = new Map<
+    string,
+    { value: number; at: number }
+  >();
+  spreadDegrees(moving: boolean, now = performance.now()): number {
+    const d = this.assets?.manifest.weapons.find(
+      (w) => w.id === this.equippedWeapon,
+    );
+    if (!d) return 0.6;
+    const bloom = this.weaponBloom.get(this.equippedWeapon);
+    return (
+      d.spread_degrees * (moving ? d.moving_multiplier : 1) +
+      Math.max(
+        0,
+        (bloom?.value ?? 0) -
+          ((now - (bloom?.at ?? now)) / 1000) * d.bloom_recovery,
+      )
+    );
+  }
+  private weaponStatus: PlayerStatus | undefined;
+  private triggerSequence = 0;
+  private triggerAt = -Infinity;
+  private triggerHeld = false;
+  private triggerNeedsRelease = false;
+  private lastDry = -Infinity;
+  private fireAt = -Infinity;
+  get weaponCapacity(): number {
+    return (
+      this.assets?.manifest.weapons.find((w) => w.id === this.equippedWeapon)
+        ?.capacity ?? 12
+    );
+  }
+  weaponSummary(now: number): string {
+    const s = this.weaponStatus;
+    if (!s) return "Pistol · 12 / 36";
+    const names = {
+      pistol: "Pistol",
+      rifle: "Rifle",
+      machine_gun: "Machine gun",
+    };
+    const slot = s.inventory.find((w) => w.weapon_id === s.equipped_weapon);
+    const d = this.assets?.manifest.weapons.find(
+      (w) => w.id === s.equipped_weapon,
+    );
+    const until = s.reload_end_tick ?? s.equip_end_tick;
+    const duration =
+      s.reload_end_tick !== null ? d?.reload_ticks : d?.equip_ticks;
+    const progress =
+      until !== null && duration
+        ? ` · ${s.reload_end_tick !== null ? "Reloading" : "Equipping"} ${Math.round(Math.max(0, Math.min(1, 1 - (until - this.estimatedTick(now)) / duration)) * 100)}%`
+        : "";
+    return `${names[s.equipped_weapon]} · ${slot?.magazine ?? 0} / ${slot?.reserve ?? 0}${progress} · ${s.inventory.map((w, i) => `${i + 1}:${w.owned ? names[w.weapon_id] : "—"}`).join("  ")}`;
+  }
+  selectWeapon(slot: number): void {
+    const id = this.weaponStatus?.inventory[slot];
+    if (id?.owned) this.equipWeapon(id.weapon_id);
+  }
+  cycleWeapon(direction: number): void {
+    const owned = this.weaponStatus?.inventory.filter((s) => s.owned) ?? [];
+    if (!owned.length) return;
+    const i = owned.findIndex((s) => s.weapon_id === this.equippedWeapon);
+    const next = owned[(i + direction + owned.length) % owned.length];
+    if (next) this.equipWeapon(next.weapon_id);
+  }
+  updateTrigger(
+    held: boolean,
+    yaw = 0,
+    pitch = 0,
+    now = performance.now(),
+  ): void {
+    if (!held) this.triggerNeedsRelease = false;
+    if (
+      held &&
+      !this.triggerNeedsRelease &&
+      this.equippedWeapon === "machine_gun" &&
+      this.weaponStatus?.magazine === 0
+    )
+      this.dryFire(now);
+    held =
+      held &&
+      !this.triggerNeedsRelease &&
+      !this.driving &&
+      this.phase === "playing" &&
+      this.equippedWeapon === "machine_gun";
+    if (held === this.triggerHeld && (!held || now - this.triggerAt < 100))
+      return;
+    const pressed = held && !this.triggerHeld;
+    this.triggerHeld = held;
+    this.triggerAt = now;
+    if (this.phase === "playing")
+      this.send({
+        kind: "trigger",
+        data: {
+          control_epoch: this.epoch,
+          sequence: ++this.triggerSequence,
+          held,
+          pressed,
+          weapon_id: this.equippedWeapon,
+          aim_yaw: yaw,
+          aim_pitch: pitch,
+        },
+      });
+  }
+  private stopTrigger(): void {
+    this.updateTrigger(false);
+    this.triggerNeedsRelease = true;
+  }
+  private equippedWeapon: "pistol" | "rifle" | "machine_gun" = "pistol";
   private actionAt = -Infinity;
   actionMessage = "";
   private motor: CharacterMotor | undefined;
@@ -330,7 +439,7 @@ export class GameSession {
   }
   private send(message: ClientMessage, channel: Channel = "reliable"): boolean {
     const bytes = encodeClient({
-      v: 3,
+      v: 4,
       world_id: this.world,
       session_id: this.session,
       message,
@@ -363,7 +472,7 @@ export class GameSession {
     this.send({
       kind: "client_hello",
       data: {
-        protocol_version: 3,
+        protocol_version: 4,
         build_id: info.build_id,
         content_hash: info.content_hash,
         sim_config_hash: info.sim_config_hash,
@@ -417,6 +526,7 @@ export class GameSession {
     this.lastMessageAt = performance.now();
     switch (message.kind) {
       case "baseline_begin":
+        this.stopTrigger();
         if (this.baselineOpen || message.data.baseline_id <= this.baseline)
           throw new Error("Duplicate or overlapping baseline");
         this.baselineReady = false;
@@ -515,6 +625,16 @@ export class GameSession {
         break;
       case "player_status":
         if (message.data.revision < this.statusRevision) return;
+        if (
+          message.data.equipped_weapon !== this.equippedWeapon ||
+          message.data.reload_end_tick !== null ||
+          message.data.equip_end_tick !== null ||
+          message.data.respawn_tick !== null
+        )
+          this.stopTrigger();
+
+        this.weaponStatus = message.data;
+        this.equippedWeapon = message.data.equipped_weapon;
         this.statusRevision = message.data.revision;
         this.mission = message.data.mission;
         this.repair = message.data.repair;
@@ -567,6 +687,7 @@ export class GameSession {
           message.data.control_epoch <= this.epoch
         )
           return;
+        this.stopTrigger();
         this.epoch = message.data.control_epoch;
         this.controlled = message.data.controlled_entity_id;
         this.driving = message.data.state.kind === "vehicle";
@@ -605,6 +726,26 @@ export class GameSession {
           if (this.seenEvents.size > 256) {
             const oldest = this.seenEvents.values().next().value;
             if (oldest !== undefined) this.seenEvents.delete(oldest);
+          }
+          if (event.kind === "shot" && event.data.shooter_id === this.player) {
+            const now = performance.now();
+            const d = this.assets?.manifest.weapons.find(
+              (w) => w.id === event.data.weapon_id,
+            );
+            if (d) {
+              const previous = this.weaponBloom.get(d.id);
+              this.weaponBloom.set(d.id, {
+                value: Math.min(
+                  d.bloom_max,
+                  Math.max(
+                    0,
+                    (previous?.value ?? 0) -
+                      ((now - (previous?.at ?? now)) / 1000) * d.bloom_recovery,
+                  ) + d.bloom_per_shot,
+                ),
+                at: now,
+              });
+            }
           }
           this.events.worldEvent?.(
             event,
@@ -806,22 +947,57 @@ export class GameSession {
   }
   private requestAction(action: Action): void {
     const now = performance.now();
-    if (this.phase !== "playing" || now - this.actionAt < 250) return;
-    this.actionAt = now;
+    if (
+      this.phase !== "playing" ||
+      (action.kind !== "fire" && now - this.actionAt < 250)
+    )
+      return;
+    if (action.kind !== "fire") this.actionAt = now;
     this.actionMessage = "";
     this.send({
       kind: "action",
       data: { request_id: ++this.requestId, control_epoch: this.epoch, action },
     });
   }
+  private dryFire(now: number): void {
+    if (now - this.lastDry <= 500 || this.phase !== "playing" || this.driving)
+      return;
+    this.lastDry = now;
+    this.actionMessage = "No ammunition";
+    this.events.dryFire?.(this.equippedWeapon);
+  }
   fire(yaw: number, pitch: number): void {
+    if (this.equippedWeapon === "machine_gun") return;
+    const now = performance.now();
+    const definition = this.assets?.manifest.weapons.find(
+      (w) => w.id === this.equippedWeapon,
+    );
+    if (now - this.fireAt < ((definition?.fire_ticks ?? 9) * 1000) / 30) return;
+    this.fireAt = now;
+    if (this.weaponStatus?.magazine === 0) {
+      this.dryFire(now);
+      return;
+    }
     if (!this.driving)
       this.requestAction({
         kind: "fire",
-        data: { aim_yaw: yaw, aim_pitch: pitch },
+        data: {
+          weapon_id: this.equippedWeapon,
+          aim_yaw: yaw,
+          aim_pitch: pitch,
+        },
+      });
+  }
+  equipWeapon(weaponId: "pistol" | "rifle" | "machine_gun"): void {
+    this.stopTrigger();
+    if (!this.driving)
+      this.requestAction({
+        kind: "equip_weapon",
+        data: { weapon_id: weaponId },
       });
   }
   reload(): void {
+    this.stopTrigger();
     if (!this.driving) this.requestAction({ kind: "reload", data: {} });
   }
   useTerminal(): void {
@@ -853,17 +1029,14 @@ export class GameSession {
           ? "Vehicle occupied"
           : `E enter ${target.descriptor.template_id} · Car health ${target.state.data.health}${secured ? " · Secured: police witnesses add heat" : ""}${job}`
       : terminal && !this.mission
-        ? "F choose a job · E quick accept"
+        ? "F choose a job"
         : "Walk to the left door of a parked car · E enter";
   }
   interact(): void {
     const now = performance.now();
     if (this.phase !== "playing" || now - this.actionAt < 250) return;
     const target = this.target(now);
-    if (!this.driving && !target) {
-      this.useTerminal();
-      return;
-    }
+    if (!this.driving && !target) return;
     const targetId = target?.id ?? 0;
     this.actionAt = now;
     this.actionMessage = "";

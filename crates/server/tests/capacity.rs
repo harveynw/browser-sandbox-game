@@ -192,7 +192,7 @@ async fn send(
     stats: &Arc<Mutex<BotStats>>,
 ) -> Result {
     let bytes = encode_client(&ClientEnvelope {
-        v: ProtocolVersion(3),
+        v: ProtocolVersion(4),
         world_id: world.clone(),
         session_id: session.clone(),
         message,
@@ -244,7 +244,7 @@ async fn bot(
                let envelope=decode_server(&bytes,if reliable{Delivery::Reliable}else{Delivery::Unreliable})?;
                match envelope.message{
                ServerMessage::ServerHello(info)=>{world=envelope.world_id;send(&mut peer,&world,&None,ClientMessage::ClientHello(ClientHello{
-        tshirt_colour: Default::default(),protocol_version:ProtocolVersion(3),build_id:info.build_id,content_hash:info.content_hash,sim_config_hash:info.sim_config_hash,join_ticket:OpaqueId(ticket.clone()),display_name:DisplayName(format!("Load Peer {index:02}"))}),true,&stats).await?;},
+        tshirt_colour: Default::default(),protocol_version:ProtocolVersion(4),build_id:info.build_id,content_hash:info.content_hash,sim_config_hash:info.sim_config_hash,join_ticket:OpaqueId(ticket.clone()),display_name:DisplayName(format!("Load Peer {index:02}"))}),true,&stats).await?;},
                ServerMessage::Welcome(w)=>{session=envelope.session_id;player=w.player_id.0;},
                ServerMessage::BaselineBegin(b)=>{baseline=b.baseline_id.0;playing=false;visible.clear();history.clear();},
                ServerMessage::EntityShow(s)=>{visible.insert(s.descriptor.id.0);},
@@ -264,7 +264,7 @@ async fn bot(
                if tick>last_input{last_input=tick;let(x,z,yaw)=if mode==CharacterMode::OnFoot{walker.controls(position,tick)}else{(0,0,0.0)};history.push_back(InputFrame{tick,move_x:InputAxis(x),move_z:InputAxis(z),look_yaw:Yaw(yaw),look_pitch:Pitch(0.0),buttons:Buttons(1)});while history.len()>3{history.pop_front();}send(&mut peer,&world,&session,ClientMessage::InputBatch(InputBatch{control_epoch:ControlEpoch(epoch),frames:history.iter().cloned().collect()}),false,&stats).await?;stats.lock().unwrap().frames+=1;}
                },
                _=heartbeat.tick(),if session.is_some()=>{stats.lock().unwrap().relay=peer.relay.stats.lock().unwrap().report();ping_id+=1;for reliable in [true,false]{send(&mut peer,&world,&session,ClientMessage::Ping(Ping{nonce:if reliable{ping_id}else{ping_id|0x80000000},client_time_ms:Milliseconds(started.elapsed().as_secs_f64()*1000.0)}),reliable,&stats).await?;}},
-               _=action.tick(),if playing=>{if mode==CharacterMode::OnFoot{request+=1;let a=if magazine==0{Action::Reload(Empty{})}else{Action::Fire(Fire{aim_yaw:Yaw(0.0),aim_pitch:Pitch(0.0)})};send(&mut peer,&world,&session,ClientMessage::Action(ActionRequest{request_id:RequestId(request),control_epoch:ControlEpoch(epoch),action:a}),true,&stats).await?;stats.lock().unwrap().actions+=1;}},
+               _=action.tick(),if playing=>{if mode==CharacterMode::OnFoot{request+=1;let a=if magazine==0{Action::Reload(Empty{})}else{Action::Fire(Fire{weapon_id:WeaponId::Pistol,aim_yaw:Yaw(0.0),aim_pitch:Pitch(0.0)})};send(&mut peer,&world,&session,ClientMessage::Action(ActionRequest{request_id:RequestId(request),control_epoch:ControlEpoch(epoch),action:a}),true,&stats).await?;stats.lock().unwrap().actions+=1;}},
                }
     }
     send(

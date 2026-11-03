@@ -48,3 +48,19 @@ it("restores valid shirt colours and rejects malformed saved colours", () => {
   for (const value of ["red", "#12345", "#1234567", 123])
     expect(readSettings(saved(value)).tshirtColour).toBe("#e4a25b");
 });
+
+it("migrates old bindings without losing a custom key that conflicts with a new slot default", () => {
+  const { weapon1: _one, weapon2: _two, weapon3: _three, ...old } = defaults;
+  void _one;
+  void _two;
+  void _three;
+  const settings = readSettings({
+    getItem: () =>
+      JSON.stringify({ version: 1, bindings: { ...old, jump: "Digit1" } }),
+  });
+  expect(settings.bindings.jump).toBe("Digit1");
+  expect(settings.bindings.weapon1).not.toBe("Digit1");
+  expect(new Set(Object.values(settings.bindings)).size).toBe(
+    Object.keys(defaults).length,
+  );
+});

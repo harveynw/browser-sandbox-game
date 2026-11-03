@@ -156,6 +156,17 @@
     },
     "CharacterState": {
       "properties": {
+        "equipment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EquipmentView"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "health": {
           "$ref": "#/$defs/CharacterHealth"
         },
@@ -192,6 +203,12 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "system": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "text": {
           "$ref": "#/$defs/ChatText"
@@ -412,6 +429,41 @@
         }
       ]
     },
+    "EquipmentView": {
+      "properties": {
+        "aim_pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "aiming": {
+          "type": "boolean"
+        },
+        "equip_end_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reload_end_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
+        }
+      },
+      "required": [
+        "weapon_id",
+        "aiming",
+        "aim_pitch"
+      ],
+      "type": "object"
+    },
     "EventId": {
       "maximum": 4294967295,
       "minimum": 1,
@@ -470,7 +522,7 @@
       "type": "integer"
     },
     "Magazine": {
-      "maximum": 12,
+      "maximum": 50,
       "minimum": 0,
       "type": "integer"
     },
@@ -594,6 +646,11 @@
       ],
       "type": "object"
     },
+    "Pitch": {
+      "maximum": 1.2000000476837158,
+      "minimum": -1.2000000476837158,
+      "type": "number"
+    },
     "PlayerStatus": {
       "properties": {
         "completed_jobs": {
@@ -604,8 +661,27 @@
         "credits": {
           "$ref": "#/$defs/Credits"
         },
+        "equip_end_tick": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "equipped_weapon": {
+          "$ref": "#/$defs/WeaponId"
+        },
         "heat": {
           "$ref": "#/$defs/Heat"
+        },
+        "inventory": {
+          "items": {
+            "$ref": "#/$defs/WeaponSlotView"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
         },
         "magazine": {
           "$ref": "#/$defs/Magazine"
@@ -667,6 +743,8 @@
         }
       },
       "required": [
+        "equipped_weapon",
+        "inventory",
         "revision",
         "server_tick",
         "credits",
@@ -734,8 +812,8 @@
       "type": "object"
     },
     "ProtocolVersion": {
-      "maximum": 3,
-      "minimum": 3,
+      "maximum": 4,
+      "minimum": 4,
       "type": "integer"
     },
     "Pursuit": {
@@ -1199,9 +1277,19 @@
         },
         "shooter_id": {
           "$ref": "#/$defs/EntityId"
+        },
+        "shot_sequence": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
         }
       },
       "required": [
+        "weapon_id",
+        "shot_sequence",
         "event_id",
         "server_tick",
         "shooter_id",
@@ -1367,6 +1455,40 @@
       "maximum": 4294967295,
       "minimum": 1,
       "type": "integer"
+    },
+    "WeaponId": {
+      "enum": [
+        "pistol",
+        "rifle",
+        "machine_gun"
+      ],
+      "type": "string"
+    },
+    "WeaponSlotView": {
+      "properties": {
+        "magazine": {
+          "$ref": "#/$defs/Magazine"
+        },
+        "owned": {
+          "type": "boolean"
+        },
+        "reserve": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "weapon_id": {
+          "$ref": "#/$defs/WeaponId"
+        }
+      },
+      "required": [
+        "weapon_id",
+        "owned",
+        "magazine",
+        "reserve"
+      ],
+      "type": "object"
     },
     "Welcome": {
       "properties": {

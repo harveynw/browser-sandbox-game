@@ -9,6 +9,7 @@ const tools = [
   ["/map", "City map", "Map Inspector"],
   ["/diagnostic", "Test client", "Connection Test Client"],
   ["/simulation", "Simulation", "Simulation Trace Runner"],
+  ["/weapons", "Weapons", "Weapon Preview"],
   ["/architecture", "Architecture", "Architecture Workbench"],
 ] as const;
 
@@ -35,7 +36,9 @@ export function mountToolingChrome(root: HTMLElement): () => void {
   nav.setAttribute("aria-label", "Development tools");
   nav.innerHTML = `<strong>Port Meridian</strong>${tools.map(([path, label]) => `<a href="${path}" ${location.pathname === path ? 'aria-current="page"' : ""}>${label}</a>`).join("")}<a href="/" class="tool-play">Play game ↗</a>`;
   document.body.prepend(nav);
-  let panel = root.querySelector<HTMLElement>(".map-hud, .architecture-panel");
+  let panel = root.querySelector<HTMLElement>(
+    ".map-hud, .architecture-panel, .weapon-panel",
+  );
   if (!panel) {
     panel = document.createElement("section");
     panel.append(...root.childNodes);

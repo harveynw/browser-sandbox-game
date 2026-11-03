@@ -1,3 +1,8 @@
+import { PlayerNametags } from "./nametags";
+import { WeaponModels, equipmentProgress } from "./weapons";
+import { WeaponEffects } from "./weapon-effects";
+import type { PredictionWorld } from "../simulation/bridge";
+import type { EquipmentView, PlayerStatus } from "@port-meridian/protocol";
 import { treeShape, treeGeometries } from "./trees";
 import * as THREE from "three";
 import { CharacterRig, DynamicBatch, carLean } from "./character";
@@ -20,6 +25,8 @@ export class GameRenderer {
   readonly camera = new THREE.PerspectiveCamera(65, 1, 0.05, 650);
   readonly actor = new THREE.Group();
   private readonly dynamic = new DynamicBatch(this.scene);
+  private readonly nametags = new PlayerNametags(this.scene);
+  private readonly nametagAnchor = new THREE.Vector3();
   private readonly lods = new Map<number, THREE.Mesh>();
   private readonly rigs = new Map<number, CharacterRig>();
   private localRig: CharacterRig;
@@ -49,64 +56,91 @@ export class GameRenderer {
     roughness: 0.8,
     transparent: true,
   });
-  private readonly effectSlots: {
-    line: THREE.Line;
-    marker: THREE.Mesh;
-    flash: THREE.Mesh;
-    until: number;
-  }[] = [];
-  private effectCursor = 0;
+  private readonly weaponModels = new WeaponModels();
+  private readonly weaponEffects = new WeaponEffects(this.scene);
+  private readonly muzzlePosition = new THREE.Vector3();
+  private readonly muzzleDirection = new THREE.Vector3();
+  private equipment?: EquipmentView;
+  private presentationTick = 0;
+  equipmentStatus(status: PlayerStatus): void {
+    this.equipment = {
+      weapon_id: status.equipped_weapon,
+      reload_end_tick: status.reload_end_tick,
+      equip_end_tick: status.equip_end_tick,
+      aiming: false,
+      aim_pitch: 0,
+    };
+  }
   private dustClock = 0;
   private dustCursor = 0;
   private readonly dust: {
     mesh: THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>;
     until: number;
   }[] = [];
-  private readonly pistol = new THREE.Group();
-  effect(event: WorldEvent, own = false): void {
-    if (event.kind === "shot") {
-      const rig = this.rigs.get(event.data.shooter_id);
-      if (rig) rig.fire();
-      else if (own) this.localFired = true;
-    }
-    let slot = this.effectSlots[this.effectCursor++ % 32];
-    if (!slot) {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(new Float32Array(6), 3),
+  effect(event: WorldEvent, own = false, queries?: PredictionWorld): void {
+    if (event.kind !== "shot") {
+      this.weaponEffects.impact(
+        event.data.position,
+        event.data.severity,
+        performance.now(),
+        this.low || this.reduced,
       );
-      const material = new THREE.LineBasicMaterial({ color: "#ffe595" });
-      const markerMaterial = new THREE.MeshBasicMaterial({ color: "#ffb061" });
-      const line = new THREE.Line(geometry, material),
-        marker = new THREE.Mesh(this.cube, markerMaterial);
-      this.geometry.add(geometry);
-      this.materials.add(material);
-      this.materials.add(markerMaterial);
-      const flash = new THREE.Mesh(this.cube, markerMaterial);
-      flash.scale.set(0.16, 0.16, 0.2);
-      flash.visible = false;
-      this.scene.add(line, marker, flash);
-      slot = { line, marker, flash, until: 0 };
-      this.effectSlots.push(slot);
+      return;
     }
-    const end = event.kind === "shot" ? event.data.end : event.data.position;
-    if (event.kind === "shot") {
-      const positions = slot.line.geometry.getAttribute("position");
-      positions.setXYZ(0, ...event.data.origin);
-      positions.setXYZ(1, ...event.data.end);
-      positions.needsUpdate = true;
-      slot.line.geometry.computeBoundingSphere();
+    const shot = event.data,
+      rig = own ? this.localRig : this.rigs.get(shot.shooter_id);
+    if (rig) rig.fire();
+    if (own) this.localFired = true;
+    this.muzzlePosition.set(...shot.origin);
+    if (rig?.muzzle(this.muzzlePosition)) {
+      this.muzzleDirection.set(
+        this.muzzlePosition.x - shot.origin[0],
+        this.muzzlePosition.y - shot.origin[1],
+        this.muzzlePosition.z - shot.origin[2],
+      );
+      const length = this.muzzleDirection.length();
+      const hitDistance = Math.hypot(
+        shot.end[0] - shot.origin[0],
+        shot.end[1] - shot.origin[1],
+        shot.end[2] - shot.origin[2],
+      );
+      const blocked =
+        length > 0 &&
+        queries?.raycastStatic({
+          version: 1,
+          origin: shot.origin,
+          direction: this.muzzleDirection.normalize().toArray(),
+          max_distance: length,
+        }).hit;
+      if (blocked || hitDistance < length)
+        this.muzzlePosition.set(...shot.origin);
     }
-    slot.flash.visible = event.kind === "shot" && !this.reduced;
-    if (event.kind === "shot") slot.flash.position.set(...event.data.origin);
-    slot.line.visible = event.kind === "shot";
-    slot.marker.position.set(...end);
-    slot.marker.scale.setScalar(
-      event.kind === "impact" ? 0.2 + event.data.severity * 0.4 : 0.12,
+    const range =
+      this.assets.manifest.weapons.find((w) => w.id === shot.weapon_id)
+        ?.range ?? 80;
+    const length = Math.hypot(
+      shot.end[0] - shot.origin[0],
+      shot.end[1] - shot.origin[1],
+      shot.end[2] - shot.origin[2],
     );
-    slot.marker.visible = true;
-    slot.until = performance.now() + 180;
+    const surface =
+      shot.hit_entity_id !== null
+        ? this.wheelData.has(shot.hit_entity_id)
+          ? "metal"
+          : "actor"
+        : shot.end[1] < 0.05
+          ? "ground"
+          : length < range - 0.1
+            ? "masonry"
+            : "none";
+    this.weaponEffects.shot(
+      shot,
+      this.muzzlePosition,
+      performance.now(),
+      this.reduced,
+      this.low,
+      surface,
+    );
   }
   private low = false;
   private readonly trees = treeGeometries();
@@ -209,20 +243,6 @@ export class GameRenderer {
     this.cube = cube;
     for (const geometry of Object.values(this.trees))
       this.geometry.add(geometry);
-    const gunMaterial = new THREE.MeshStandardMaterial({
-      color: "#58686f",
-      roughness: 0.65,
-    });
-    this.materials.add(gunMaterial);
-    const barrel = new THREE.Mesh(cube, gunMaterial);
-    barrel.scale.set(0.07, 0.07, 0.3);
-    barrel.position.z = -0.1;
-    const grip = new THREE.Mesh(cube, gunMaterial);
-    grip.scale.set(0.06, 0.13, 0.07);
-    grip.position.y = -0.08;
-    this.pistol.add(barrel, grip);
-    this.pistol.visible = false;
-    this.scene.add(this.pistol);
 
     const outside = assets.backdrop.primitives.filter(
       (p) => p.id === "ocean" || p.id === "heights_distant_hill",
@@ -378,19 +398,24 @@ export class GameRenderer {
     this.materials.add(this.staleMaterial);
     this.materials.add(this.characterMaterial);
     const localMaterials = new Map<string, THREE.MeshStandardMaterial>();
-    this.localRig = new CharacterRig(cube, (color) => {
-      let m = localMaterials.get(color);
-      if (!m) {
-        m = new THREE.MeshStandardMaterial({
-          color,
-          roughness: 0.85,
-          transparent: true,
-        });
-        localMaterials.set(color, m);
-        this.materials.add(m);
-      }
-      return m;
-    });
+    this.localRig = new CharacterRig(
+      cube,
+      (color) => {
+        let m = localMaterials.get(color);
+        if (!m) {
+          m = new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.85,
+            transparent: true,
+          });
+          localMaterials.set(color, m);
+          this.materials.add(m);
+        }
+        return m;
+      },
+      0,
+      this.weaponModels,
+    );
     this.actor.add(this.localRig.root);
     this.actor.traverse((o) => {
       if (o instanceof THREE.Mesh) o.castShadow = true;
@@ -557,7 +582,11 @@ export class GameRenderer {
     reloading = false,
     disabled = false,
     skidding = false,
+    tick = 0,
+    pitch = 0,
+    queries?: PredictionWorld,
   ): void {
+    this.presentationTick = tick;
     this.dustClock += dt;
     if (
       driving &&
@@ -601,6 +630,34 @@ export class GameRenderer {
         reloading,
         incapacitated: disabled,
         fired: this.localFired,
+        weapon: this.equipment?.weapon_id,
+        obstructed:
+          aiming &&
+          !!queries?.raycastStatic({
+            version: 1,
+            origin: [
+              motor.position[0],
+              motor.position[1] + 1.45,
+              motor.position[2],
+            ],
+            direction: [
+              -Math.sin(motor.yaw) * Math.cos(pitch),
+              Math.sin(pitch),
+              -Math.cos(motor.yaw) * Math.cos(pitch),
+            ],
+            max_distance: this.equipment?.weapon_id === "pistol" ? 0.65 : 1.2,
+          }).hit,
+        pitch,
+        reloadProgress: equipmentProgress(
+          this.equipment,
+          tick,
+          this.assets.manifest.weapons,
+        ).reload,
+        equipProgress: equipmentProgress(
+          this.equipment,
+          tick,
+          this.assets.manifest.weapons,
+        ).equip,
       },
       dt,
       performance.now() / 1000,
@@ -638,6 +695,40 @@ export class GameRenderer {
   }
   remotes(actors: readonly RenderActor[]): void {
     this.dynamic.begin();
+    const players = new Set(
+      actors
+        .filter(
+          (a) =>
+            a.descriptor.entity_kind === "player" &&
+            a.state.kind === "character",
+        )
+        .map((a) => a.id),
+    );
+    this.nametags.retain(players);
+    for (const actor of actors) {
+      if (!players.has(actor.id) || actor.state.kind !== "character") continue;
+      if (actor.state.data.mode !== "driving") continue;
+      let height = actor.motor.position[1] + 1.8;
+      if (actor.state.data.mode === "driving") {
+        const vehicleId = actor.state.data.vehicle_id;
+        const vehicle = actors.find(
+          (a) => a.id === vehicleId && a.state.kind === "vehicle",
+        );
+        const template = this.assets.manifest.vehicle_templates.find(
+          (t) => t.id === vehicle?.descriptor.template_id,
+        );
+        height = vehicle
+          ? vehicle.motor.position[1] + (template?.dimensions[1] ?? 1.4) + 0.05
+          : actor.motor.position[1] + 1.1;
+      }
+      this.nametags.update(
+        actor.id,
+        actor.descriptor.display_name ?? "Guest",
+        actor.motor.position[0],
+        height,
+        actor.motor.position[2],
+      );
+    }
     const present = new Set(actors.map((a) => a.id));
     for (const [id] of this.remoteActors)
       if (!present.has(id)) {
@@ -679,6 +770,7 @@ export class GameRenderer {
             this.cube,
             (c) => this.visualMaterial(c),
             actor.id % 4,
+            this.weaponModels,
           );
           this.rigs.set(actor.id, rig);
           group.add(rig.root);
@@ -729,6 +821,29 @@ export class GameRenderer {
               actor.state.kind === "character" &&
               actor.state.data.mode === "driving",
             incapacitated: actor.state.data.health === 0,
+            ...(actor.state.kind === "character"
+              ? {
+                  weapon: actor.state.data.equipment?.weapon_id,
+                  aiming: actor.state.data.equipment?.aiming,
+                  pitch: actor.state.data.equipment?.aim_pitch,
+                  reloadProgress: equipmentProgress(
+                    actor.state.data.equipment,
+                    this.presentationTick,
+                    this.assets.manifest.weapons,
+                  ).reload,
+                  equipProgress: equipmentProgress(
+                    actor.state.data.equipment,
+                    this.presentationTick,
+                    this.assets.manifest.weapons,
+                  ).equip,
+                  reloading:
+                    equipmentProgress(
+                      actor.state.data.equipment,
+                      this.presentationTick,
+                      this.assets.manifest.weapons,
+                    ).reload !== null,
+                }
+              : {}),
           },
           this.frameDt,
           performance.now() / 1000,
@@ -737,9 +852,26 @@ export class GameRenderer {
         if (actor.state.data.health === 0) group.position.y += 0.4;
       }
       group.updateMatrixWorld(true);
+      if (
+        actor.descriptor.entity_kind === "player" &&
+        actor.state.kind === "character" &&
+        actor.state.data.mode !== "driving"
+      ) {
+        const rig = this.rigs.get(actor.id);
+        if (rig) {
+          rig.headTop(this.nametagAnchor);
+          this.nametags.update(
+            actor.id,
+            actor.descriptor.display_name ?? "Guest",
+            this.nametagAnchor.x,
+            this.nametagAnchor.y,
+            this.nametagAnchor.z,
+          );
+        }
+      }
       const distant =
         actor.state.kind !== "vehicle" &&
-        (this.low || group.position.distanceTo(this.actor.position) > 55);
+        group.position.distanceTo(this.actor.position) > (this.low ? 25 : 55);
       if (distant) {
         let simple = this.lods.get(actor.id);
         if (!simple) {
@@ -761,27 +893,26 @@ export class GameRenderer {
       } else
         group.traverse((o) => {
           if (o instanceof THREE.Mesh && o.visible) {
-            const parentVisible = o.parent?.visible ?? true;
-            if (parentVisible) this.dynamic.add(o);
+            let visible = true;
+            for (let parent = o.parent; parent; parent = parent.parent)
+              visible &&= parent.visible;
+            if (visible) this.dynamic.add(o);
           }
         });
     }
     this.dynamic.end();
   }
-  render(distance: number, aiming = false): void {
-    this.pistol.visible = aiming;
-    this.pistol.position
-      .set(0.12, -0.12, -0.55)
-      .applyQuaternion(this.camera.quaternion)
-      .add(this.camera.position);
-    this.pistol.quaternion.copy(this.camera.quaternion);
-    for (const slot of this.effectSlots)
-      if (performance.now() >= slot.until) {
-        slot.line.visible = false;
-        slot.marker.visible = false;
-        slot.flash.visible = false;
-      } else if (performance.now() > slot.until - 145)
-        slot.flash.visible = false;
+  render(distance: number): void {
+    this.nametags.layout(
+      this.camera,
+      this.canvas.clientHeight,
+      this.actor.position,
+    );
+    this.weaponEffects.update(
+      performance.now(),
+      Math.min(this.frameDt, 0.05),
+      this.low,
+    );
     for (const d of this.dust) {
       const left = (d.until - performance.now()) / 450;
       d.mesh.visible = left > 0 && !this.low;
@@ -791,7 +922,7 @@ export class GameRenderer {
         d.mesh.position.y += this.frameDt * 0.25;
       }
     }
-    this.actor.visible = distance > 0.15 && !aiming;
+    this.actor.visible = distance > 0.35;
     this.actor.traverse((object) => {
       if (object instanceof THREE.Mesh)
         object.material.opacity =
@@ -800,6 +931,9 @@ export class GameRenderer {
     this.graphics.render(this.scene, this.camera);
   }
   dispose(): void {
+    this.nametags.dispose();
+    this.weaponEffects.dispose();
+    this.weaponModels.dispose();
     this.stream.dispose();
     this.dynamic.dispose();
     for (const texture of this.textures) texture.dispose();

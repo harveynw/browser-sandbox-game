@@ -347,7 +347,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
         server::systems::missions::Phase::Failed
     );
     let until = w.core.players[&w.sessions.peers[&p].player_id()]
-        .weapon
+        .lifecycle
         .respawn
         .unwrap();
     let position = w.players[&player].state.motor.position.clone();
@@ -368,7 +368,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
     );
     assert!(
         w.core.players[&w.sessions.peers[&p].player_id()]
-            .weapon
+            .lifecycle
             .protected_until
             .unwrap()
             > w.tick
@@ -578,7 +578,7 @@ fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss()
     );
     let arrested = w.players[&id].state.motor.position.clone();
     let due = w.core.players[&w.sessions.peers[&p].player_id()]
-        .weapon
+        .lifecycle
         .respawn
         .unwrap();
     while w.tick < due - 1 {

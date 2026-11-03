@@ -26,7 +26,7 @@ impl Replication {
             peer,
             delivery,
             ServerEnvelope {
-                v: ProtocolVersion(3),
+                v: ProtocolVersion(4),
                 world_id: Some(OpaqueId(world.id.clone())),
                 session_id: sid.map(|s| OpaqueId(s.into())),
                 message,
@@ -55,8 +55,8 @@ impl Replication {
                 .state
                 .vehicle_id
                 .map(|car| EntityState::Vehicle(world.vehicles[&car.0].state.clone()))
-                .unwrap_or_else(|| EntityState::Character(player.state.clone())),
-            player_state: player.state.clone(),
+                .unwrap_or_else(|| EntityState::Character(player.public_state())),
+            player_state: player.public_state(),
         })
     }
     pub(crate) fn entities(
@@ -78,7 +78,7 @@ impl Replication {
                             template_id: TemplateId("player_greybox".into()),
                             display_name: Some(p.display_name.clone()),
                         },
-                        EntityState::Character(p.state.clone()),
+                        EntityState::Character(p.public_state()),
                     ),
                 )
             })
@@ -161,6 +161,9 @@ impl Replication {
         police: &mut PoliceSystem,
     ) -> Result<(), String> {
         s.epoch = s.epoch.checked_add(1).ok_or("epoch exhausted")?;
+        if let Some(player) = s.player.and_then(|id| world.players.get_mut(&id.0)) {
+            player.weapon.trigger = None;
+        }
         s.inputs.clear();
         // Refresh both replicas reliably with a fresh visibility generation. Older RTC
         // packets cannot restore a previous occupancy mode, even at the same tick.
@@ -244,6 +247,9 @@ impl Replication {
     ) -> Result<PlayerStatus, String> {
         let p = s.profile.as_ref().ok_or("profile missing")?;
         Ok(PlayerStatus {
+            equipped_weapon: world.players[&s.player_id()].weapon.equipped,
+            inventory: world.players[&s.player_id()].weapon.views(),
+            equip_end_tick: world.players[&s.player_id()].weapon.equip_end,
             revision: Revision(s.status_revision),
             server_tick: tick,
             credits: p.credits,
@@ -254,8 +260,8 @@ impl Replication {
             magazine: Magazine(world.players[&s.player_id()].weapon.magazine),
             reload_end_tick: world.players[&s.player_id()].weapon.reload_end,
             mission: missions.mission(s.player_id()).as_ref().map(|m| m.view()),
-            respawn_tick: world.players[&s.player_id()].weapon.respawn,
-            protected_until_tick: world.players[&s.player_id()].weapon.protected_until,
+            respawn_tick: world.players[&s.player_id()].lifecycle.respawn,
+            protected_until_tick: world.players[&s.player_id()].lifecycle.protected_until,
         })
     }
     pub(crate) fn baseline(
@@ -493,7 +499,7 @@ impl Replication {
                         peer,
                         Delivery::Reliable,
                         ServerEnvelope {
-                            v: ProtocolVersion(3),
+                            v: ProtocolVersion(4),
                             world_id: Some(OpaqueId(world.id.clone())),
                             session_id: session.id.clone().map(OpaqueId),
                             message: ServerMessage::PlayerStatus(Replication::status(
@@ -721,7 +727,7 @@ pub fn snapshot(
     records: Vec<StateRecord>,
 ) -> ServerEnvelope {
     ServerEnvelope {
-        v: ProtocolVersion(3),
+        v: ProtocolVersion(4),
         world_id: Some(OpaqueId(world.into())),
         session_id: Some(OpaqueId(session.into())),
         message: ServerMessage::Snapshot(Snapshot {

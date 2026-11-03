@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md#documentation) · [Networking lifecycle](networking.md) · [WASM bridge](simulation.md#browser-wasm-boundary)
 
-The game protocol is **version 3**. Rust owns the shapes in [`protocol/src/types.rs`](../crates/protocol/src/types.rs). `xtask` generates TypeScript declarations, JSON Schema metadata, shared limits and cross-language fixtures. The browser does not maintain a second handwritten DTO model or run a network schema-validation pipeline.
+The game protocol is **version 4**. Rust owns the shapes in [`protocol/src/types.rs`](../crates/protocol/src/types.rs). `xtask` generates TypeScript declarations, JSON Schema metadata, shared limits and cross-language fixtures. The browser does not maintain a second handwritten DTO model or run a network schema-validation pipeline.
 
 ## Wire representation
 

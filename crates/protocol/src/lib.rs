@@ -1,4 +1,4 @@
-//! Version 3 wire types and a small Serde/MessagePack codec.
+//! Version 4 wire types and a small Serde/MessagePack codec.
 //! The server owns session admission and authoritative gameplay checks.
 
 #[cfg(feature = "codec")]

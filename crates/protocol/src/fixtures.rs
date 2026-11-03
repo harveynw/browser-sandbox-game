@@ -90,7 +90,7 @@ pub fn positive() -> Result<Vec<Fixture>> {
             r,
             tagged(
                 "client_hello",
-                json!({"protocol_version":3,"build_id":"test-v2","content_hash":hash,"sim_config_hash":hash,"join_ticket":"b".repeat(64),"display_name":"Player 🐈"}),
+                json!({"protocol_version":4,"build_id":"test-v2","content_hash":hash,"sim_config_hash":hash,"join_ticket":"b".repeat(64),"display_name":"Player 🐈"}),
             ),
         ),
         (
@@ -120,7 +120,7 @@ pub fn positive() -> Result<Vec<Fixture>> {
             r,
             tagged(
                 "action",
-                json!({"request_id":2,"control_epoch":1,"action":tagged("fire",json!({"aim_yaw":0.5,"aim_pitch":-0.5}))}),
+                json!({"request_id":2,"control_epoch":1,"action":tagged("fire",json!({"weapon_id":"pistol","aim_yaw":0.5,"aim_pitch":-0.5}))}),
             ),
         ),
         (
@@ -163,13 +163,13 @@ pub fn positive() -> Result<Vec<Fixture>> {
             r,
             tagged(
                 "player_status",
-                json!({"revision":1,"server_tick":30,"credits":150,"completed_jobs":1,"heat":0,"pursuit":"clear","magazine":12,"reload_end_tick":null,"mission":null,"repair":null,"respawn_tick":null,"protected_until_tick":null}),
+                json!({"equipped_weapon":"pistol","inventory":[{"weapon_id":"pistol","owned":true,"magazine":12,"reserve":36},{"weapon_id":"rifle","owned":false,"magazine":0,"reserve":0},{"weapon_id":"machine_gun","owned":false,"magazine":0,"reserve":0}],"equip_end_tick":null,"revision":1,"server_tick":30,"credits":150,"completed_jobs":1,"heat":0,"pursuit":"clear","magazine":12,"reload_end_tick":null,"mission":null,"repair":null,"respawn_tick":null,"protected_until_tick":null}),
             ),
         ),
     ];
     let mut fixtures = Vec::new();
     for (name, direction, delivery, message) in examples {
-        let value = json!({"v":3,"world_id":"world-0001","session_id":if name=="client_hello"{Value::Null}else{json!("session-0001")},"message":message});
+        let value = json!({"v":4,"world_id":"world-0001","session_id":if name=="client_hello"{Value::Null}else{json!("session-0001")},"message":message});
         let (bytes, value) = if direction == "client" {
             let typed: ClientEnvelope =
                 serde_json::from_value(value).map_err(|e| invalid(e.to_string()))?;

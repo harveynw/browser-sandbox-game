@@ -115,8 +115,25 @@ export class ChatPanel {
     const name = document.createElement("span");
     name.className = "chat-name";
     name.textContent = `${line.username}: `;
-    node.append(name);
-    for (const part of chatParts(line.text)) {
+    if (!line.system) node.append(name);
+    if (line.system) node.classList.add("chat-system");
+    const parts: ChatPart[] = line.system
+      ? line.text.startsWith(line.username)
+        ? [
+            { text: line.username, style: "strong" },
+            ...(line.text.slice(line.username.length).startsWith(" eliminated ")
+              ? [
+                  { text: " eliminated " },
+                  {
+                    text: line.text.slice(line.username.length + 12),
+                    style: "strong" as const,
+                  },
+                ]
+              : [{ text: line.text.slice(line.username.length) }]),
+          ]
+        : [{ text: line.text }]
+      : chatParts(line.text);
+    for (const part of parts) {
       const span = document.createElement(part.style ?? "span");
       span.textContent = part.text;
       node.append(span);

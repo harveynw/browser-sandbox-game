@@ -51,7 +51,8 @@ impl WorldContent {
         }
         let manifest: WorldManifest =
             serde_json::from_slice(&manifest_bytes).map_err(|e| e.to_string())?;
-        if manifest.schema_version != 1
+        if manifest.weapons != protocol::weapon_catalogue()
+            || manifest.schema_version != 1
             || manifest.content_hash != index.content_hash
             || canonical::manifest_hash(&manifest)? != index.content_hash
             || manifest.chunks.len() > 64

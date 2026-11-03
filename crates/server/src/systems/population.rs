@@ -363,6 +363,7 @@ impl PopulationSystem {
                 Pedestrian {
                     id: EntityId(id),
                     state: CharacterState {
+                        equipment: None,
                         motor: sim_core::spawn_character(p, yaw)?,
                         health: CharacterHealth(100),
                         mode: CharacterMode::OnFoot,

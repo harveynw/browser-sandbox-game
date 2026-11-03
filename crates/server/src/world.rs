@@ -103,7 +103,7 @@ impl World {
     }
     pub fn build(&self) -> ServerHello {
         ServerHello {
-            protocol_version: ProtocolVersion(3),
+            protocol_version: ProtocolVersion(4),
             build_id: BuildId(BUILD_ID.into()),
             content_hash: ContentHash(self.content.manifest.content_hash.clone()),
             sim_config_hash: ContentHash(self.content.manifest.sim_config_hash.clone()),
@@ -132,7 +132,7 @@ pub(crate) fn test_envelope(
     kind: &str,
     data: serde_json::Value,
 ) -> ServerEnvelope {
-    serde_json::from_value(serde_json::json!({"v":3,"world_id":world,"session_id":sid,"message":{"kind":kind,"data":data}})).unwrap()
+    serde_json::from_value(serde_json::json!({"v":4,"world_id":world,"session_id":sid,"message":{"kind":kind,"data":data}})).unwrap()
 }
 
 pub(crate) fn entity_position(state: &EntityState) -> [f32; 3] {

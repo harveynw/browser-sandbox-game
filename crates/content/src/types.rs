@@ -1,4 +1,5 @@
 //! Content coordinates are meters: +X east, +Y up, -Z north. Feet/bottom anchors.
+pub use protocol::{WeaponDefinition, WeaponId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -281,6 +282,7 @@ object!(VisualAsset {
     sha256: String
 });
 object!(WorldManifest {
+    weapons: [WeaponDefinition;3],
     schema_version: u32, world_asset_id: String, content_hash: String,
     sim_config_hash: String, sim_config_url: String,
     bounds: Bounds, roads: Roads, collision_url: String, collision_sha256: String,

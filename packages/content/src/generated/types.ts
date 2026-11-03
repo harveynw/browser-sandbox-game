@@ -80,7 +80,11 @@ export type ChunkAsset = { id: string, cx: number, cz: number, visual_url: strin
 
 export type VisualAsset = { id: string, url: string, sha256: string, };
 
-export type WorldManifest = { schema_version: number, world_asset_id: string, content_hash: string, sim_config_hash: string, sim_config_url: string, bounds: Bounds, roads: Roads, collision_url: string, collision_sha256: string, debug_url: string, debug_sha256: string, chunks: Array<ChunkAsset>, districts: Array<District>, backdrop: VisualAsset, minimap: VisualAsset, road_graph: RoadGraph, pedestrian_graph: RoadGraph, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, vehicle_visuals: Array<VisualAsset>, };
+export type WeaponDefinition = { id: WeaponId, capacity: number, max_reserve: number, fire_ticks: number, reload_ticks: number, equip_ticks: number, damage: number, range: number, automatic: boolean, spread_degrees: number, moving_multiplier: number, bloom_per_shot: number, bloom_max: number, bloom_recovery: number, };
+
+export type WeaponId = "pistol" | "rifle" | "machine_gun";
+
+export type WorldManifest = { weapons: [WeaponDefinition, WeaponDefinition, WeaponDefinition], schema_version: number, world_asset_id: string, content_hash: string, sim_config_hash: string, sim_config_url: string, bounds: Bounds, roads: Roads, collision_url: string, collision_sha256: string, debug_url: string, debug_sha256: string, chunks: Array<ChunkAsset>, districts: Array<District>, backdrop: VisualAsset, minimap: VisualAsset, road_graph: RoadGraph, pedestrian_graph: RoadGraph, reservations: Array<Reservation>, accesses: Array<Access>, spawns: Array<SpawnPoint>, parking: Array<ParkingSpawn>, zones: Array<Zone>, mission_templates: Array<MissionTemplate>, vehicle_templates: Array<VehicleTemplate>, vehicle_visuals: Array<VisualAsset>, };
 
 export type PackageIndex = { schema_version: number, content_hash: string, manifest_url: string, manifest_sha256: string, };
 

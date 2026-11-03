@@ -800,6 +800,98 @@
       ],
       "type": "object"
     },
+    "WeaponDefinition": {
+      "properties": {
+        "automatic": {
+          "type": "boolean"
+        },
+        "bloom_max": {
+          "format": "double",
+          "type": "number"
+        },
+        "bloom_per_shot": {
+          "format": "double",
+          "type": "number"
+        },
+        "bloom_recovery": {
+          "format": "double",
+          "type": "number"
+        },
+        "capacity": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "damage": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "equip_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fire_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "$ref": "#/$defs/WeaponId"
+        },
+        "max_reserve": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "moving_multiplier": {
+          "format": "double",
+          "type": "number"
+        },
+        "range": {
+          "format": "double",
+          "type": "number"
+        },
+        "reload_ticks": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spread_degrees": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "automatic",
+        "bloom_max",
+        "bloom_per_shot",
+        "bloom_recovery",
+        "capacity",
+        "damage",
+        "equip_ticks",
+        "fire_ticks",
+        "id",
+        "max_reserve",
+        "moving_multiplier",
+        "range",
+        "reload_ticks",
+        "spread_degrees"
+      ],
+      "type": "object"
+    },
+    "WeaponId": {
+      "enum": [
+        "pistol",
+        "rifle",
+        "machine_gun"
+      ],
+      "type": "string"
+    },
     "Zone": {
       "additionalProperties": false,
       "properties": {
@@ -957,6 +1049,14 @@
       },
       "type": "array"
     },
+    "weapons": {
+      "items": {
+        "$ref": "#/$defs/WeaponDefinition"
+      },
+      "maxItems": 3,
+      "minItems": 3,
+      "type": "array"
+    },
     "world_asset_id": {
       "type": "string"
     },
@@ -991,6 +1091,7 @@
     "spawns",
     "vehicle_templates",
     "vehicle_visuals",
+    "weapons",
     "world_asset_id",
     "zones"
   ],
