@@ -1,3 +1,4 @@
+import { setAudioPosition, setAudioOrientation } from "./spatial";
 import type { WeaponId } from "@port-meridian/protocol";
 /** Original procedural audio; a shared bus and bounded voices, with no downloaded media. */
 export type Cue =
@@ -130,9 +131,7 @@ export class GameAudio {
     p.refDistance = 4;
     p.maxDistance = 70;
     p.rolloffFactor = 1.4;
-    p.positionX.value = position[0] ?? 0;
-    p.positionY.value = position[1] ?? 0;
-    p.positionZ.value = position[2] ?? 0;
+    setAudioPosition(p, position);
     return p;
   }
   private stop(slot: number): void {
@@ -310,9 +309,7 @@ export class GameAudio {
     }
     loop.source.frequency.setTargetAtTime(frequency, c.currentTime, 0.08);
     loop.gain.gain.setTargetAtTime(volume, c.currentTime, 0.08);
-    loop.panner.positionX.value = position[0] ?? 0;
-    loop.panner.positionY.value = position[1] ?? 0;
-    loop.panner.positionZ.value = position[2] ?? 0;
+    setAudioPosition(loop.panner, position);
   }
   private endLoop(name: string): void {
     const loop = this.loops.get(name);
@@ -335,13 +332,12 @@ export class GameAudio {
     this.listener = position;
     const c = this.context;
     if (!c || this.paused || this.muted || c.state !== "running") return;
-    c.listener.positionX.value = position[0] ?? 0;
-    c.listener.positionY.value = (position[1] ?? 0) + 1.5;
-    c.listener.positionZ.value = position[2] ?? 0;
-    c.listener.forwardX.value = -Math.sin(yaw);
-    c.listener.forwardY.value = 0;
-    c.listener.forwardZ.value = -Math.cos(yaw);
-    c.listener.upY.value = 1;
+    setAudioPosition(c.listener, [
+      position[0] ?? 0,
+      (position[1] ?? 0) + 1.5,
+      position[2] ?? 0,
+    ]);
+    setAudioOrientation(c.listener, yaw);
     if (driving)
       this.loop(
         "engine",
