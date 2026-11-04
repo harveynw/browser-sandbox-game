@@ -66,6 +66,8 @@ export type ChatText = string;
 
 export type ChatLine = { system?: boolean, id: EventId, username: DisplayName, text: ChatText, server_tick: number, };
 
+export type PlayerMapEntry = { player_id: EntityId, position: Vec3, };
+
 export type DetailText = string;
 
 export type Vec3 = [Scalar, Scalar, Scalar];
@@ -108,7 +110,7 @@ export type ResyncReason = "stale" | "overflow" | "invalid_state";
 
 export type Delivery = "reliable" | "unreliable";
 
-export type ServerMessage = { "kind": "server_hello", "data": ServerHello } | { "kind": "reject", "data": Reject } | { "kind": "welcome", "data": Welcome } | { "kind": "baseline_begin", "data": BaselineBegin } | { "kind": "entity_show", "data": EntityShow } | { "kind": "baseline_end", "data": BaselineEnd } | { "kind": "start_play", "data": StartPlay } | { "kind": "entity_hide", "data": EntityHide } | { "kind": "snapshot", "data": Snapshot } | { "kind": "chat", "data": ChatLine } | { "kind": "chat_error", "data": DetailText } | { "kind": "owner_state", "data": OwnerState } | { "kind": "control_changed", "data": OwnerState } | { "kind": "action_result", "data": ActionResult } | { "kind": "player_status", "data": PlayerStatus } | { "kind": "world_event", "data": WorldEvent } | { "kind": "pong", "data": Pong } | { "kind": "disconnect", "data": Disconnect };
+export type ServerMessage = { "kind": "server_hello", "data": ServerHello } | { "kind": "reject", "data": Reject } | { "kind": "welcome", "data": Welcome } | { "kind": "baseline_begin", "data": BaselineBegin } | { "kind": "entity_show", "data": EntityShow } | { "kind": "baseline_end", "data": BaselineEnd } | { "kind": "start_play", "data": StartPlay } | { "kind": "entity_hide", "data": EntityHide } | { "kind": "snapshot", "data": Snapshot } | { "kind": "chat", "data": ChatLine } | { "kind": "chat_error", "data": DetailText } | { "kind": "player_map", "data": Array<PlayerMapEntry> } | { "kind": "owner_state", "data": OwnerState } | { "kind": "control_changed", "data": OwnerState } | { "kind": "action_result", "data": ActionResult } | { "kind": "player_status", "data": PlayerStatus } | { "kind": "world_event", "data": WorldEvent } | { "kind": "pong", "data": Pong } | { "kind": "disconnect", "data": Disconnect };
 
 export type ServerHello = { protocol_version: ProtocolVersion, build_id: BuildId, content_hash: ContentHash, sim_config_hash: ContentHash, tick_rate: TickRate, snapshot_rate: SnapshotRate, };
 

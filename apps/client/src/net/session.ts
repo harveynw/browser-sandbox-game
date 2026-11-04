@@ -215,6 +215,7 @@ export class GameSession {
   private equippedWeapon: "pistol" | "rifle" | "machine_gun" = "pistol";
   private actionAt = -Infinity;
   actionMessage = "";
+  mapPlayers: { player_id: number; position: [number, number, number] }[] = [];
   private motor: CharacterMotor | undefined;
   private ownerLogAt = 0;
   private ownerTick = 0;
@@ -239,6 +240,7 @@ export class GameSession {
       this.prediction = undefined;
       this.local = undefined;
       this.replicas.clear();
+      this.mapPlayers = [];
       this.pending.clear();
       this.session = null;
       this.status(`Closed: ${reason}`);
@@ -675,6 +677,11 @@ export class GameSession {
           );
         }
         this.showStatus();
+        break;
+      case "player_map":
+        this.mapPlayers = message.data.filter(
+          (p) => p.player_id !== this.player,
+        );
         break;
       case "snapshot":
         if (this.phase === "playing")

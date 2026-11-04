@@ -53,6 +53,7 @@ pub fn typescript() -> String {
         DisplayName,
         ChatText,
         ChatLine,
+        PlayerMapEntry,
         DetailText,
         Vec3,
         Empty,

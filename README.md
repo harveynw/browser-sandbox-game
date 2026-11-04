@@ -1,15 +1,19 @@
+<img src="content/screengrab_oct.png" alt="Port Meridian gameplay screenshot" />
+
 # Port Meridian
 
 Port Meridian is an original third-person multiplayer browser game set in a compact coastal city. Explore on foot or by car, earn credits through jobs, and escape a three-level police response. A Rust server owns gameplay; the TypeScript/Three.js client shares Rust movement code through WebAssembly.
 
+**100% of the code here has been written using a combination of OpenAI Codex agents** (GPT-6 Astra, Sol, Terra), with some high-level interventions by hand to keep the architecture and abstractions under control. This project was developed to <ins>test the performance of [net crate](https://github.com/harveynw/net-crate)</ins>, which handles reliable and unreliable communication between the server and the browser.
+
 ## Features
 
-- One authoritative world for up to **16 players**, with a **768 × 768 m** city across six districts.
+- One authoritative world with a **64-connection limit** and a **768 × 768 m** city across six districts.
 - Walking, sprinting, jumping, third-person camera and three arcade vehicle classes: compact, van and sport.
 - Courier deliveries, ordered checkpoint time trials and secured-vehicle recovery jobs; saved credits and paid vehicle repairs.
 - Ambient traffic and pedestrians, witnessed crimes, police pursuit/search, arrests and safe respawns.
-- A pistol with aim, reload and NPC/vehicle damage. Players do not damage one another.
-- Original procedural scenery, articulated characters, synthesized sound, a city map, remappable controls, quality settings and reduced motion.
+- Pistol, rifle and machine gun with finite ammunition, reloading, NPC and vehicle damage, and on-foot PvP with spawn protection and respawns. Players spawn with all three weapons.
+- Original procedural scenery, articulated characters, synthesized sound, a city map and minimap with white dots for other online players, remappable controls, quality settings and reduced motion.
 - Local prediction and reconciliation, interpolated remote actors, interest-managed replication and compact diagnostics with performance captures.
 - SQLite guest profiles retain committed credits and completed jobs across restarts; each server launch creates a fresh world.
 
@@ -30,7 +34,7 @@ Normal saves live in `var/profiles.sqlite`. For isolated testing, use `npm run p
 
 ## Playing
 
-WASD/arrows move or drive, Shift sprints, Space jumps or applies the handbrake, and E enters/exits cars. RMB/Q aims, left click/X fires and R reloads. F opens job choices at a cyan terminal or repairs a stopped car in the green Ironworks zone. M opens the map; Esc opens the menu while the world continues. If mouse capture is declined, drag the scene to look. Controls can be remapped in the menu.
+WASD/arrows move or drive, Shift sprints, Space jumps or applies the handbrake, and E enters/exits cars. RMB/Q aims, left click/X fires and R reloads. Select the pistol, rifle or machine gun with 1/2/3 or the mouse wheel. F opens job choices at a cyan terminal or repairs a stopped car in the green Ironworks zone. M opens the map; Esc opens the menu while the world continues. If mouse capture is declined, drag the scene to look. Controls can be remapped in the menu.
 
 Start at the cyan Quay terminal for courier or recovery work. Courier contracts pay 120–220 credits depending on the assigned destination, recovery pays 250, and the north city ring time trial pays 200. Repairs cost 50. The [gameplay guide](docs/gameplay.md) describes locations, conditions, timers and police rules.
 
@@ -58,8 +62,4 @@ These guides describe the implemented game. The owning code, generated contracts
 
 `npm run check` verifies generated outputs, WASM, types, lint/formatting and Rust/TypeScript tests. `npm run build` produces the client and native artifacts. Socket/process tests run explicitly as described in [testing](docs/testing.md).
 
-The supported deployment is **localhost**. Local gameplay is verified with the in-app Chromium browser, including two guests, driving deliveries, police escape and saved rewards across restarts. The broader browser matrix remains unverified. Process supervision is verified on macOS; Linux is unverified and Windows supervision is unsupported. Target-network performance, reference-hardware budgets and sustained memory stability remain **unqualified**; the [performance guide](docs/performance.md) records the measured limits. Public hosting requires separate deployment and transport work.
-
-## Experimental droplet playtest
-
-The Ubuntu deployment uses HTTPS/WSS through Caddy and direct ICE-lite WebRTC on a configured host IP. Configuration, service operations and save backup instructions are in [deploy/README.md](deploy/README.md). Localhost remains the default; the small public playtest has no loaded-capacity or long-session qualification.
+Localhost is the default development setup. Local gameplay is verified with the in-app Chromium browser, including two guests, driving deliveries, police escape and saved rewards across restarts. The broader browser matrix remains unverified. Process supervision is verified on macOS; Linux is unverified and Windows supervision is unsupported. Target-network performance, reference-hardware budgets and sustained memory stability remain **unqualified**; the [performance guide](docs/performance.md) records the measured limits.

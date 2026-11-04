@@ -407,6 +407,40 @@ impl Replication {
         sessions: &mut Sessions,
         systems: &mut Systems,
     ) -> Result<(), String> {
+        if world.tick.is_multiple_of(30) {
+            let players: Vec<_> = sessions
+                .peers
+                .values()
+                .filter(|s| s.phase == SessionPhase::Playing)
+                .filter_map(|s| s.player.and_then(|id| world.players.get(&id.0)))
+                .map(|p| PlayerMapEntry {
+                    player_id: p.id,
+                    position: p
+                        .state
+                        .vehicle_id
+                        .and_then(|id| world.vehicles.get(&id.0))
+                        .map_or_else(
+                            || p.state.motor.position.clone(),
+                            |v| v.state.motor.position.clone(),
+                        ),
+                })
+                .collect();
+            let recipients: Vec<_> = sessions
+                .peers
+                .iter()
+                .filter(|(_, s)| s.phase == SessionPhase::Playing)
+                .map(|(&peer, s)| (peer, s.id.clone()))
+                .collect();
+            for (peer, sid) in recipients {
+                Self::reliable(
+                    peer,
+                    sid.as_deref(),
+                    ServerMessage::PlayerMap(players.clone()),
+                    world,
+                    sessions,
+                );
+            }
+        }
         Replication::sync_visible(
             world,
             sessions,

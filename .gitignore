@@ -8,6 +8,9 @@ coverage/
 /content/generated/
 /apps/client/public/content/packages/
 
+# Local deployment setup
+deploy/
+
 # Local runtime state and environment overrides
 /var/
 .env

@@ -52,6 +52,7 @@ export class CityMap {
   private actors: readonly RenderActor[] = [];
   private target: readonly number[] | null | undefined;
   private courier = false;
+  private players: readonly { position: readonly number[] }[] = [];
   private destinationButton: HTMLButtonElement | undefined;
   private routeKey = "";
   private route: readonly (readonly number[])[] = [];
@@ -75,7 +76,7 @@ export class CityMap {
     header.append(title, dismiss);
     const legend = document.createElement("p");
     legend.textContent =
-      "NORTH ↑ · J Jobs · G Garage · R Repair · Gold: destination · White arrow: you · Dots: nearby cars. Drag or use arrows to pan; scroll or use + / − to zoom. The world continues.";
+      "NORTH ↑ · J Jobs · G Garage · R Repair · Gold: destination · White arrow: you · White dots: online players · Squares: nearby cars. Drag or use arrows to pan; scroll or use + / − to zoom. The world continues.";
     this.canvas.setAttribute(
       "aria-label",
       "City map, north up, current location and job destination",
@@ -263,6 +264,7 @@ export class CityMap {
     target: readonly number[] | null | undefined,
     courier: boolean,
     minimap: HTMLCanvasElement,
+    players: readonly { position: readonly number[] }[] = [],
   ): void {
     const key = courier && target ? target.join(",") : "";
     if (key !== this.routeKey) {
@@ -276,6 +278,7 @@ export class CityMap {
     if (this.destinationButton) this.destinationButton.disabled = !target;
     this.motor = motor;
     this.actors = actors;
+    this.players = players;
     this.target = target;
     this.draw(
       minimap,
@@ -382,6 +385,16 @@ export class CityMap {
       ctx.stroke();
       ctx.fillStyle = "#f4c563";
       ctx.fillRect(x - 2, y - 2, 4, 4);
+    }
+    for (const player of this.players) {
+      const [x, y] = point(player.position[0] ?? 0, player.position[2] ?? 0);
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.strokeStyle = "#0009";
+      ctx.lineWidth = 1;
+      ctx.stroke();
     }
     if (this.motor) {
       const [x, y] = point(this.motor.position[0], this.motor.position[2]);

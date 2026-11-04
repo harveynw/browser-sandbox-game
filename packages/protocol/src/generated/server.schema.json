@@ -651,6 +651,26 @@
       "minimum": -1.2000000476837158,
       "type": "number"
     },
+    "PlayerMapEntry": {
+      "properties": {
+        "player_id": {
+          "$ref": "#/$defs/EntityId"
+        },
+        "position": {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "player_id",
+        "position"
+      ],
+      "type": "object"
+    },
     "PlayerStatus": {
       "properties": {
         "completed_jobs": {
@@ -1111,6 +1131,25 @@
             },
             "kind": {
               "const": "chat_error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "data": {
+              "items": {
+                "$ref": "#/$defs/PlayerMapEntry"
+              },
+              "type": "array"
+            },
+            "kind": {
+              "const": "player_map",
               "type": "string"
             }
           },

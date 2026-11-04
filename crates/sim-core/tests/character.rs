@@ -628,3 +628,56 @@ fn camera_sphere_keeps_radius_at_walls_corners_and_awnings() {
         );
     }
 }
+
+#[test]
+fn resting_character_keeps_facing_after_releasing_movement() {
+    let (c, w) = room(vec![]);
+    for position in [[0.0, 0.02, 0.0], [37.3, 0.02, -61.7], [-110.2, 0.02, 95.1]] {
+        let mut s = settled(&w, &c, position);
+        for tick in 4..34 {
+            s = step_character(
+                &s,
+                &input(tick, 18000, 32767, 0),
+                &StepContext {
+                    tick,
+                    collision: &w,
+                    config: &c,
+                },
+            )
+            .unwrap()
+            .motor;
+        }
+        for tick in 34..50 {
+            s = step_character(
+                &s,
+                &neutral_input(tick, s.yaw),
+                &StepContext {
+                    tick,
+                    collision: &w,
+                    config: &c,
+                },
+            )
+            .unwrap()
+            .motor;
+        }
+        let yaw = s.yaw.0;
+        for tick in 50..350 {
+            s = step_character(
+                &s,
+                &neutral_input(tick, s.yaw),
+                &StepContext {
+                    tick,
+                    collision: &w,
+                    config: &c,
+                },
+            )
+            .unwrap()
+            .motor;
+            assert!(
+                (s.yaw.0 - yaw).abs() < 0.001,
+                "resting yaw changed at {position:?}: {yaw} -> {}",
+                s.yaw.0
+            );
+        }
+    }
+}

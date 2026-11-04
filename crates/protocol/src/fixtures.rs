@@ -158,6 +158,15 @@ pub fn positive() -> Result<Vec<Fixture>> {
             ),
         ),
         (
+            "player_map",
+            "server",
+            r,
+            tagged(
+                "player_map",
+                json!([{"player_id":1,"position":[10.0,0.02,20.0]}]),
+            ),
+        ),
+        (
             "player_status",
             "server",
             r,

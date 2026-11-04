@@ -883,6 +883,7 @@ export class GameApp {
               (t) => t.id === mission?.template_id,
             )?.objective.kind === "courier",
             this.minimap,
+            this.session?.mapPlayers ?? [],
           );
         const jobs = this.session?.nearbyJobs(now) ?? [];
         const key = jobs.map((t) => t.id).join(",");

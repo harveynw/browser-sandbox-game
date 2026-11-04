@@ -381,9 +381,13 @@ wire_enum!(ServerMessage {
     ServerHello(ServerHello), Reject(Reject), Welcome(Welcome),
     BaselineBegin(BaselineBegin), EntityShow(EntityShow), BaselineEnd(BaselineEnd),
     StartPlay(StartPlay), EntityHide(EntityHide), Snapshot(Snapshot),
-    Chat(ChatLine), ChatError(DetailText),
+    Chat(ChatLine), ChatError(DetailText), PlayerMap(Vec<PlayerMapEntry>),
     OwnerState(OwnerState), ControlChanged(OwnerState), ActionResult(ActionResult),
     PlayerStatus(PlayerStatus), WorldEvent(WorldEvent), Pong(Pong), Disconnect(Disconnect),
+});
+wire_struct!(PlayerMapEntry {
+    player_id: EntityId,
+    position: Vec3
 });
 wire_struct!(ServerHello {
     protocol_version: ProtocolVersion,

@@ -143,7 +143,9 @@ pub fn step_character(
     };
     let target_yaw = if input.buttons.0 & AIM != 0 {
         input.look_yaw.0
-    } else if vx.hypot(vz) > 0.0001 {
+    // Ground contact corrections can alternate sideways even with no movement.
+    // Only meaningful intended motion may change walking facing.
+    } else if horizontal.length() > 0.05 && vx.hypot(vz) > 0.05 {
         (-vx).atan2(-vz)
     } else {
         state.yaw.0

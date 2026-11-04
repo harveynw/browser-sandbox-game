@@ -1861,3 +1861,59 @@ fn spawn_protection_blocks_shots_until_expiry_or_firing() {
         assert_eq!(w.vehicles[&1].state.health.0, 100);
     }
 }
+
+#[test]
+fn player_map_includes_distant_online_players_and_removes_disconnected_players() {
+    let (mut w, mut a, mut t) = setup();
+    let p = peer(0);
+    let q = peer(1);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    join(&mut w, &mut a, &mut t, q, None);
+    ready(&mut w, &mut a, &mut t, q);
+    let other = w.sessions.peers[&q].player_id();
+    place(&mut w, q, [300.0, 0.02, 300.0]);
+    for _ in 0..30 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let entries = t
+        .sent
+        .iter()
+        .rev()
+        .find_map(|(peer, _, message)| {
+            if *peer != p {
+                return None;
+            }
+            match &message.message {
+                ServerMessage::PlayerMap(entries) => Some(entries),
+                _ => None,
+            }
+        })
+        .unwrap();
+    assert_eq!(entries.len(), 2);
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.player_id.0 == other && entry.position.0[0].0 > 299.0)
+    );
+    w.disconnect(q, &mut a);
+    for _ in 0..30 {
+        step(&mut w, &mut a, &mut t);
+    }
+    let entries = t
+        .sent
+        .iter()
+        .rev()
+        .find_map(|(peer, _, message)| {
+            if *peer != p {
+                return None;
+            }
+            match &message.message {
+                ServerMessage::PlayerMap(entries) => Some(entries),
+                _ => None,
+            }
+        })
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    assert!(entries.iter().all(|entry| entry.player_id.0 != other));
+}
