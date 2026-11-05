@@ -1,3 +1,8 @@
+import {
+  isSurroundings,
+  surroundingsShape,
+  surroundingsGeometries,
+} from "../render/surroundings";
 import { treeShape, treeGeometries } from "../render/trees";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -106,7 +111,7 @@ export function mountMapInspector(root: HTMLElement): () => void {
     root.prepend(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#172b37");
-    const camera = new THREE.OrthographicCamera(-200, 200, 200, -200, 1, 2000);
+    const camera = new THREE.OrthographicCamera(-200, 200, 200, -200, 1, 6000);
     const fit = () => {
       const aspect = innerWidth / innerHeight;
       const extent =
@@ -139,6 +144,8 @@ export function mountMapInspector(root: HTMLElement): () => void {
     scene.add(sunlight);
     const cube = new THREE.BoxGeometry(1, 1, 1);
     geometries.add(cube);
+    const terrain = surroundingsGeometries();
+    for (const geometry of Object.values(terrain)) geometries.add(geometry);
     const trees = treeGeometries();
     for (const geometry of Object.values(trees)) geometries.add(geometry);
     const outlines = new THREE.EdgesGeometry(cube);
@@ -172,14 +179,19 @@ export function mountMapInspector(root: HTMLElement): () => void {
               ? 1
               : 0;
       const shape = treeShape(p);
+      const scenery = surroundingsShape(p);
       const mesh = new THREE.Mesh(
-        shape === "box" ? cube : trees[shape],
+        scenery ? terrain[scenery] : shape === "box" ? cube : trees[shape],
         material(p.color, layer),
       );
       mesh.position.set(...p.center);
       mesh.scale.set(...(p.half_extents.map((n) => n * 2) as Vec3));
       parent.add(mesh);
     }
+    const surroundings = new THREE.Group();
+    scene.add(surroundings);
+    for (const p of data.backdrop.primitives.filter(isSurroundings))
+      box(p, surroundings);
     for (const chunk of data.chunks)
       for (const p of chunk.primitives) box(p, solids);
     for (const p of manifest.parking) {
@@ -332,6 +344,9 @@ export function mountMapInspector(root: HTMLElement): () => void {
         el,
         position: new THREE.Vector3(label.position[0], 4, label.position[2]),
       };
+    });
+    checkbox("Surroundings", true, (v) => {
+      surroundings.visible = v;
     });
     checkbox("Collision", true, (v) => {
       collisionGroup.visible = v;

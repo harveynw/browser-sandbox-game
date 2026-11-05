@@ -2,6 +2,8 @@
 pub mod bake;
 pub mod canonical;
 pub mod contract;
+mod landmarks;
+mod surroundings;
 pub mod types;
 pub mod validate;
 mod vegetation;

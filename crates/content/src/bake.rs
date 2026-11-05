@@ -238,15 +238,39 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             }
         }
     }
+    let mut landmark_visuals = BTreeMap::new();
+    let mut landmark_details = Vec::new();
     for landmark in &source.landmarks {
-        let mut center = landmark.position;
-        center[1] += landmark.size[1] / 2.0;
-        collider(
-            &mut colliders,
-            ColliderRole::Landmark,
-            center,
-            landmark.size.map(|n| n / 2.0),
-        );
+        // Keep the frozen slice physics fixture unchanged; bespoke art belongs to the live city.
+        let parts = if full {
+            crate::landmarks::parts(landmark)
+        } else {
+            let mut center = landmark.position;
+            center[1] += landmark.size[1] / 2.0;
+            vec![primitive(
+                format!("solid_{}", colliders.len() + 1),
+                VisualRole::Landmark,
+                center,
+                landmark.size.map(|n| n / 2.0),
+                &landmark.color,
+                Some(0),
+            )]
+        };
+        for mut part in parts {
+            if part.collider_id.is_some() {
+                collider(
+                    &mut colliders,
+                    ColliderRole::Landmark,
+                    part.center,
+                    part.half_extents,
+                );
+                let id = colliders.last().unwrap().id;
+                part.collider_id = Some(id);
+                landmark_visuals.insert(id, part);
+            } else {
+                landmark_details.push(part);
+            }
+        }
     }
     let collision = CollisionPackage {
         schema_version: 1,
@@ -274,11 +298,17 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
     }
     let mut visuals = Vec::new();
     let palette = ["#687f87", "#83958e", "#9c8d80", "#75858d"];
-    let mut landmark_index = 0;
     for c in &collision.colliders {
+        if let Some(part) = landmark_visuals.get(&c.id) {
+            visuals.push(part.clone());
+            continue;
+        }
         let (role, color) = match c.role {
             ColliderRole::Ground => (VisualRole::Ground, "#647763"),
-            ColliderRole::Boundary => (VisualRole::Boundary, "#e0a348"),
+            ColliderRole::Boundary => (
+                VisualRole::Boundary,
+                if full { "#8c9187" } else { "#e0a348" },
+            ),
             ColliderRole::Building => (
                 VisualRole::Building,
                 source
@@ -292,11 +322,7 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
                     })
                     .map_or(palette[c.id as usize % palette.len()], |d| d.color.as_str()),
             ),
-            ColliderRole::Landmark => {
-                let color = &source.landmarks[landmark_index].color;
-                landmark_index += 1;
-                (VisualRole::Landmark, color.as_str())
-            }
+            ColliderRole::Landmark => unreachable!("landmark parts have authored visuals"),
         };
         let mut shell = primitive(
             if identities.contains_key(&c.id) {
@@ -328,6 +354,8 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
         }
         visuals.push(shell);
     }
+
+    visuals.extend(landmark_details);
 
     let road_half = source.roads.carriageway_width / 2.0;
     let pavement_half = road_half + source.roads.sidewalk_width;
@@ -487,22 +515,9 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             .collect(),
     };
     if full {
-        backdrop.primitives.push(primitive(
-            "ocean".into(),
-            VisualRole::Ground,
-            [0.0, -2.0, 0.0],
-            [800.0, 0.1, 800.0],
-            "#426d82",
-            None,
-        ));
-        backdrop.primitives.push(primitive(
-            "heights_distant_hill".into(),
-            VisualRole::Landmark,
-            [-216.0, 10.0, -420.0],
-            [60.0, 20.0, 24.0],
-            "#65825e",
-            None,
-        ));
+        backdrop
+            .primitives
+            .extend(crate::surroundings::primitives());
     }
     let minimap = VisualChunk {
         schema_version: 1,

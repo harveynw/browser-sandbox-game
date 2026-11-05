@@ -1,3 +1,9 @@
+import { createMoon, moonOffset } from "./moon";
+import {
+  isSurroundings,
+  surroundingsShape,
+  surroundingsGeometries,
+} from "./surroundings";
 import { PlayerNametags } from "./nametags";
 import { WeaponModels, equipmentProgress } from "./weapons";
 import { WeaponEffects } from "./weapon-effects";
@@ -22,7 +28,7 @@ import type { CharacterMotor, WorldEvent } from "@port-meridian/protocol";
 export class GameRenderer {
   readonly graphics: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(65, 1, 0.05, 650);
+  readonly camera = new THREE.PerspectiveCamera(65, 1, 0.05, 6000);
   readonly actor = new THREE.Group();
   private readonly dynamic = new DynamicBatch(this.scene);
   private readonly nametags = new PlayerNametags(this.scene);
@@ -45,6 +51,7 @@ export class GameRenderer {
       roll: number;
     }
   >();
+  private readonly moon = createMoon();
   private readonly sun = new THREE.DirectionalLight("#aecbff", 1.6);
   private reduced = false;
   private localFired = false;
@@ -144,6 +151,7 @@ export class GameRenderer {
   }
   private low = false;
   private readonly trees = treeGeometries();
+  private readonly surroundings = surroundingsGeometries();
   private readonly palette = new Map<string, THREE.MeshStandardMaterial>();
   private readonly chunks = new Map<string, THREE.Group>();
   private readonly fallback = new Map<string, THREE.Group>();
@@ -224,6 +232,9 @@ export class GameRenderer {
       this.textures.add(texture);
       this.scene.background = texture;
     } else this.scene.background = new THREE.Color("#121827");
+    this.scene.add(this.moon);
+    this.materials.add(this.moon.material);
+    if (this.moon.material.map) this.textures.add(this.moon.material.map);
     this.scene.fog = new THREE.Fog("#121827", 100, 420);
     this.scene.add(new THREE.HemisphereLight("#aecbff", "#182014", 1.8));
     this.sun.position.set(-30, 60, 30);
@@ -244,9 +255,9 @@ export class GameRenderer {
     for (const geometry of Object.values(this.trees))
       this.geometry.add(geometry);
 
-    const outside = assets.backdrop.primitives.filter(
-      (p) => p.id === "ocean" || p.id === "heights_distant_hill",
-    );
+    for (const geometry of Object.values(this.surroundings))
+      this.geometry.add(geometry);
+    const outside = assets.backdrop.primitives.filter(isSurroundings);
     const outsideGroup = this.batch(outside);
     this.fallback.set("outside", outsideGroup);
     this.scene.add(outsideGroup);
@@ -443,8 +454,10 @@ export class GameRenderer {
         (p.id.includes("-front-") ||
           p.id.includes("-side-") ||
           p.id.endsWith("-roof"));
-      const color =
-        p.role === "road"
+      const scenery = isSurroundings(p);
+      const color = scenery
+        ? p.color
+        : p.role === "road"
           ? "#242b35"
           : p.role === "sidewalk"
             ? "#535a63"
@@ -458,7 +471,7 @@ export class GameRenderer {
                     )
                     .getStyle()
                 : p.color;
-      const key = `${color}:${layer}:${luminous}:${treeShape(p)}`;
+      const key = `${color}:${layer}:${luminous}:${surroundingsShape(p) ?? treeShape(p)}:${scenery}`;
       let material = this.palette.get(key);
       if (!material) {
         material = new THREE.MeshStandardMaterial({
@@ -466,6 +479,7 @@ export class GameRenderer {
           emissive: luminous ? color : "#000000",
           emissiveIntensity: luminous ? 0.65 : 0,
           roughness: 0.95,
+          fog: !scenery,
           polygonOffset: layer > 0,
           polygonOffsetFactor: -layer,
           polygonOffsetUnits: -layer,
@@ -483,8 +497,13 @@ export class GameRenderer {
       const first = values[0];
       if (!first) continue;
       const shape = treeShape(first);
+      const terrain = surroundingsShape(first);
       const mesh = new THREE.InstancedMesh(
-        shape === "box" ? this.cube : this.trees[shape],
+        terrain
+          ? this.surroundings[terrain]
+          : shape === "box"
+            ? this.cube
+            : this.trees[shape],
         material,
         values.length,
       );
@@ -931,6 +950,7 @@ export class GameRenderer {
         object.material.opacity =
           distance < 0.8 ? Math.max(0.05, distance / 0.8) : 1;
     });
+    this.moon.position.copy(this.camera.position).add(moonOffset);
     this.graphics.render(this.scene, this.camera);
   }
   dispose(): void {
