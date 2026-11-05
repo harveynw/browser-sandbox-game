@@ -14,6 +14,7 @@ export const defaults = {
   weapon1: "Digit1",
   weapon2: "Digit2",
   weapon3: "Digit3",
+  surrender: "KeyG",
 } as const;
 export type Control = keyof typeof defaults;
 export type Bindings = Record<Control, string>;
@@ -72,9 +73,10 @@ export function controlText(text: string, bindings: Bindings): string {
     Q: keyLabel(bindings.aim),
     R: keyLabel(bindings.reload),
     M: keyLabel(bindings.map),
+    G: keyLabel(bindings.surrender),
   };
   return text.replace(
-    /\b(WASD|Shift|Space|E|F|Q|R|M)\b/g,
+    /\b(WASD|Shift|Space|E|F|Q|R|M|G)\b/g,
     (m) => labels[m] ?? m,
   );
 }
@@ -125,7 +127,12 @@ export function readSettings(
       base.name = v.name;
     if (v.bindings) {
       const merged = { ...defaults, ...v.bindings };
-      for (const action of ["weapon1", "weapon2", "weapon3"] as const) {
+      for (const action of [
+        "weapon1",
+        "weapon2",
+        "weapon3",
+        "surrender",
+      ] as const) {
         if (v.bindings[action] !== undefined) continue;
         const used = new Set(
           Object.entries(merged)
@@ -144,6 +151,7 @@ export function readSettings(
               "Digit7",
               "Digit8",
               "Digit9",
+              "KeyH",
             ].find((k) => !used.has(k)) ?? defaults[action];
       }
       if (

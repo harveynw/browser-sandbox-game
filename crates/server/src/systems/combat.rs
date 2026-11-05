@@ -13,6 +13,7 @@ enum ShotTarget {
     Vehicle(u32),
     Pedestrian(u32),
     Player(u32),
+    Officer(u32),
 }
 
 #[derive(Default)]
@@ -75,6 +76,96 @@ impl CombatSystem {
             .expect("combat event IDs exhausted");
         EventId(self.event)
     }
+    fn trace_shot(
+        world: &World,
+        population: &PopulationSystem,
+        police: &PoliceSystem,
+        shooter: u32,
+        origin: [f32; 3],
+        direction: [f32; 3],
+        range: f32,
+    ) -> (f32, Option<ShotTarget>) {
+        // Query from the chest through the muzzle offset as part of the same
+        // segment: a nearby wall cannot be skipped by the visual muzzle.
+        // MOVEMENT includes car proxies. Resolve their exact hit independently
+        // so static geometry wins equal-distance ties without trusting IDs.
+        let static_hit = world
+            .collision
+            .raycast(origin, direction, range, QueryFilter::VISION)
+            .ok()
+            .flatten();
+        let mut nearest = static_hit.map_or(range, |h| h.distance);
+        // Ground is solid for shots as well.
+        if direction[1] < 0.0 {
+            nearest = nearest.min((-origin[1] / direction[1]).max(0.0));
+        }
+        let mut target = None;
+        for (&car_id, car) in &world.vehicles {
+            if let Some(d) = sim_core::collision::ray_vehicle(
+                origin,
+                direction,
+                car.state.motor.position.0.map(|v| v.0),
+                car.state.motor.yaw.0,
+                car.template.dimensions.map(|v| v as f32),
+                range,
+            ) && d < nearest
+            {
+                nearest = d;
+                target = Some(ShotTarget::Vehicle(car_id));
+            }
+        }
+        for (&ped_id, ped) in &population.pedestrians {
+            if ped.state.health.0 == 0 {
+                continue;
+            }
+            if let Some(d) = sim_core::collision::ray_character(
+                origin,
+                direction,
+                ped.state.motor.position.0.map(|v| v.0),
+                range,
+            ) && d < nearest
+            {
+                nearest = d;
+                target = Some(ShotTarget::Pedestrian(ped_id));
+            }
+        }
+        for (&player_id, player) in &world.players {
+            if player_id == shooter
+                || player.state.health.0 == 0
+                || player.state.mode != CharacterMode::OnFoot
+            {
+                continue;
+            }
+            if let Some(d) = sim_core::collision::ray_character(
+                origin,
+                direction,
+                player.state.motor.position.0.map(|v| v.0),
+                range,
+            ) && d < nearest
+            {
+                nearest = d;
+                target = Some(ShotTarget::Player(player_id));
+            }
+        }
+        for (&id, officer) in &police.officers {
+            if id != shooter
+                && !officer.mounted
+                && officer.state.health.0 > 0
+                && let Some(d) = sim_core::collision::ray_character(
+                    origin,
+                    direction,
+                    officer.state.motor.position.0.map(|v| v.0),
+                    range,
+                )
+                && d < nearest
+            {
+                nearest = d;
+                target = Some(ShotTarget::Officer(id));
+            }
+        }
+        (nearest, target)
+    }
+
     pub(crate) fn weapon_action(
         &mut self,
         peer: PeerKey,
@@ -156,6 +247,7 @@ impl CombatSystem {
                     .lifecycle
                     .protected_until = None;
                 s.status_dirty = true;
+                police.wanted_mut(id.0).surrendering = false;
                 let p = world.players[&id.0].state.motor.position.0.map(|v| v.0);
                 let origin = [p[0], p[1] + 1.45, p[2]];
                 let moving = world.players[&id.0].state.motor.velocity.0[0]
@@ -189,73 +281,15 @@ impl CombatSystem {
                     .clamp(-1.5, 1.5)
                     .sin_cos();
                 let direction = [-sin * cp, sp, -cos * cp];
-                // Query from the chest through the muzzle offset as part of the same
-                // segment: a nearby wall cannot be skipped by the visual muzzle.
-                // MOVEMENT includes car proxies. Resolve their exact hit independently
-                // so static geometry wins equal-distance ties without trusting IDs.
-                let static_hit = world
-                    .collision
-                    .raycast(
-                        origin,
-                        direction,
-                        definition.range as f32,
-                        QueryFilter::VISION,
-                    )
-                    .ok()
-                    .flatten();
-                let mut nearest = static_hit.map_or(definition.range as f32, |h| h.distance);
-                // Ground is solid for shots as well.
-                if direction[1] < 0.0 {
-                    nearest = nearest.min((-origin[1] / direction[1]).max(0.0));
-                }
-                let mut target = None;
-                for (&car_id, car) in &world.vehicles {
-                    if let Some(d) = sim_core::collision::ray_vehicle(
-                        origin,
-                        direction,
-                        car.state.motor.position.0.map(|v| v.0),
-                        car.state.motor.yaw.0,
-                        car.template.dimensions.map(|v| v as f32),
-                        definition.range as f32,
-                    ) && d < nearest
-                    {
-                        nearest = d;
-                        target = Some(ShotTarget::Vehicle(car_id));
-                    }
-                }
-                for (&ped_id, ped) in &population.pedestrians {
-                    if ped.state.health.0 == 0 {
-                        continue;
-                    }
-                    if let Some(d) = sim_core::collision::ray_character(
-                        origin,
-                        direction,
-                        ped.state.motor.position.0.map(|v| v.0),
-                        definition.range as f32,
-                    ) && d < nearest
-                    {
-                        nearest = d;
-                        target = Some(ShotTarget::Pedestrian(ped_id));
-                    }
-                }
-                for (&player_id, player) in &world.players {
-                    if player_id == id.0
-                        || player.state.health.0 == 0
-                        || player.state.mode != CharacterMode::OnFoot
-                    {
-                        continue;
-                    }
-                    if let Some(d) = sim_core::collision::ray_character(
-                        origin,
-                        direction,
-                        player.state.motor.position.0.map(|v| v.0),
-                        definition.range as f32,
-                    ) && d < nearest
-                    {
-                        nearest = d;
-                        target = Some(ShotTarget::Player(player_id));
-                    }
-                }
+                let (nearest, target) = Self::trace_shot(
+                    world,
+                    population,
+                    police,
+                    id.0,
+                    origin,
+                    direction,
+                    definition.range as f32,
+                );
                 let hit = match target {
                     Some(ShotTarget::Vehicle(target)) => self
                         .damage_vehicle(target, definition.damage, Some(id), world)
@@ -289,6 +323,10 @@ impl CombatSystem {
                             }
                             Some(EntityId(target))
                         }
+                    }
+                    Some(ShotTarget::Officer(target)) => {
+                        police.damage_officer(target, definition.damage);
+                        Some(EntityId(target))
                     }
                     None => None,
                 };
@@ -324,10 +362,12 @@ impl CombatSystem {
                     police.report_crime(
                         id.0,
                         cause,
-                        if let ShotTarget::Vehicle(car) = target {
-                            crate::systems::police::CrimeKind::PoliceCar(car)
-                        } else {
-                            crate::systems::police::CrimeKind::Harm
+                        match target {
+                            ShotTarget::Vehicle(car) => {
+                                crate::systems::police::CrimeKind::PoliceCar(car)
+                            }
+                            ShotTarget::Officer(_) => crate::systems::police::CrimeKind::Officer,
+                            _ => crate::systems::police::CrimeKind::Harm,
                         },
                         end,
                         world,
@@ -816,6 +856,78 @@ impl CombatSystem {
             sessions.peers.insert(peer, s);
         }
     }
+    fn officer_fire(
+        &mut self,
+        shot: crate::systems::police::OfficerShot,
+        world: &mut World,
+        sessions: &mut Sessions,
+        population: &mut PopulationSystem,
+        police: &mut PoliceSystem,
+        missions: &mut MissionSystem,
+        chat: &mut crate::systems::chat::ChatSystem,
+    ) {
+        if world.players[&shot.target]
+            .lifecycle
+            .protected_until
+            .is_some_and(|end| world.tick < end)
+        {
+            return;
+        }
+        let (distance, target) = Self::trace_shot(
+            world,
+            population,
+            police,
+            shot.shooter,
+            shot.origin,
+            shot.direction,
+            shot.range,
+        );
+        let hit = match target {
+            Some(ShotTarget::Player(id)) if id == shot.target => {
+                let player = world.players.get_mut(&id).expect("traced player");
+                if player
+                    .lifecycle
+                    .protected_until
+                    .is_some_and(|end| world.tick < end)
+                {
+                    return;
+                }
+                player.state.health.0 = player.state.health.0.saturating_sub(shot.damage);
+                if player.state.health.0 == 0 {
+                    Self::down_player(id, world, sessions, population, police, missions);
+                    chat.police_elimination(id, world, sessions);
+                }
+                Some(EntityId(id))
+            }
+            Some(ShotTarget::Vehicle(id))
+                if world.vehicles[&id].state.driver_id == Some(EntityId(shot.target)) =>
+            {
+                self.damage_vehicle(id, shot.damage, None, world)
+                    .then_some(EntityId(id))
+            }
+            Some(_) => return,
+            None => None,
+        };
+        let end = std::array::from_fn(|i| shot.origin[i] + shot.direction[i] * distance);
+        population.frighten(shot.origin, world.tick);
+        Self::combat_event(
+            WorldEvent::Shot(Shot {
+                weapon_id: shot.weapon,
+                shot_sequence: shot.sequence,
+                event_id: self.event_id(),
+                server_tick: world.tick,
+                shooter_id: EntityId(shot.shooter),
+                origin: Vec3(shot.origin.map(Scalar)),
+                end: Vec3(end.map(Scalar)),
+                hit_entity_id: hit,
+            }),
+            shot.origin,
+            None,
+            world,
+            sessions,
+        );
+    }
+
     pub(crate) fn update(
         &mut self,
         world: &mut World,
@@ -825,6 +937,17 @@ impl CombatSystem {
         missions: &mut MissionSystem,
         chat: &mut crate::systems::chat::ChatSystem,
     ) {
+        for shot in police.step_officers(world, sessions, population) {
+            if world.players.get(&shot.target).is_some_and(|player| {
+                player.state.health.0 > 0
+                    && matches!(
+                        player.state.mode,
+                        CharacterMode::OnFoot | CharacterMode::Driving
+                    )
+            }) {
+                self.officer_fire(shot, world, sessions, population, police, missions, chat);
+            }
+        }
         CombatSystem::process_disabled(world, sessions, population, police, missions);
         for id in self
             .incapacitated

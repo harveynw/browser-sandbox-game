@@ -681,6 +681,7 @@ export class GameApp {
         const aiming =
           this.input.active &&
           this.input.aiming &&
+          !this.input.surrendering &&
           this.health > 0 &&
           this.mode === "on_foot";
         this.renderer.pose(
@@ -696,6 +697,7 @@ export class GameApp {
           this.session?.estimatedTick(now) ?? 0,
           this.input.pitch,
           this.queries,
+          this.input.surrendering && this.mode === "on_foot",
         );
         this.renderer.remotes(remotes);
         for (const id of this.remoteReloads.keys())
@@ -779,6 +781,7 @@ export class GameApp {
                 .filter(
                   (a) =>
                     a.descriptor.entity_kind === "police" &&
+                    a.state.kind === "vehicle" &&
                     !a.stale &&
                     Math.hypot(
                       a.motor.position[0] - localMotor.position[0],
@@ -1015,7 +1018,14 @@ export class GameApp {
                 ? `Arrest ${Math.min(100, Math.round(((estimated - (this.arrestStart ?? estimated)) / 90) * 100))}% · move`
                 : this.pursuit === "searching"
                   ? "Searching · stay hidden"
-                  : "Pursuit · break sight",
+                  : this.input.surrendering && this.mode === "on_foot"
+                    ? "Surrendering · hold still"
+                    : this.mode === "on_foot"
+                      ? controlText(
+                          "Pursuit · hold G to surrender",
+                          this.settings.bindings,
+                        )
+                      : "Pursuit · break sight",
           ammo: `${this.session?.weaponSummary(now) ?? "Pistol"} · ${controlText(combat, this.settings.bindings)}`,
           capacity: this.session?.weaponCapacity ?? 12,
           magazine: this.magazine,
@@ -1030,7 +1040,25 @@ export class GameApp {
               : null,
           warning: net?.stale
             ? "Connection delayed — waiting for the server"
-            : (this.session?.actionMessage ?? ""),
+            : this.heat > 0 &&
+                remotes.some(
+                  (actor) =>
+                    localMotor !== undefined &&
+                    actor.descriptor.entity_kind === "police" &&
+                    actor.state.kind === "character" &&
+                    actor.state.data.health > 0 &&
+                    actor.state.data.equipment?.aiming &&
+                    !actor.stale &&
+                    Math.hypot(
+                      actor.motor.position[0] - localMotor.position[0],
+                      actor.motor.position[2] - localMotor.position[2],
+                    ) < 25,
+                )
+              ? controlText(
+                  "Armed officers nearby · hold G to surrender",
+                  this.settings.bindings,
+                )
+              : (this.session?.actionMessage ?? ""),
         });
         this.root.setAttribute(
           "aria-label",

@@ -137,7 +137,7 @@ impl Control {
             .values()
             .filter(|p| **p == crate::systems::population::VehiclePool::Parked)
             .count();
-        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":sessions.peers.len(),"traffic":systems.population.traffic.len(),"parked":parked,"pedestrians":systems.population.pedestrians.len(),"police":systems.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":systems.population.metrics.path_jobs,"max_path_jobs_per_tick":systems.population.metrics.max_path_jobs_per_tick,"blocked_spawns":systems.population.metrics.blocked_spawns},"queues":queues,"peers":peers});
+        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":sessions.peers.len(),"traffic":systems.population.traffic.len(),"parked":parked,"pedestrians":systems.population.pedestrians.len(),"police":systems.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":systems.population.metrics.path_jobs,"max_path_jobs_per_tick":systems.population.metrics.max_path_jobs_per_tick,"blocked_spawns":systems.population.metrics.blocked_spawns},"police":systems.police.diagnostics(),"queues":queues,"peers":peers});
     }
     pub fn route(
         &mut self,

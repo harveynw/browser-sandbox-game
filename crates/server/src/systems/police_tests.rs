@@ -15,17 +15,11 @@ fn city() -> (World, Sessions, crate::systems::Systems) {
     (world, sessions, systems)
 }
 
-// Preserve patrol coverage in both home districts when retired police vehicles are replaced.
-
+// Preserve coverage in all home districts when retired patrols are replaced.
 #[test]
-fn retired_patrol_replacement_preserves_both_home_districts() {
+fn retired_patrol_replacement_preserves_all_home_districts() {
     let (mut w, mut sessions, mut systems) = city();
-    for cycle in 0..6 {
-        let home = if cycle % 2 == 0 {
-            [-192.0, 0.0, 160.0]
-        } else {
-            [0.0, 0.0, -160.0]
-        };
+    for (cycle, home) in PATROL_HOMES.into_iter().enumerate() {
         let id = *systems
             .police
             .units
@@ -41,34 +35,25 @@ fn retired_patrol_replacement_preserves_both_home_districts() {
         systems
             .police
             .spawn_patrols(
-                (cycle + 1) * 30,
+                (cycle as u32 + 1) * 30,
                 &[],
                 &mut w,
                 &mut sessions,
                 &mut systems.combat,
             )
             .unwrap();
-        assert_eq!(systems.police.units.len(), 2);
-        assert_eq!(
-            systems
-                .police
-                .units
-                .values()
-                .filter(|u| u.home == [-192.0, 0.0, 160.0])
-                .count(),
-            1,
-            "Quay must receive its replacement"
-        );
-        assert_eq!(
-            systems
-                .police
-                .units
-                .values()
-                .filter(|u| u.home == [0.0, 0.0, -160.0])
-                .count(),
-            1,
-            "Civic must receive its replacement"
-        );
+        assert_eq!(systems.police.units.len(), PATROL_HOMES.len());
+        for home in PATROL_HOMES {
+            assert_eq!(
+                systems
+                    .police
+                    .units
+                    .values()
+                    .filter(|u| u.home == home)
+                    .count(),
+                1
+            );
+        }
     }
 }
 
@@ -77,7 +62,7 @@ fn retired_patrol_replacement_preserves_both_home_districts() {
 #[test]
 fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling() {
     let (mut w, mut sessions, mut systems) = city();
-    assert_eq!(systems.police.units.len(), 2);
+    assert_eq!(systems.police.units.len(), PATROL_HOMES.len());
     let initial: BTreeMap<_, _> = systems
         .police
         .units
@@ -89,7 +74,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
         w.collision
             .set_vehicle_proxies(&w.vehicles.values().map(Vehicle::proxy).collect::<Vec<_>>())
             .unwrap();
-        // Observers at each unit prevent the stuck-retirement branch from hiding failures.
+        // Keep every patrol visible while checking that it retains its identity.
         let observers: Vec<_> = systems
             .police
             .units
@@ -242,6 +227,15 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         &mut w,
     );
     assert!(systems.police.crimes.is_empty());
+    systems
+        .police
+        .report_crime(player, CrimeId::Shot(3), CrimeKind::Shot, right, &mut w);
+    assert_eq!(
+        systems.police.crimes[&(player, CrimeId::Shot(3))]
+            .kind
+            .points(),
+        1
+    );
     w.vehicles.get_mut(&id).unwrap().state.health = VehicleHealth(0);
     systems.police.report_crime(
         player,
@@ -251,4 +245,42 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         &mut w,
     );
     assert_eq!(systems.police.crimes.len(), 1);
+    let report = systems.police.crimes[&(player, CrimeId::Shot(3))];
+    assert_eq!(report.kind.points(), 10);
+}
+
+#[test]
+fn recovery_rechecks_rear_clearance_before_reversing() {
+    let (mut world, mut sessions, mut systems) = city();
+    let id = *systems.police.units.keys().next().unwrap();
+    let car = &world.vehicles[&id];
+    let yaw = car.state.motor.yaw.0;
+    let position = car.state.motor.position.0.map(|v| v.0);
+    let rear = car.template.dimensions[2] as f32 / 2.0 + 0.4;
+    let observer = Observer {
+        position: [
+            position[0] + yaw.sin() * rear,
+            position[1],
+            position[2] + yaw.cos() * rear,
+        ],
+        yaw,
+    };
+    systems.police.units.get_mut(&id).unwrap().reverse_until = 45;
+    systems
+        .police
+        .prepare_tick(
+            1,
+            &[observer],
+            &mut world,
+            &mut sessions,
+            &mut systems.population,
+        )
+        .unwrap();
+    let unit = &systems.police.units[&id];
+    assert!(unit.blocked);
+    assert_eq!(unit.reverse_until, 1);
+    assert_eq!(
+        systems.police.vehicle_input(id, 1, 0.0).unwrap().buttons,
+        Buttons(4)
+    );
 }

@@ -585,6 +585,7 @@ export class GameRenderer {
     tick = 0,
     pitch = 0,
     queries?: PredictionWorld,
+    surrendering = false,
   ): void {
     this.presentationTick = tick;
     this.dustClock += dt;
@@ -629,6 +630,7 @@ export class GameRenderer {
         aiming,
         reloading,
         incapacitated: disabled,
+        surrendering,
         fired: this.localFired,
         weapon: this.equipment?.weapon_id,
         obstructed:
@@ -771,6 +773,7 @@ export class GameRenderer {
             (c) => this.visualMaterial(c),
             actor.id % 4,
             this.weaponModels,
+            actor.descriptor.entity_kind === "police",
           );
           this.rigs.set(actor.id, rig);
           group.add(rig.root);

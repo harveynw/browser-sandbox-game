@@ -51,6 +51,12 @@ impl MovementSystem {
                 .inputs
                 .remove(&next)
                 .unwrap_or_else(|| sim_core::neutral_input(next, player.state.motor.yaw));
+            // The handbrake bit is otherwise unused by the on-foot motor.
+            police.wanted_mut(id).surrendering = player.state.mode == CharacterMode::OnFoot
+                && input.buttons.0 & 4 != 0
+                && input.buttons.0 & 10 == 0
+                && input.move_x.0 == 0
+                && input.move_z.0 == 0;
             let retiring = missions.mission(s.player_id()).as_ref().is_some_and(|m| {
                 m.phase == crate::systems::missions::Phase::Failed
                     && m.reserved_vehicle == player.state.vehicle_id.map(|v| v.0)

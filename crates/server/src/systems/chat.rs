@@ -139,6 +139,19 @@ impl ChatSystem {
         ));
         self.system_message(username, text, Some(extra), world, sessions);
     }
+    pub(crate) fn police_elimination(
+        &mut self,
+        victim: u32,
+        world: &mut World,
+        sessions: &mut Sessions,
+    ) {
+        let text = ChatText(format!(
+            "Police eliminated {}",
+            world.players[&victim].display_name.0
+        ));
+        self.system_message(DisplayName("Police".into()), text, None, world, sessions);
+    }
+
     fn system_message(
         &mut self,
         username: DisplayName,

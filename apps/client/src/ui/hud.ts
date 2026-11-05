@@ -39,6 +39,9 @@ export class GameHud {
   private combat = document.createElement("p");
   private wanted = document.createElement("div");
   private warning = document.createElement("p");
+  private previousHeat = 0;
+  private notice = "";
+  private noticeUntil = 0;
   constructor() {
     this.element.className = "game-hud";
     this.objective.className = "hud-objective";
@@ -130,6 +133,21 @@ export class GameHud {
     this.objective.hidden = !m.guidance;
     this.wallet.textContent = `${m.credits.toLocaleString()} CR`;
     const heat = Math.max(0, Math.min(3, Math.round(m.heat)));
+    this.wanted.classList.toggle(
+      "searching",
+      m.pursuit.startsWith("Searching"),
+    );
+    if (heat > this.previousHeat) {
+      this.notice =
+        [
+          "",
+          "Police alerted",
+          "Armed police responding",
+          "Maximum police response",
+        ][heat] ?? "";
+      this.noticeUntil = performance.now() + 3500;
+    }
+    this.previousHeat = heat;
     this.wanted.replaceChildren(
       ...Array.from({ length: 3 }, (_, index) => {
         const star = document.createElement("span");
@@ -163,8 +181,9 @@ export class GameHud {
       .filter(Boolean)
       .join(" · ");
     this.combat.hidden = !this.combat.textContent;
-    this.warning.textContent = m.warning;
-    this.warning.hidden = !m.warning;
+    this.warning.textContent =
+      m.warning || (performance.now() < this.noticeUntil ? this.notice : "");
+    this.warning.hidden = !this.warning.textContent;
   }
 }
 export function friendlyProblem(detail: string): string {

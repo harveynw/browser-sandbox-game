@@ -107,6 +107,27 @@ impl Replication {
                     ),
                 )
             }))
+            .chain(
+                police
+                    .officers
+                    .iter()
+                    .filter(|(_, officer)| !officer.mounted)
+                    .map(|(&id, officer)| {
+                        (
+                            id,
+                            (
+                                EntityDescriptor {
+                                    id: EntityId(id),
+                                    entity_kind: EntityKind::Police,
+                                    template_id: TemplateId("player_greybox".into()),
+                                    display_name: None,
+                                    tshirt_colour: Some(TshirtColour(0x263f68)),
+                                },
+                                EntityState::Character(officer.state.clone()),
+                            ),
+                        )
+                    }),
+            )
             .chain(population.pedestrians.iter().map(|(&id, p)| {
                 (
                     id,

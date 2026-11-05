@@ -158,8 +158,17 @@ export class InputState {
     this.job = false;
     return value;
   }
+  get surrendering(): boolean {
+    return (
+      this.down("surrender") &&
+      !(["forward", "backward", "left", "right", "jump"] as const).some(
+        (action) => this.down(action),
+      )
+    );
+  }
   sample(driving = false): Omit<InputFrame, "tick"> {
     const down = (action: Control) => this.down(action);
+    const surrender = !driving && this.surrendering;
     const result = {
       move_x: (Number(down("right")) - Number(down("left"))) * 32767,
       move_z: (Number(down("forward")) - Number(down("backward"))) * 32767,
@@ -167,8 +176,16 @@ export class InputState {
       look_pitch: this.pitch,
       buttons:
         (!this.aiming && down("sprint") ? 1 : 0) |
-        (!driving && this.active && this.aiming ? 8 : 0) |
-        (driving ? (down("jump") ? 4 : 0) : this.active && this.jump ? 2 : 0),
+        (!driving && this.active && this.aiming && !surrender ? 8 : 0) |
+        (driving
+          ? down("jump")
+            ? 4
+            : 0
+          : surrender
+            ? 4
+            : this.active && this.jump
+              ? 2
+              : 0),
     };
     this.jump = false;
     return result;

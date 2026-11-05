@@ -168,6 +168,7 @@ export class SettingsPanel {
       weapon1: "Weapon slot 1",
       weapon2: "Weapon slot 2",
       weapon3: "Weapon slot 3",
+      surrender: "Hold to surrender",
     };
     for (const action of Object.keys(defaults) as Control[]) {
       const label = document.createElement("label"),

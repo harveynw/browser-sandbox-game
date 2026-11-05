@@ -18,6 +18,7 @@ export type Clip =
 export interface AnimationInput {
   motor: CharacterMotor;
   driving?: boolean;
+  surrendering?: boolean;
   incapacitated?: boolean;
   aiming?: boolean | undefined;
   reloading?: boolean;
@@ -125,6 +126,7 @@ export class CharacterRig {
     private readonly material: (color: string) => THREE.MeshStandardMaterial,
     palette = 0,
     private readonly weapons?: WeaponModels,
+    police = false,
   ) {
     const shirt = clothing[palette % 4] ?? "#e4a25b",
       skin =
@@ -151,6 +153,13 @@ export class CharacterRig {
     part(this.head, skin, [0.3, 0.34, 0.29], [0, 0, 0]);
     part(this.head, "#293c46", [0.31, 0.09, 0.3], [0, 0.14, 0]);
     part(this.head, "#26343b", [0.2, 0.06, 0.015], [0, 0.015, -0.15]);
+    if (police) {
+      part(this.head, "#16263d", [0.36, 0.14, 0.34], [0, 0.23, 0]);
+      part(this.head, "#101c2b", [0.34, 0.035, 0.2], [0, 0.18, -0.18]);
+      part(this.torso, "#e4bf61", [0.075, 0.09, 0.025], [-0.12, 0.12, -0.16]);
+      part(this.torso, "#142031", [0.5, 0.085, 0.32], [0, -0.22, 0]);
+      part(this.torso, "#101a29", [0.1, 0.15, 0.11], [0.27, -0.18, 0]);
+    }
     this.arms.forEach((arm, i) => {
       arm.position.set(i === 0 ? -0.31 : 0.31, 0.19, 0);
       this.torso.add(arm);
@@ -230,6 +239,12 @@ export class CharacterRig {
     if (clip === "land" && !reduced) {
       this.torso.position.y -= 0.1;
       this.legs.forEach((a) => (a.rotation.x = 0.18));
+    }
+    if (input.surrendering && !input.incapacitated && !input.driving) {
+      this.arms[0].rotation.set(-2.6, 0, -0.35);
+      this.arms[1].rotation.set(-2.6, 0, 0.35);
+      if (this.weapon) this.weapon.root.visible = false;
+      return;
     }
     if (input.weapon && this.weapons && input.weapon !== this.weaponId) {
       if (this.weapon) this.weaponHand.remove(this.weapon.root);

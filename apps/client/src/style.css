@@ -1245,3 +1245,18 @@ select {
   padding-top: 18vh;
   font-weight: 700;
 }
+
+@keyframes search-stars {
+  50% {
+    opacity: 0.3;
+  }
+}
+.hud-wanted.searching {
+  animation: search-stars 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-wanted.searching {
+    animation: none;
+    color: #a7c9df;
+  }
+}

@@ -611,20 +611,20 @@ fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss()
     assert!(w.systems.missions.active[&w.sessions.peers[&p].player_id()].is_none());
 }
 
-// Limit police to eight units while rotating assignments fairly among sixteen wanted guests.
+// Limit police to eight units while rotating assignments fairly among sixty_four wanted guests.
 #[test]
-fn sixteen_wanted_guests_share_at_most_eight_police_with_rotating_fair_assignments() {
+fn configured_capacity_wanted_guests_share_at_most_eight_police_with_rotating_fair_assignments() {
     let (mut w, mut a, mut t) = police_setup();
-    for n in 0..16 {
+    for n in 0..crate::world::MAX_PLAYERS as u32 {
         let p = peer(n);
         join(&mut w, &mut a, &mut t, p, None);
         ready(&mut w, &mut a, &mut t, p);
     }
     let ids: BTreeSet<_> = w.players.keys().copied().collect();
     let mut assigned = BTreeSet::new();
-    for turn in 1..=16 {
+    for turn in 1..=crate::world::MAX_PLAYERS as u32 {
         w.tick = turn * 150 - 1;
-        for n in 0..16 {
+        for n in 0..crate::world::MAX_PLAYERS as u32 {
             let p = peer(n);
             let id = w.sessions.peers[&p].player_id();
             let pos = w.core.players[&id].state.motor.position.0.map(|v| v.0);
@@ -638,6 +638,7 @@ fn sixteen_wanted_guests_share_at_most_eight_police_with_rotating_fair_assignmen
         step(&mut w, &mut a, &mut t);
         t.sent.clear();
         assert!(w.systems.police.units.len() <= 8);
+        assert!(w.systems.police.officers.len() <= 16);
         assigned.extend(w.systems.police.units.values().filter_map(|u| u.target));
     }
     assert_eq!(w.systems.police.units.len(), 8);
@@ -804,4 +805,87 @@ fn all_blocked_exit_candidates_preserve_occupancy_and_epoch() {
     assert_eq!(w.sessions.peers[&p].epoch, 1);
     assert_eq!(w.vehicles[&car].state.driver_id, Some(id));
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.code==ActionCode::ExitBlocked)));
+}
+
+#[test]
+fn police_officers_deploy_and_fire_at_a_suspect_who_attacked_the_patrol() {
+    use crate::systems::police::{CrimeId, CrimeKind};
+    let (mut w, mut a, mut t) = police_setup();
+    let p = peer(0);
+    join(&mut w, &mut a, &mut t, p, None);
+    ready(&mut w, &mut a, &mut t, p);
+    let player = w.sessions.peers[&p].player_id();
+    let patrol = *w.systems.police.units.keys().next().unwrap();
+    let motor = &w.vehicles[&patrol].state.motor;
+    let position = motor.position.0.map(|v| v.0);
+    let target = sim_core::anchor(motor, [0.0, 0.02, -9.0]);
+    place(&mut w, p, target);
+    w.core
+        .players
+        .get_mut(&player)
+        .unwrap()
+        .lifecycle
+        .protected_until = None;
+    w.systems.police.report_crime(
+        player,
+        CrimeId::Shot(123),
+        CrimeKind::PoliceCar(patrol),
+        position,
+        &mut w.core,
+    );
+    for _ in 0..24 {
+        let tick = w.core.tick + 1;
+        let mut input = sim_core::neutral_input(tick, Yaw(0.0));
+        input.buttons = Buttons(4);
+        w.sessions
+            .peers
+            .get_mut(&p)
+            .unwrap()
+            .inputs
+            .insert(tick, input);
+        step(&mut w, &mut a, &mut t);
+    }
+    assert!(
+        w.systems
+            .police
+            .officers
+            .values()
+            .any(|officer| !officer.mounted)
+    );
+    assert_eq!(w.players[&player].state.health.0, 100);
+    // Let the old five-second threat window expire before surrender ends.
+    w.core.tick += 151;
+    for _ in 0..90 {
+        keep_alive(&w, &mut t, p);
+        step(&mut w, &mut a, &mut t);
+        if w.players[&player].state.health.0 < 100 {
+            break;
+        }
+    }
+    assert!(
+        w.systems
+            .police
+            .officers
+            .values()
+            .any(|officer| !officer.mounted)
+    );
+    assert!(
+        w.players[&player].state.health.0 < 100,
+        "target {:?}, officers {:?}, shots {}",
+        w.players[&player].state,
+        w.systems
+            .police
+            .officers
+            .values()
+            .map(|o| &o.state)
+            .collect::<Vec<_>>(),
+        t.sent
+            .iter()
+            .filter(|(_, _, m)| matches!(m.message, ServerMessage::WorldEvent(WorldEvent::Shot(_))))
+            .count()
+    );
+    assert!(t.sent.iter().any(|(_, _, message)| {
+        matches!(&message.message, ServerMessage::WorldEvent(WorldEvent::Shot(shot))
+            if w.systems.police.officers.contains_key(&shot.shooter_id.0))
+    }));
 }

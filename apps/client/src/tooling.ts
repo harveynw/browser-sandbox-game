@@ -9,6 +9,7 @@ const tools = [
   ["/map", "City map", "Map Inspector"],
   ["/diagnostic", "Test client", "Connection Test Client"],
   ["/simulation", "Simulation", "Simulation Trace Runner"],
+  ["/police", "Police", "Police Pursuit Monitor"],
   ["/weapons", "Weapons", "Weapon Preview"],
   ["/architecture", "Architecture", "Architecture Workbench"],
 ] as const;

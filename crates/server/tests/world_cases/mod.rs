@@ -824,7 +824,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     let mut a = Profiles::default();
     let mut t = FakeTransport::default();
     assert_eq!(w.systems.population.pools.len(), 16);
-    assert_eq!(w.systems.police.units.len(), 2);
+    assert_eq!(w.systems.police.units.len(), 4);
     assert!(w.vehicles.values().any(|v| v.template.id == "van"));
     assert!(w.vehicles.values().any(|v| v.template.id == "sport"));
     for id in w

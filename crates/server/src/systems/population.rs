@@ -112,6 +112,15 @@ impl Navigation {
             .copied()
     }
     pub(crate) fn path(&self, from: u32, goal: u32) -> VecDeque<u32> {
+        self.path_avoiding(from, goal, None)
+    }
+
+    pub(crate) fn path_avoiding(
+        &self,
+        from: u32,
+        goal: u32,
+        blocked: Option<u32>,
+    ) -> VecDeque<u32> {
         let mut cost = BTreeMap::from([(from, 0.0_f32)]);
         let mut previous = BTreeMap::new();
         let mut visited = BTreeSet::new();
@@ -134,7 +143,9 @@ impl Navigation {
             }
             visited.insert(id);
             for &(to, speed, _) in self.edges.get(&id).into_iter().flatten() {
-                let next = d + distance(self.points[&id], self.points[&to]) / speed.max(0.1);
+                let penalty = if Some(to) == blocked { 20.0 } else { 0.0 };
+                let next =
+                    d + distance(self.points[&id], self.points[&to]) / speed.max(0.1) + penalty;
                 if next < *cost.get(&to).unwrap_or(&f32::INFINITY) {
                     cost.insert(to, next);
                     previous.insert(to, id);

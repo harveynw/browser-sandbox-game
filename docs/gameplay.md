@@ -22,6 +22,7 @@ Original landmarks include the Quay water tower, Market canopy, garage beacon, C
 | RMB / Q | Hold / toggle aim | — |
 | LMB / X | Fire while aiming | — |
 | R | Reload | — |
+| G (hold still) | Lower your weapon and surrender to nearby police | — |
 | M | City map | City map |
 | Esc | Open menu, neutralize controls | Open menu, neutralize controls |
 
@@ -61,7 +62,7 @@ Only committed rewards appear as spendable credits. Repair eligibility is checke
 | Traffic | At most **24** cars |
 | Pedestrians | At most **32** |
 | Parked pool | **24 slots**, including **8 recovery reservations**; four ordinary cars are authored |
-| Police | Separate cap of **8**, with two base patrols |
+| Police | Separate cap of **8**, with four base patrols |
 
 The director runs at 1 Hz. New ambient actors must be 40–160 m from guests, outside every guest's 40 m radius, hidden by static vision blockers and collision-clear. Cars need 12 m separation; pedestrians need 3 m. Unavailable candidates leave slots empty. IDs increase monotonically; visibility generations handle hide/re-entry.
 
@@ -81,17 +82,17 @@ Incapacitated pedestrians are non-controlling for 300 ticks before leaving the p
 
 ## Police and private heat
 
-Shots can be heard within **80 m** through walls. Secured theft requires a witness within **50 m** and static sight; pedestrian harm requires **60 m** and sight. A damaged police car reports its own hit. Causal IDs and a 64-entry per-player history deduplicate observations. Heat rises at most once per thirty ticks, caps at three, and is private to its owner.
+Police can hear shots within **80 m** through walls. Witnessed theft or heard gunfire can trigger one star, witnessed harm can trigger two, and hitting police can trigger three. A shot counts once at its strongest reported severity.
 
-Sight checks run at 5 Hz within **70 m**. Five seconds without sight starts Searching. Units navigate to the last observed position, not the hidden player's current location. Twenty unseen search seconds remove one heat level; fresh sight/crime restarts pursuit/timers.
+Sight checks run at 5 Hz. Patrols use the last confirmed position to search after losing sight. A search reduces the current level after 20, 35 or 50 seconds, depending on the number of stars. Fresh sight restarts pursuit. Support units can intercept a recently seen vehicle and split up to search nearby exits.
 
-Patrol home assignments balance Quay and Civic when replacing retired units. Assignments give each wanted player one unit before extras, rotating under contention while retaining the eight-unit cap. Reinforcements must be hidden, collision-clear and at least 40 m from guests. Visible units never recycle; no-path units stop. Police use shared car motors and do not shoot or exit into separate officers.
+Four patrols are based in Old Quay, Civic Center, Ironworks and East Docks. Up to eight patrol cars and sixteen officers can be active. Officers can disembark, pursue on foot and return to their cars. They carry pistols, with a rifle available to the lead unit at three stars. Officers can fire in self-defense or warn and engage a visibly resisting suspect at higher wanted levels. Walls, vehicles and other actors block shots.
 
-Arrest requires an assigned live unit's front anchor within **3 m**, static sight and target speed below **0.5 m/s** for **90 continuous ticks**. Arrest safely releases vehicle control, fails an active job, clears heat and advances the epoch. After 150 ticks a safe respawn restores health/ammunition. Credits persist. Blocked exits/spawns defer the transition safely.
+Hold **G** while still on foot to lower your weapon and surrender. Move or release G to end surrender. Arrest requires a nearby assigned officer or patrol car with sight for three continuous seconds while you are nearly stationary. Arrest safely releases vehicle control, fails an active job and clears wanted status. After five seconds, a safe respawn restores health and ammunition. Credits persist.
 
 ## Scope
 
-This is a localhost, single-world game with original procedural art and synthesized effects. Rewind shooting, explosions, on-foot police, distributed worlds and realistic suspension dynamics are outside the implemented rules. Browser compatibility and performance qualifications are listed in [testing](testing.md) and [performance](performance.md).
+This is a localhost, single-world game with original procedural art and synthesized effects. Rewind shooting, explosions, distributed worlds and realistic suspension dynamics are outside the implemented rules. Browser compatibility and performance qualifications are listed in [testing](testing.md) and [performance](performance.md).
 
 ### Player T-shirt colour
 
