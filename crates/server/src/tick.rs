@@ -1,102 +1,137 @@
-//! One fixed simulation tick, in gameplay order. Networking is polled/flushed by main.
+//! Small server-facing driver; ECS setup and schedule wiring live in ecs/.
 use crate::{
-    admission::Profiles, replication::Replication, sessions::Sessions, systems::Systems,
-    transport::Network, world::World,
+    admission::Profiles,
+    ecs::{
+        TickOutcome,
+        runtime::{Scratch, TickIo},
+    },
+    transport::Network,
 };
-use std::time::Instant;
-/// Preserve pre-movement actions, post-movement consequences and replication ordering.
-pub fn step(
-    world: &mut World,
-    sessions: &mut Sessions,
-    systems: &mut Systems,
-    network: &mut Network,
-    profiles: &mut Profiles,
-    now: u64,
-    allow_joins: bool,
-) -> Result<(), String> {
-    if world.tick >= u32::MAX - 1 {
-        return Err("world tick exhausted; restart required".into());
-    }
+#[cfg(test)]
+use crate::{sessions::Sessions, systems::Systems, world::World as FixtureWorld};
+use bevy_ecs::prelude::*;
 
-    let mut timing = Instant::now();
-    sessions.receive(network, profiles, now, allow_joins, world, systems)?;
-    world.timings.admission.observe(timing.elapsed());
-    timing = Instant::now();
-    let mut frame = systems.movement.prepare_tick(
-        world,
-        sessions,
-        &mut systems.population,
-        &mut systems.police,
-        &mut systems.combat,
-        &mut systems.missions,
-    )?;
-    world.timings.planning.observe(timing.elapsed());
-    timing = Instant::now();
-    systems.movement.update(
-        &mut frame,
-        world,
-        sessions,
-        &mut systems.population,
-        &mut systems.police,
-        &mut systems.combat,
-        &mut systems.missions,
-    )?;
-    world.timings.motors.observe(timing.elapsed());
-    timing = Instant::now();
-    systems.combat.update(
-        world,
-        sessions,
-        &mut systems.population,
-        &mut systems.police,
-        &mut systems.missions,
-        &mut systems.chat,
-    );
-    systems.police.finish_tick(
-        world,
-        sessions,
-        &mut systems.population,
-        &mut systems.missions,
-    )?;
-    for peer in frame.failed {
-        sessions.disconnect(peer, profiles, world, systems);
-        sessions.closing.insert(peer, "unsafe motor input/state");
+/// Validated ECS startup state before sockets are bound. Content-check mode can
+/// inspect this without creating a dummy transport or starting the live loop.
+pub struct PreparedWorld {
+    host: bevy_ecs::world::World,
+}
+impl PreparedWorld {
+    pub fn new(content: crate::content_loader::WorldContent) -> Result<Self, String> {
+        Ok(Self {
+            host: crate::ecs::bootstrap::build(content)?,
+        })
     }
-    systems
-        .repairs
-        .update(profiles, world, sessions, &mut systems.police)?;
-    systems.missions.update(
-        profiles,
-        &frame.previous_cars,
-        world,
-        sessions,
-        &mut systems.population,
-        &mut systems.police,
-        &mut systems.combat,
-        &mut systems.repairs,
-    )?;
-    world.timings.gameplay.observe(timing.elapsed());
-    timing = Instant::now();
-    Replication::publish(world, sessions, systems)?;
-    world.timings.replication.observe(timing.elapsed());
-    timing = Instant::now();
-    Replication::flush(
-        network,
-        profiles,
-        now,
-        &frame.previous_cars,
-        world,
-        sessions,
-        systems,
-    )?;
-    world.timings.flush.observe(timing.elapsed());
-    Ok(())
+    pub fn build(&self) -> protocol::ServerHello {
+        crate::world::build(&self.host.resource::<crate::ecs::state::Content>().0)
+    }
+    pub fn world_id(&self) -> &str {
+        &self.host.resource::<crate::ecs::state::WorldIdentity>().0
+    }
+    pub fn start(self, network: Network) -> TickDriver {
+        TickDriver::from_host(self.host, network)
+    }
 }
-/// Resolve interrupted economic operations after disconnecting all players.
-pub fn shutdown(
-    world: &mut World,
-    sessions: &mut Sessions,
-    systems: &mut Systems,
-    profiles: &mut Profiles,
-) -> bool {
-    sessions.shutdown(profiles, world, systems)
+
+pub struct TickDriver {
+    host: bevy_ecs::world::World,
+    schedule: Schedule,
+    diagnostics: bevy_ecs::system::SystemState<crate::diagnostics::Diagnostics<'static, 'static>>,
 }
+impl TickDriver {
+    #[cfg(test)]
+    pub(crate) fn from_parts(
+        core: FixtureWorld,
+        sessions: Sessions,
+        systems: Systems,
+        network: Network,
+    ) -> Self {
+        let mut host = crate::ecs::state::install(core);
+        host.insert_resource(sessions);
+        crate::ecs::state::install_systems(&mut host, systems);
+        Self::from_host(host, network)
+    }
+    pub fn new(
+        content: crate::content_loader::WorldContent,
+        network: Network,
+    ) -> Result<Self, String> {
+        Ok(PreparedWorld::new(content)?.start(network))
+    }
+    fn from_host(mut host: bevy_ecs::world::World, network: Network) -> Self {
+        crate::ecs::schedule::initialize(&mut host, network);
+        let schedule = crate::ecs::schedule::build();
+        let diagnostics = bevy_ecs::system::SystemState::new(&mut host);
+        Self {
+            host,
+            schedule,
+            diagnostics,
+        }
+    }
+    pub fn network(&self) -> &Network {
+        self.host.non_send::<Network>()
+    }
+    pub fn network_mut(&mut self) -> &mut Network {
+        self.host.non_send_mut::<Network>().into_inner()
+    }
+    pub fn tick(&self) -> u32 {
+        self.host.resource::<crate::ecs::state::Clock>().0
+    }
+    pub fn diagnostics(&mut self) -> crate::diagnostics::Snapshot {
+        self.diagnostics
+            .get(&self.host)
+            .expect("read-only diagnostics")
+            .snapshot()
+    }
+    pub fn build(&self) -> protocol::ServerHello {
+        crate::world::build(&self.host.resource::<crate::ecs::state::Content>().0)
+    }
+    pub fn world_id(&self) -> &str {
+        &self.host.resource::<crate::ecs::state::WorldIdentity>().0
+    }
+    #[cfg(test)]
+    pub(crate) fn into_parts(mut self) -> (FixtureWorld, Sessions, Systems, Network, Schedule) {
+        let network = self.host.remove_non_send::<Network>().unwrap();
+        let (core, sessions, systems) = crate::ecs::state::unpack(self.host);
+        (core, sessions, systems, network, self.schedule)
+    }
+    #[cfg(test)]
+    pub(crate) fn use_schedule(&mut self, schedule: Schedule) {
+        self.schedule = schedule;
+    }
+    pub fn step(
+        &mut self,
+        profiles: &mut Profiles,
+        now: u64,
+        allow_joins: bool,
+    ) -> Result<(), String> {
+        if self.tick() >= u32::MAX - 1 {
+            return Err("world tick exhausted; restart required".into());
+        }
+        crate::gameplay_messages::clear(&mut self.host);
+        self.host.resource_mut::<Scratch>().reset();
+        // A previous returned failure cannot suppress the next tick's admission phase.
+        let _ = self.host.resource_mut::<TickOutcome>().finish();
+        self.host.insert_non_send(TickIo {
+            profiles: std::mem::take(profiles),
+            now,
+            allow_joins,
+        });
+        self.schedule.run(&mut self.host);
+        let io = self
+            .host
+            .remove_non_send::<TickIo>()
+            .expect("scoped tick IO");
+        *profiles = io.profiles;
+        crate::gameplay_messages::clear(&mut self.host);
+        self.host.resource_mut::<Scratch>().frame = None;
+        self.host.resource_mut::<Scratch>().gameplay_started = None;
+        self.host.resource_mut::<Scratch>().movement_started = None;
+        self.host.resource_mut::<TickOutcome>().finish()
+    }
+    pub fn shutdown(&mut self, profiles: &mut Profiles) -> bool {
+        crate::shutdown::run(&mut self.host, profiles)
+    }
+}
+#[cfg(test)]
+#[path = "ecs/driver_tests.rs"]
+mod tests;

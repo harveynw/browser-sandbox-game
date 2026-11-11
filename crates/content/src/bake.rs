@@ -121,20 +121,22 @@ pub fn bake(source: &Authoring) -> Result<BakedPackage> {
             (b.max[2] - b.min[2]) / 2.0,
         ],
     );
+    // Waist-height perimeter; visual shells use these same collider dimensions.
+    let barrier_half_height = 0.5;
     for x in [b.min[0] + 0.5, b.max[0] - 0.5] {
         collider(
             &mut colliders,
             ColliderRole::Boundary,
-            [x, 2.0, center[2]],
-            [0.5, 2.0, (b.max[2] - b.min[2]) / 2.0],
+            [x, barrier_half_height, center[2]],
+            [0.5, barrier_half_height, (b.max[2] - b.min[2]) / 2.0],
         );
     }
     for z in [b.min[2] + 0.5, b.max[2] - 0.5] {
         collider(
             &mut colliders,
             ColliderRole::Boundary,
-            [center[0], 2.0, z],
-            [(b.max[0] - b.min[0]) / 2.0, 2.0, 0.5],
+            [center[0], barrier_half_height, z],
+            [(b.max[0] - b.min[0]) / 2.0, barrier_half_height, 0.5],
         );
     }
     let full = source.bounds.min[0] == -384.0;

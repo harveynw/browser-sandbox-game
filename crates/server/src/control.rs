@@ -1,5 +1,5 @@
 //! Explicit localhost development issuer; not a public authentication service.
-use crate::{admission::Profiles, sessions::Sessions, systems::Systems, world::World};
+use crate::{admission::Profiles, diagnostics::Snapshot};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -70,8 +70,7 @@ struct Probe {
     rtc: bool,
 }
 impl Control {
-    pub fn new(world: &World) -> Self {
-        let hello = world.build();
+    pub fn new(hello: protocol::ServerHello) -> Self {
         Self {
             public_origin: None,
             metrics: json!({}),
@@ -83,30 +82,14 @@ impl Control {
             build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
         }
     }
-    pub fn update(
-        &mut self,
-        world: &World,
-        sessions: &Sessions,
-        now: u64,
-        healthy: bool,
-        overloaded: bool,
-    ) {
-        use crate::sessions::SessionPhase;
+    pub fn update(&mut self, snapshot: &Snapshot, now: u64, healthy: bool, overloaded: bool) {
         self.status = Status {
             last_tick_ms: now,
-            tick: world.tick,
-            sessions: sessions.peers.len(),
-            players: world.players.len(),
-            loading: sessions
-                .peers
-                .values()
-                .filter(|s| s.phase == SessionPhase::Loading)
-                .count(),
-            playing: sessions
-                .peers
-                .values()
-                .filter(|s| s.phase == SessionPhase::Playing)
-                .count(),
+            tick: snapshot.tick,
+            sessions: snapshot.sessions,
+            players: snapshot.players,
+            loading: snapshot.loading,
+            playing: snapshot.playing,
             overloaded,
             transport_healthy: healthy,
         };
@@ -119,25 +102,22 @@ impl Control {
     }
     pub fn record_performance(
         &mut self,
-        world: &World,
-        sessions: &Sessions,
-        systems: &Systems,
+        snapshot: &Snapshot,
         queues: Value,
         gap: Duration,
         now: u64,
     ) {
         self.scheduler_poll_gap.observe(gap);
-        if !world.tick.is_multiple_of(30) {
+        let Some(mut metrics) = snapshot.metrics.clone() else {
             return;
-        }
-        let peers:Vec<_>=sessions.peers.values().map(|s|json!({"player_id":s.player.map(|id|id.0),"phase":format!("{:?}",s.phase),"epoch":s.epoch,"traffic":s.traffic,"input_ring":s.inputs.len()})).collect();
-        let parked = systems
-            .population
-            .pools
-            .values()
-            .filter(|p| **p == crate::systems::population::VehiclePool::Parked)
-            .count();
-        self.metrics = json!({"world_id":world.id,"build":self.build,"tick":world.tick,"uptime_ms":now,"tick_work":self.tick_work.report(),"populated_tick_work":self.populated_tick_work.report(),"scheduler_poll_gap":self.scheduler_poll_gap.report(),"systems":world.timings.report(),"world":world.metrics,"population":{"players":world.players.len(),"sessions":sessions.peers.len(),"traffic":systems.population.traffic.len(),"parked":parked,"pedestrians":systems.population.pedestrians.len(),"police":systems.police.units.len(),"vehicles":world.vehicles.len(),"path_jobs":systems.population.metrics.path_jobs,"max_path_jobs_per_tick":systems.population.metrics.max_path_jobs_per_tick,"blocked_spawns":systems.population.metrics.blocked_spawns},"police":systems.police.diagnostics(),"queues":queues,"peers":peers});
+        };
+        metrics["build"] = self.build.clone();
+        metrics["uptime_ms"] = json!(now);
+        metrics["tick_work"] = self.tick_work.report();
+        metrics["populated_tick_work"] = self.populated_tick_work.report();
+        metrics["scheduler_poll_gap"] = self.scheduler_poll_gap.report();
+        metrics["queues"] = queues;
+        self.metrics = metrics;
     }
     pub fn route(
         &mut self,

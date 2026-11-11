@@ -1,97 +1,38 @@
-%% Backend module system — implemented architecture.
-%% Update with module, ownership, transport or data-flow changes.
-%% Purple: orchestration; blue: networking; green: simulation;
-%% orange: graphics; yellow: content; grey: diagnostics/external.
+%% Current backend architecture after the native ECS migration.
 flowchart TD
-  subgraph group_0["crates/server/src/ — startup and world"]
-    launcher["tools/local.mjs<br/>Tool checks / builds / owned process groups<br/>Deadline / sibling cleanup / shutdown"]:::app
-    probe["examples/local_probe.rs<br/>Normal guest admission / full baseline<br/>Real nonce-matched WS + RTC startup receipts"]:::other
-    main["main.rs<br/>Startup and main loop · fixed-step scheduling at 30 Hz"]:::app
-    config["config.rs · config/dev.toml<br/>SQLite default / explicit memory mode"]:::app
-    persistence["persistence.rs · SQLite worker thread<br/>Migrations / WAL / atomic economic ledger<br/>Repair acknowledgements and restart refunds"]:::other
-    database["var/profiles.sqlite<br/>Profiles · economic events · unresolved repairs"]:::other
-    performance["performance.rs<br/>Bounded world / complete-tick histograms<br/>Per-peer encoded bytes and queue snapshots"]:::other
-    loader["content_loader.rs<br/>Select city.json · verify full world<br/>Preload all static collision"]:::content
-    world["world.rs<br/>Authoritative sessions, players and movement"]:::sim
-    police["police.rs<br/>Authoritative crime witnesses and private heat<br/>Balanced replacement homes · capped patrol / pursuit<br/>Search / arrest"]:::sim
-    combat["combat.rs<br/>Server pistol and hit queries<br/>Damage, cooldowns and safe respawns"]:::sim
-    jobs["jobs.rs<br/>Mission acceptance / reward lifecycle<br/>Eight recovery reservations and safe garage exits"]:::sim
-    repairs["repairs.rs<br/>Observed repair dwell / identity validation<br/>Queued debit, application and compensation"]:::sim
-    missions["missions.rs<br/>Courier / recovery dwell and swept trial gates"]:::sim
-    population["population.rs<br/>1 Hz director · 5 Hz NPC decisions<br/>Pool tags, lane paths and intersection reservations"]:::sim
-    vehicles["vehicles.rs<br/>Car state, seat anchors and safe exits"]:::sim
-  end
-  subgraph group_1["crates/server/src/ — networking and admission"]
-    control["control.rs · HTTP thread<br/>Sessions, tickets, health and cached /api/metrics"]:::net
-    admission["admission.rs · shared state<br/>Guest profiles, one-use tickets<br/>Committed profile cache · bounded worker operations<br/>Memory adapter for tests"]:::net
-    transport["transport.rs · game-loop owned<br/>Bounded queues, codecs and channel routing"]:::net
-    replication["replication.rs<br/>Visibility · snapshot packing<br/>Coalescing · rate budgets"]:::net
-  end
-  subgraph group_2["Shared Rust crates"]
-    sim["crates/sim-core/<br/>Character / vehicle motors<br/>Static collision and car proxies"]:::sim
-    content["crates/content/<br/>Content types and validation"]:::content
-    protocol["crates/protocol/<br/>Serde DTOs · direct MessagePack codec<br/>Scalar / input-batch limits"]:::net
-  end
-    browser["Browser frontend"]:::other
-    assets["Baked content package<br/>Six districts · collision / configuration<br/>Visual streaming belongs to browser"]:::content
-    net["net-crate<br/>WebSocket + WebRTC server"]:::other
-
-  launcher -->|"spawn release server"| main
-  launcher -->|"run after frontend proxy is live"| probe
-  probe <-->|"normal WS / RTC signalling and messages"| net
-  probe <-->|"HTTP through Vite proxy / receipt report"| control
-  main -->|"validate local configuration"| config
-  config -->|"open and recover before listeners"| persistence
-  admission <-->|"bounded commands / committed results"| persistence
-  persistence <-->|"single connection · transactions"| database
-  main -->|"load at startup"| loader
-  assets -->|"baked package"| loader
-  loader -->|"validation"| content
-  loader -->|"loaded world"| world
-  main -->|"30 Hz steps"| world
-  world -->|"per-system timing"| performance
-  main -->|"complete tick timing"| performance
-  transport -->|"queue depths / close reasons"| control
-  performance -->|"read-only cached metrics"| control
-  main -->|"start / publish health"| control
-  main -->|"start / poll / flush"| transport
-  browser <-->|"HTTP :3001"| control
-  control <-->|"create guest / issue ticket"| admission
-  world <-->|"consume ticket / activate session"| admission
-  browser <-->|"WS + WebRTC :3000"| net
-  net <-->|"binary messages"| transport
-  transport -->|"queued client messages"| world
-  world -->|"lifecycle / owner state"| transport
-  world -->|"visible entities"| replication
-  replication -->|"remote snapshots · 10 Hz"| transport
-  transport -.->|"coalescing / budgets"| replication
-  transport -->|"encode / decode"| protocol
-  replication -->|"packet sizing"| protocol
-  world <-->|"police controls · safe arrests / control epochs"| police
-  combat -->|"deduplicated shot / harm / impact observations"| police
-  police -->|"shared road navigation"| population
-  police -->|"vehicle motor and static sight queries"| sim
-  world -->|"private heat / pursuit status"| transport
-  world <-->|"weapon intent · impacts · life state"| combat
-  combat -->|"ray / swept box-capsule queries"| sim
-  combat -->|"Shot / Impact and control epochs"| transport
-  world -->|"evaluate jobs after movement"| jobs
-  jobs -->|"pure objective advancement"| missions
-  jobs -->|"reserve / release recovery cars"| vehicles
-  world -->|"advance repair operation"| repairs
-  repairs <-->|"queued debit / refund and committed profile"| admission
-  repairs -->|"revalidate original driver / car / zone / epoch"| vehicles
-  world <-->|"commit reward event / profile values"| admission
-  world -->|"private mission and credits status"| transport
-  world <-->|"spawn / recycle · NPC controls and replicas"| population
-  population -->|"shared motors and collision queries"| sim
-  world -->|"step authoritative movement"| sim
-  world -->|"atomic entry / exit geometry"| vehicles
-  vehicles -->|"seat transforms and clearance queries"| sim
-
-  classDef app fill:#E9DDF7,stroke:#BDC5CE,color:#202B38
-  classDef net fill:#DCEBFA,stroke:#BDC5CE,color:#202B38
-  classDef sim fill:#DFF1E4,stroke:#BDC5CE,color:#202B38
-  classDef gfx fill:#FBE5D2,stroke:#BDC5CE,color:#202B38
-  classDef content fill:#FFF1BC,stroke:#BDC5CE,color:#202B38
-  classDef other fill:#ECEFF2,stroke:#BDC5CE,color:#202B38
+  Main["main.rs<br/>30 Hz cadence, network polling, overload limits"]
+  Startup["ecs/bootstrap.rs · PreparedWorld<br/>Validate content and spawns<br/>Indexed parked actors and initial patrols"]
+  Driver["tick.rs · TickDriver<br/>One authoritative Bevy world<br/>Small driver: step and service access"]
+  Main --> Startup --> Driver
+  Driver --> ECS["ecs/<br/>Phase order, schedules, checkpoints<br/>Resources, message registration and setup"]
+  Content["content_loader.rs<br/>Immutable verified content/configuration"] --> Startup
+  Browser["Browser clients"] <-->|WS / RTC| Network["transport.rs<br/>Bounded transport queues and codecs"]
+  Main -->|poll / flush| Network
+  Network --> Ingress["sessions/ingress.rs<br/>Scope, budgets, packet ordering<br/>Admission and baseline messages"]
+  Ingress --> Driver
+  ECS --> Gameplay["Native query systems<br/>Planning → movement → combat → police<br/>Failed peers → repairs → missions"]
+  Gameplay <--> Actors["Components<br/>Player / vehicle / pedestrian / officer<br/>AI controllers, wanted, missions, lifecycle"]
+  Gameplay <--> Messages["Typed ECS messages<br/>Actions, impacts, crime, lifecycle<br/>Control transitions and rewards"]
+  Gameplay <--> Resources["Shared coordination resources<br/>Navigation, RNG, reservations<br/>Cooldowns, metrics and session protocol state"]
+  Gameplay --> Collision["sim-core<br/>Shared motors and collision queries"]
+  ECS --> Publish["replication/publication.rs + native.rs<br/>Map → visibility → owners → snapshots → status<br/>Ordered commit and failure cleanup"]
+  Actors --> Publish
+  Publish --> Egress["replication/egress.rs<br/>Bounded flush and message-driven failure cleanup"]
+  Egress --> Network
+  Egress --> Messages
+  Profiles["admission.rs<br/>Profile cache, ticket service, operation receipts"] <-->|bounded work / committed results| Storage["persistence.rs<br/>SQLite worker and durable economic ledger"]
+  Ingress --> Profiles
+  Gameplay --> Profiles
+  HTTP["control.rs · HTTP thread<br/>Guest/session APIs, health and cached metrics"] <--> Profiles
+  Browser <-->|HTTP| HTTP
+  Diagnostics["diagnostics.rs<br/>Read-only ECS snapshot<br/>Detailed metrics once per second"] --> HTTP
+  Actors --> Diagnostics
+  Resources --> Diagnostics
+  Main --> Diagnostics
+  Main --> Shutdown["shutdown.rs<br/>Native disconnect cleanup<br/>Bounded repair/persistence drain"]
+  Shutdown --> Messages
+  Shutdown --> Profiles
+  classDef sim fill:#d5f5df,stroke:#278344
+  classDef io fill:#dcebf8,stroke:#5b83a5
+  class Startup,Driver,Gameplay,Actors,Messages,Resources,Collision,Publish,Diagnostics,Shutdown sim
+  class Network,Ingress,Egress,Profiles,Storage,HTTP io

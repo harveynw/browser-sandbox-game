@@ -16,7 +16,7 @@ Verify these observations against the checkout:
 
 - `crates/server/src/entities/weapon.rs`: a single pistol magazine, fire/reload deadlines, and respawn/protection state currently share one `Weapon` struct.
 - `crates/server/src/systems/combat.rs`: pistol capacity 12, cooldown 9 ticks, reload 45 ticks, range 80m and damage 25 are hard-coded. Reload currently replenishes the magazine without reserve ammunition. Respawn replaces weapon state.
-- `crates/server/src/systems/police.rs` and `missions.rs`: also touch weapon timers/protection. Audit every reference when separating lifecycle state.
+- `crates/server/src/systems/police/mod.rs` and `missions/mod.rs`: also touch weapon timers/protection. Audit every reference when separating lifecycle state.
 - `crates/protocol/src/types.rs`: reliable `ActionRequest` carries request ID and control epoch; actions include `Fire` and `Reload`. `PlayerStatus` carries private ammunition/reload state. `Shot` lacks weapon identity.
 - `apps/client/src/net/session.ts`: generic action submission has a shared 250ms throttle. Do not route every automatic bullet through this path or simply remove its limits.
 - `apps/client/src/input/input.ts`, `game/app.ts`, `game/settings.ts`: fire is currently edge-triggered; key bindings and settings need migration-safe defaults.

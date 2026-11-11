@@ -10,10 +10,10 @@ Keep three stars for this iteration. Helicopters, five-star escalation, drive-by
 
 ## Current implementation
 
-- `crates/server/src/systems/police.rs` owns wanted state, patrol allocation, driving and arrest. There are at most eight police cars globally, with demand of one car per star and at least two patrols. Allocation rotates across wanted players.
+- `crates/server/src/systems/police/mod.rs` owns wanted state, patrol allocation, driving and arrest. There are at most eight police cars globally, with demand of one car per star and at least two patrols. Allocation rotates across wanted players.
 - Witnessed crimes add one star, at most once per second, capped at three. Crime categories affect witnessing but not severity. Sight loss starts searching after five seconds; searching removes one star every twenty seconds. A stationary suspect near a car's front can be arrested after three seconds.
 - All levels use the same driver. Steering decisions run at 5 Hz, replanning at most 2 Hz per unit. Cars generally target 4 or 12 m/s, slow to at most 8 m/s on the short direct approach, and stop for sensed obstacles. There is no interception or reversing recovery. Hidden cars stuck for fifteen seconds can be removed.
-- `Navigation` in `systems/population.rs` already finds travel-time routes over directed edges. Problems include nearest-node attachment, restarting from an existing route-front node, simplistic waypoint tracking and no temporary obstruction costs. Replacing the search algorithm alone will not fix driving.
+- `Navigation` in `systems/population/mod.rs` already finds travel-time routes over directed edges. Problems include nearest-node attachment, restarting from an existing route-front node, simplistic waypoint tracking and no temporary obstruction costs. Replacing the search algorithm alone will not fix driving.
 - Police have vehicles but no officer entities. `systems/combat.rs` contains player-fired hitscan, weapon timing and damage handling. Pedestrians have character motors but no combat controller.
 - `Heat` in `crates/protocol/src/types.rs` and the client HUD support three stars. Replication distinguishes police vehicles; officers will need their own replicated identity and presentation.
 
@@ -35,7 +35,7 @@ The escape loop remains pursuit → lost contact → search → gradual reductio
 
 ## Ownership and boundaries
 
-Split `police.rs` into focused modules as the stages require; retain `PoliceSystem` as the coordinator rather than introducing a generic AI framework.
+Split `police/mod.rs` into focused modules as the stages require; retain `PoliceSystem` as the coordinator rather than introducing a generic AI framework.
 
 - `WantedState`: severity, stars, pursuit phase, observed contact, warning/threat state, decay and arrest timers, causal crime history.
 - `ResponseProfile`: per-level unit demand, speed/spacing limits, tactics, officer loadouts and search parameters.

@@ -57,6 +57,43 @@ impl std::ops::DerefMut for Weapon {
     }
 }
 impl Weapon {
+    /// Shared eligibility rules for native intent selection and synchronous actions.
+    pub(crate) fn can_fire(
+        &self,
+        aim: &Fire,
+        automatic_tick: bool,
+        tick: u32,
+    ) -> std::result::Result<WeaponDefinition, ActionCode> {
+        let definition = self.definition();
+        if (definition.automatic && !automatic_tick) || aim.weapon_id != self.equipped {
+            return Err(ActionCode::Unavailable);
+        }
+        if self.equip_end.is_some() {
+            return Err(ActionCode::Cooldown);
+        }
+        if self.shot_sequence == u32::MAX {
+            return Err(ActionCode::Unavailable);
+        }
+        if self.reload_end.is_some() || tick < self.next_fire {
+            return Err(ActionCode::Cooldown);
+        }
+        if self.magazine == 0 {
+            return Err(ActionCode::NoAmmo);
+        }
+        Ok(definition)
+    }
+    pub(crate) fn begin_fire(
+        &mut self,
+        aim: &Fire,
+        automatic_tick: bool,
+        tick: u32,
+    ) -> std::result::Result<WeaponDefinition, ActionCode> {
+        let definition = self.can_fire(aim, automatic_tick, tick)?;
+        self.magazine -= 1;
+        self.next_fire = tick.saturating_add(definition.fire_ticks);
+        Ok(definition)
+    }
+
     pub fn trigger_intent(&mut self, intent: &Trigger, tick: u32) {
         if intent.sequence <= self.trigger_sequence {
             return;
@@ -279,5 +316,43 @@ mod trigger_tests {
         assert!(w.trigger.is_some());
         w.equip(WeaponId::Pistol, 104);
         assert!(w.trigger.is_none());
+    }
+}
+
+#[cfg(test)]
+mod firing_tests {
+    use super::*;
+    #[test]
+    fn firing_validation_is_read_only_and_commit_rechecks_before_spending_ammo() {
+        let mut weapon = Weapon::default();
+        let aim = Fire {
+            weapon_id: weapon.equipped,
+            aim_yaw: Yaw(0.0),
+            aim_pitch: Pitch(0.0),
+        };
+        let ammo = weapon.magazine;
+        let definition = weapon.can_fire(&aim, false, 10).unwrap();
+        assert_eq!(weapon.magazine, ammo);
+        assert_eq!(weapon.next_fire, 0);
+        weapon.reload_end = Some(20);
+        assert!(matches!(
+            weapon.begin_fire(&aim, false, 10),
+            Err(ActionCode::Cooldown)
+        ));
+        assert_eq!(weapon.magazine, ammo);
+        weapon.reload_end = None;
+        weapon.begin_fire(&aim, false, 10).unwrap();
+        assert_eq!(weapon.magazine, ammo - 1);
+        assert_eq!(weapon.next_fire, 10 + definition.fire_ticks);
+        assert!(matches!(
+            weapon.begin_fire(&aim, false, 10),
+            Err(ActionCode::Cooldown)
+        ));
+        assert_eq!(weapon.magazine, ammo - 1);
+        weapon.magazine = 0;
+        assert!(matches!(
+            weapon.begin_fire(&aim, false, 10 + definition.fire_ticks),
+            Err(ActionCode::NoAmmo)
+        ));
     }
 }

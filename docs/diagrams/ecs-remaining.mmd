@@ -1,0 +1,13 @@
+%% Native ECS migration: all stages complete.
+flowchart TD
+  Movement["✓ Movement, impacts and lifecycle"]
+  Weapons["✓ Weapons and hit presentation"]
+  AI["✓ AI and planning"]
+  Missions["✓ Missions, repairs and persistence messages"]
+  Sessions["✓ Session lifecycle and player actions"]
+  Replication["✓ Session protocol, replication and I/O"]
+  Cleanup["✓ Native startup, diagnostics and shutdown<br/>Legacy bridge removed; fixture adapters test-only"]
+  Verified["✓ Validated and running<br/>160 tests passed · release build and connection probe passed"]
+  Movement --> Weapons --> AI --> Missions --> Sessions --> Replication --> Cleanup --> Verified
+  classDef complete fill:#d5f5df,stroke:#278344
+  class Movement,Weapons,AI,Missions,Sessions,Replication,Cleanup,Verified complete

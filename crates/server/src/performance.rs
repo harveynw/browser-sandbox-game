@@ -51,7 +51,7 @@ impl Histogram {
         json!({"samples":self.count,"p50_ms":self.quantile(0.5),"p95_ms":self.quantile(0.95),"p99_ms":self.quantile(0.99),"min_ms":if self.count==0{0.0}else{self.min as f64/1000.0},"max_ms":self.max as f64/1000.0,"mean_ms":if self.count==0{0.0}else{self.sum as f64/self.count as f64/1000.0}})
     }
 }
-#[derive(Default)]
+#[derive(Default, bevy_ecs::prelude::Resource)]
 pub struct WorldTimings {
     pub admission: Histogram,
     pub planning: Histogram,

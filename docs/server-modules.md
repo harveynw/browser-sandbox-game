@@ -15,21 +15,21 @@ flowchart TB
     persistence["persistence.rs: SQLite worker"]
     performance["performance.rs: timing histograms"]
     tick["tick.rs: ordered simulation tick"]
-    sessions["sessions.rs: admission, input, actions"]
+    sessions["sessions/mod.rs: admission, input, actions"]
     transport["transport.rs: Network"]
-    replication["replication.rs: visibility and output"]
+    replication["replication/mod.rs: visibility and output"]
     world["world.rs: players, vehicles, collision, content"]
 
     subgraph systems["systems/"]
         owners["mod.rs: Systems owns concrete systems"]
-        movement["movement.rs: MovementSystem"]
-        population["population.rs: PopulationSystem"]
+        movement["movement/mod.rs: MovementSystem"]
+        population["population/mod.rs: PopulationSystem"]
         combat["combat.rs: CombatSystem"]
         chat["chat.rs: ChatSystem"]
-        police["police.rs: PoliceSystem"]
-        missions["missions.rs: MissionSystem"]
-        repairs["repairs.rs: RepairSystem"]
-        police_tests["police_tests.rs: test-only child of police"]
+        police["police/mod.rs: PoliceSystem"]
+        missions["missions/mod.rs: MissionSystem"]
+        repairs["repairs/mod.rs: RepairSystem"]
+        police_tests["police/tests.rs: test-only child of police"]
     end
     subgraph entities["entities/"]
         entitymod["mod.rs: entity module declarations"]
@@ -81,4 +81,4 @@ flowchart TB
     police_tests -. exercises .-> police & world & owners
 ```
 
-Mission selection remains inside `MissionSystem`: `systems/missions/selection.rs` ranks authored options from the random instance ID, and `systems/missions/state.rs` owns objective progression, deadlines and mission views. `missions.rs` handles acceptance, recovery reservations and committed rewards. Neither sessions nor the frontend chooses random objectives.
+Mission selection remains inside `MissionSystem`: `systems/missions/selection.rs` ranks authored options from the random instance ID, and `systems/missions/state.rs` owns objective progression, deadlines and mission views. `missions/mod.rs` handles acceptance, recovery reservations and committed rewards. Neither sessions nor the frontend chooses random objectives.

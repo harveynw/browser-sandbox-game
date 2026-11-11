@@ -1,4 +1,7 @@
 use super::*;
+use server::entities::player::Player as PlayerComponent;
+use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::systems::police::Wanted as WantedComponent;
 fn job(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, name: &str) {
     vehicle_action(
         w,
@@ -12,7 +15,11 @@ fn job(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, name: &str) {
     );
 }
 fn car_at(w: &mut World, car: u32, pos: [f32; 3]) {
-    w.vehicles.get_mut(&car).unwrap().state.motor = sim_core::spawn_vehicle(pos, 0.0).unwrap();
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&car)
+        .unwrap()
+        .state
+        .motor = sim_core::spawn_vehicle(pos, 0.0).unwrap();
 }
 fn enter(
     w: &mut World,
@@ -36,7 +43,7 @@ fn enter(
     );
     step(w, a, t);
     assert_eq!(
-        w.vehicles[&car].state.driver_id,
+        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
         w.sessions.peers[&p].player
     );
 }
@@ -64,7 +71,11 @@ fn repair_setup() -> (World, Profiles, FakeTransport, PeerKey, String) {
     w.sessions.peers.get_mut(&p).unwrap().profile = Some(value);
     enter(&mut w, &mut a, &mut t, p, 1, 1);
     car_at(&mut w, 1, [220.0, 0.0, -180.0]);
-    w.vehicles.get_mut(&1).unwrap().state.health = VehicleHealth(50);
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&1)
+        .unwrap()
+        .state
+        .health = VehicleHealth(50);
     step(&mut w, &mut a, &mut t);
     (w, a, t, p, cookie)
 }
@@ -91,7 +102,7 @@ fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
         RepairPhase::Dwell
     );
     ticks(&mut w, &mut a, &mut t, p, 58);
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
@@ -101,9 +112,12 @@ fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
         w.sessions.peers[&p].repair_view.as_ref().unwrap().phase,
         RepairPhase::DebitPending
     );
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
     ticks(&mut w, &mut a, &mut t, p, 1);
-    assert_eq!(w.vehicles[&1].state.health.0, 100);
+    assert_eq!(
+        w.entities.view::<VehicleComponent>()[&1].state.health.0,
+        100
+    );
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         100
@@ -134,10 +148,14 @@ fn delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_ca
     join(&mut w, &mut a, &mut t, p, Some(&cookie));
     ready(&mut w, &mut a, &mut t, p);
     enter(&mut w, &mut a, &mut t, p, 2, 1);
-    w.vehicles.get_mut(&2).unwrap().state.health = VehicleHealth(35);
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&2)
+        .unwrap()
+        .state
+        .health = VehicleHealth(35);
     ticks(&mut w, &mut a, &mut t, p, 45);
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
-    assert_eq!(w.vehicles[&2].state.health.0, 35);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&2].state.health.0, 35);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
@@ -186,13 +204,16 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     place(&mut w, p, [0.0, 0.02, -256.0]);
     job(&w, &mut t, p, 1, "trial_city_ring");
     step(&mut w, &mut a, &mut t);
-    assert!(w.systems.missions.active[&w.sessions.peers[&p].player_id()].is_none());
+    assert!(
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+            .is_none()
+    );
     enter(&mut w, &mut a, &mut t, p, 1, 2);
     car_at(&mut w, 1, [0.0, 0.0, -256.0]);
     job(&w, &mut t, p, 3, "trial_city_ring");
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -201,7 +222,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     car_at(&mut w, 1, [0.0, 0.0, -256.0]);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -210,13 +231,14 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     car_at(&mut w, 1, [-256.0, 0.0, 128.0]);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
         1
     );
-    let selected_gates = match &w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let selected_gates = match &w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .objective
@@ -229,7 +251,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -267,10 +289,15 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         job(&w, &mut t, p, 1, "recovery_docks_quay");
         step(&mut w, &mut a, &mut t);
     }
-    assert!(w.systems.missions.active[&w.sessions.peers[&peer(8)].player_id()].is_none());
+    assert!(
+        w.entities.values::<server::metadata::PlayerMission>()
+            [&w.sessions.peers[&peer(8)].player_id()]
+            .is_none()
+    );
     let ids: BTreeSet<_> = (0..8)
         .map(|n| {
-            w.systems.missions.active[&w.sessions.peers[&peer(n)].player_id()]
+            w.entities.values::<server::metadata::PlayerMission>()
+                [&w.sessions.peers[&peer(n)].player_id()]
                 .as_ref()
                 .unwrap()
                 .reserved_vehicle
@@ -279,15 +306,15 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         .collect();
     assert_eq!(ids.len(), 8);
     assert_eq!(
-        w.systems
-            .population
-            .pools
+        w.entities
+            .values::<server::metadata::PoolMembership>()
             .values()
             .filter(|pool| **pool == server::systems::population::VehiclePool::Parked)
             .count(),
         24
     );
-    let car = w.systems.missions.active[&w.sessions.peers[&peer(0)].player_id()]
+    let car = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(0)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
@@ -305,30 +332,57 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         }),
     );
     step(&mut w, &mut a, &mut t);
-    assert!(w.vehicles[&car].state.driver_id.is_none());
+    assert!(
+        w.entities.view::<VehicleComponent>()[&car]
+            .state
+            .driver_id
+            .is_none()
+    );
     vehicle_action(&w, &mut t, peer(0), 2, 1, Action::CancelMission(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(!w.vehicles.contains_key(&car));
+    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
     place(&mut w, peer(8), [48.0, 0.02, -180.0]);
     job(&w, &mut t, peer(8), 3, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
-    assert!(w.systems.missions.active[&w.sessions.peers[&peer(8)].player_id()].is_some());
-    let disconnected = w.systems.missions.active[&w.sessions.peers[&peer(1)].player_id()]
+    assert!(
+        w.entities.values::<server::metadata::PlayerMission>()
+            [&w.sessions.peers[&peer(8)].player_id()]
+            .is_some()
+    );
+    let disconnected = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(1)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
     w.disconnect(peer(1), &mut a);
-    assert!(!w.vehicles.contains_key(&disconnected));
-    let destroyed = w.systems.missions.active[&w.sessions.peers[&peer(2)].player_id()]
+    assert!(
+        !w.entities
+            .view::<VehicleComponent>()
+            .contains_key(&disconnected)
+    );
+    let destroyed = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(2)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
-    w.vehicles.get_mut(&destroyed).unwrap().state.health = VehicleHealth(0);
-    w.vehicles.get_mut(&destroyed).unwrap().state.disabled = true;
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&destroyed)
+        .unwrap()
+        .state
+        .health = VehicleHealth(0);
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&destroyed)
+        .unwrap()
+        .state
+        .disabled = true;
     step(&mut w, &mut a, &mut t);
-    assert!(!w.vehicles.contains_key(&destroyed));
+    assert!(
+        !w.entities
+            .view::<VehicleComponent>()
+            .contains_key(&destroyed)
+    );
     assert_eq!(
         w.sessions.peers[&peer(2)]
             .profile
@@ -339,20 +393,31 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         0
     );
     let dead = w.sessions.peers[&peer(3)].player.unwrap().0;
-    let dead_car = w.systems.missions.active[&w.sessions.peers[&peer(3)].player_id()]
+    let dead_car = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(3)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
-    w.players.get_mut(&dead).unwrap().state.health = CharacterHealth(0);
+    w.entities
+        .get_mut_by_id::<PlayerComponent>(&dead)
+        .unwrap()
+        .state
+        .health = CharacterHealth(0);
     step(&mut w, &mut a, &mut t);
-    assert!(!w.vehicles.contains_key(&dead_car));
-    let expired = w.systems.missions.active[&w.sessions.peers[&peer(4)].player_id()]
+    assert!(
+        !w.entities
+            .view::<VehicleComponent>()
+            .contains_key(&dead_car)
+    );
+    let expired = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(4)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
-    let deadline = w.systems.missions.active[&w.sessions.peers[&peer(4)].player_id()]
+    let deadline = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&peer(4)].player_id()]
         .as_ref()
         .unwrap()
         .deadline;
@@ -361,7 +426,7 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         keep_alive(&w, &mut t, peer(n));
     }
     step(&mut w, &mut a, &mut t);
-    assert!(!w.vehicles.contains_key(&expired));
+    assert!(!w.entities.view::<VehicleComponent>().contains_key(&expired));
 }
 
 // Accept only the reserved recovery car and wait for a safe driver exit before completing garage delivery.
@@ -374,7 +439,8 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     job(&w, &mut t, p, 1, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
-    let car = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let car = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
@@ -383,7 +449,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     car_at(&mut w, 1, [-220.0, 0.0, 48.0]);
     ticks(&mut w, &mut a, &mut t, p, 31);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .dwell,
@@ -401,25 +467,31 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     car_at(&mut w, 1, [-152.0, 0.0, 176.0]);
     enter(&mut w, &mut a, &mut t, p, car, 4);
     car_at(&mut w, car, [-220.0, 0.0, 48.0]);
-    let offsets = w.vehicles[&car].template.exit_offsets.clone();
+    let offsets = w.entities.view::<VehicleComponent>()[&car]
+        .template
+        .exit_offsets
+        .clone();
     for (index, offset) in offsets.iter().enumerate() {
         let q = peer(index as u32 + 1);
         join(&mut w, &mut a, &mut t, q, None);
         ready(&mut w, &mut a, &mut t, q);
-        let mut pos = sim_core::anchor(&w.vehicles[&car].state.motor, *offset);
+        let mut pos = sim_core::anchor(
+            &w.entities.view::<VehicleComponent>()[&car].state.motor,
+            *offset,
+        );
         pos[1] = 0.02;
         place(&mut w, q, pos);
     }
     ticks(&mut w, &mut a, &mut t, p, 35);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
         server::systems::missions::Phase::Active
     );
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -435,7 +507,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     }
     ticks(&mut w, &mut a, &mut t, p, 2);
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -446,9 +518,17 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
         250
     );
     let owner = w.sessions.peers[&p].player.unwrap().0;
-    assert_eq!(w.players[&owner].state.mode, CharacterMode::OnFoot);
-    assert!(!w.vehicles.contains_key(&car));
-    let position = w.players[&owner].state.motor.position.0.map(|v| v.0);
+    assert_eq!(
+        w.entities.view::<PlayerComponent>()[&owner].state.mode,
+        CharacterMode::OnFoot
+    );
+    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
+    let position = w.entities.view::<PlayerComponent>()[&owner]
+        .state
+        .motor
+        .position
+        .0
+        .map(|v| v.0);
     assert!(
         (position[0] + 220.0).hypot(position[2] - 48.0) < 5.0,
         "delivery must use a door, never a remote spawn"
@@ -460,13 +540,25 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
 fn repair_rejects_heat_and_funds_and_cancels_interrupted_dwell_without_debit() {
     let (mut w, mut a, mut t, p, _) = repair_setup();
     let id = w.sessions.peers[&p].player_id();
-    w.systems.police.wanted_mut(id).heat = 1;
-    w.systems.police.wanted_mut(id).pursuit = Pursuit::Pursuing;
+    w.entities
+        .get_mut_by_id::<WantedComponent>(&(id))
+        .expect("admitted wanted state")
+        .heat = 1;
+    w.entities
+        .get_mut_by_id::<WantedComponent>(&(id))
+        .expect("admitted wanted state")
+        .pursuit = Pursuit::Pursuing;
     repair(&w, &mut t, p, 2);
     step(&mut w, &mut a, &mut t);
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==2 && r.code==ActionCode::PursuitActive)));
-    w.systems.police.wanted_mut(id).heat = 0;
-    w.systems.police.wanted_mut(id).pursuit = Pursuit::Clear;
+    w.entities
+        .get_mut_by_id::<WantedComponent>(&(id))
+        .expect("admitted wanted state")
+        .heat = 0;
+    w.entities
+        .get_mut_by_id::<WantedComponent>(&(id))
+        .expect("admitted wanted state")
+        .pursuit = Pursuit::Clear;
     w.sessions
         .peers
         .get_mut(&p)
@@ -499,7 +591,7 @@ fn repair_rejects_heat_and_funds_and_cancels_interrupted_dwell_without_debit() {
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
     );
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
 }
 
 // Release ownership and the reserved slot when cancelling a driven recovery, without rewarding the player.
@@ -512,7 +604,8 @@ fn cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward() {
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     job(&w, &mut t, p, 1, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
-    let car = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let car = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
@@ -521,11 +614,11 @@ fn cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward() {
     let epoch = w.sessions.peers[&p].epoch;
     vehicle_action(&w, &mut t, p, 3, epoch, Action::CancelMission(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(!w.vehicles.contains_key(&car));
+    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
     assert_eq!(w.sessions.peers[&p].epoch, epoch + 1);
     assert_eq!(w.sessions.peers[&p].profile.as_ref().unwrap().credits.0, 0);
     assert_eq!(
-        w.players[&w.sessions.peers[&p].player.unwrap().0]
+        w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0]
             .state
             .mode,
         CharacterMode::OnFoot
@@ -553,7 +646,11 @@ fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards
         let accepted_at = w.tick;
         job(&w, &mut transport, p, 1, "courier_quay_market");
         step(&mut w, &mut profiles, &mut transport);
-        let mission = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        let mission = w
+            .entities
+            .values::<server::metadata::PlayerMission>()
+            .get(&w.sessions.peers[&p].player_id())
+            .unwrap()
             .as_ref()
             .unwrap();
         assert_eq!(mission.variant_index, Some(0));
@@ -581,7 +678,8 @@ fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards
         job(&w, &mut transport, p, 1, "courier_quay_market");
         step(&mut w, &mut profiles, &mut transport);
         assert_eq!(
-            w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+            w.entities.values::<server::metadata::PlayerMission>()
+                [&w.sessions.peers[&p].player_id()]
                 .as_ref()
                 .unwrap()
                 .id,

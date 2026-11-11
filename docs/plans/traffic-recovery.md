@@ -12,12 +12,12 @@ This is an implementation plan, not an implemented change. The current working t
 
 Paths below are relative to the repository root.
 
-- `crates/server/src/systems/population.rs`: `Traffic`, `TrafficPhase`, `Navigation`, `Intersections`, `PopulationSystem::{direct, decide, vehicle_input, release_ai}` and existing tests.
-- `crates/server/src/systems/movement.rs`: AI decisions precede authoritative motor integration; `vehicle_input` supplies inputs to the shared motor.
+- `crates/server/src/systems/population/mod.rs`: `Traffic`, `TrafficPhase`, `Navigation`, `Intersections`, `PopulationSystem::{direct, decide, vehicle_input, release_ai}` and existing tests.
+- `crates/server/src/systems/movement/mod.rs`: AI decisions precede authoritative motor integration; `vehicle_input` supplies inputs to the shared motor.
 - `crates/sim-core/src/collision.rs`: vehicle shapes, collision/sweep queries and character shapes.
 - `crates/sim-core/src/`: shared vehicle motor, including steering, braking and reverse semantics. Verify these before implementing recovery inputs.
 - `crates/content/src/` and the loaded manifest: road graph, directed edges, lane geometry and parking destinations.
-- `crates/server/src/systems/police.rs`: independently controlled vehicles that must remain physical obstacles.
+- `crates/server/src/systems/police/mod.rs`: independently controlled vehicles that must remain physical obstacles.
 
 Observed behaviour:
 
@@ -43,7 +43,7 @@ These rules allow a reservation holder to be physically blocked by another vehic
 
 ## Proposed state and ownership
 
-Keep the traffic controller server-owned. Extract a focused traffic/intersection module if it makes `population.rs` easier to maintain; avoid a general-purpose scheduling framework.
+Keep the traffic controller server-owned. Extract a focused traffic/intersection module if it makes `population/mod.rs` easier to maintain; avoid a general-purpose scheduling framework.
 
 Suggested structures (names can follow repository conventions):
 

@@ -2,13 +2,35 @@
 //! Vehicle state and safe possession geometry. Transactions are owned by World.
 use protocol::{EntityId, VehicleState};
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
+#[derive(bevy_ecs::prelude::Component, Clone)]
 pub struct Vehicle {
     pub id: EntityId,
-    pub template: content::VehicleTemplate,
+    /// Immutable authored geometry/mechanics shared with read-only AI observations.
+    pub template: std::sync::Arc<content::VehicleTemplate>,
     pub state: VehicleState,
     pub idle_ticks: u32,
 }
 impl Vehicle {
+    pub(crate) fn apply_damage(
+        &mut self,
+        amount: u16,
+        attacker: Option<protocol::EntityId>,
+    ) -> bool {
+        if self.state.disabled
+            || self.state.health.0 == 0
+            || attacker.is_some_and(|a| self.state.driver_id.is_some_and(|driver| driver != a))
+        {
+            return false;
+        }
+        self.state.health.0 = self.state.health.0.saturating_sub(amount);
+        self.idle_ticks = 0;
+        if self.state.health.0 == 0 {
+            self.state.disabled = self.state.driver_id.is_none();
+            self.stop();
+        }
+        true
+    }
+
     pub fn stop(&mut self) {
         self.state.motor.speed = protocol::Scalar(0.0);
         self.state.motor.velocity = protocol::Vec3([protocol::Scalar(0.0); 3]);

@@ -328,12 +328,12 @@ fn only_one_worker_can_own_a_database_and_recovery_does_not_run_in_a_second_serv
 
 #[test]
 fn durable_http_admission_returns_pending_cookie_then_only_committed_profile() {
-    use server::{content_loader::WorldContent, control::Control, world::World};
+    use server::{content_loader::WorldContent, control::Control, world};
     let db = Database::new();
     let root =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
-    let world = World::new(WorldContent::load(&root).unwrap()).unwrap();
-    let mut c = Control::new(&world);
+    let hello = world::build(&WorldContent::load(&root).unwrap());
+    let mut c = Control::new(hello);
     c.profiles = Profiles::sqlite(&db.0).unwrap();
     let r = c.route(
         "POST",

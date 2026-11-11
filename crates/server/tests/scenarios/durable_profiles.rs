@@ -1,4 +1,7 @@
 use super::*;
+use server::entities::player::Player as PlayerComponent;
+use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::systems::police::Wanted as WantedComponent;
 use std::{
     thread,
     time::{Duration, Instant},
@@ -111,9 +114,16 @@ fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() 
         }),
     );
     step(&mut w, &mut a, &mut t);
-    w.vehicles.get_mut(&1).unwrap().state.motor =
-        sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
-    w.vehicles.get_mut(&1).unwrap().state.health = VehicleHealth(50);
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&1)
+        .unwrap()
+        .state
+        .motor = sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&1)
+        .unwrap()
+        .state
+        .health = VehicleHealth(50);
     let c = rusqlite::Connection::open(&db.0).unwrap();
     c.execute_batch("BEGIN IMMEDIATE").unwrap();
     vehicle_action(
@@ -154,7 +164,7 @@ fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() 
     for _ in 0..5 {
         pump(&mut w, &mut a, &mut t, p);
     }
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
     persistent_join(&mut w, &mut a, &mut t, p, Some(&cookie));
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
@@ -208,9 +218,16 @@ fn sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart(
         }),
     );
     step(&mut w, &mut a, &mut t);
-    w.vehicles.get_mut(&1).unwrap().state.motor =
-        sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
-    w.vehicles.get_mut(&1).unwrap().state.health = VehicleHealth(50);
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&1)
+        .unwrap()
+        .state
+        .motor = sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
+    w.entities
+        .get_mut_by_id::<VehicleComponent>(&1)
+        .unwrap()
+        .state
+        .health = VehicleHealth(50);
     vehicle_action(
         &w,
         &mut t,
@@ -225,13 +242,13 @@ fn sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart(
         keep_alive(&w, &mut t, p);
         step(&mut w, &mut a, &mut t);
     }
-    assert_eq!(w.vehicles[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
     );
     let until = Instant::now() + Duration::from_secs(3);
-    while w.vehicles[&1].state.health.0 < 100 {
+    while w.entities.view::<VehicleComponent>()[&1].state.health.0 < 100 {
         assert!(Instant::now() < until);
         pump(&mut w, &mut a, &mut t, p);
     }
@@ -293,16 +310,19 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         }),
     );
     step(&mut w, &mut a, &mut t);
-    let instance = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let instance = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .id
         .clone();
-    let reward = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let reward = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .reward;
-    let target = w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+    let target = w.entities.values::<server::metadata::PlayerMission>()
+        [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .target;
@@ -314,7 +334,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -333,7 +353,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         pump(&mut w, &mut a, &mut t, p);
     }
     assert_eq!(
-        w.systems.missions.active[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -366,13 +386,16 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
             .completed_jobs,
         1
     );
-    assert!(w.systems.missions.active[&w.sessions.peers[&p].player_id()].is_none());
+    assert!(
+        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+            .is_none()
+    );
     assert_eq!(
-        w.systems.police.wanted[&w.sessions.peers[&p].player_id()].heat,
+        w.entities.view::<WantedComponent>()[&w.sessions.peers[&p].player_id()].heat,
         0
     );
     assert_eq!(
-        w.players[&w.sessions.peers[&p].player.unwrap().0]
+        w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0]
             .state
             .mode,
         CharacterMode::OnFoot

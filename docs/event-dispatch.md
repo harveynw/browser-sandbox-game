@@ -158,13 +158,13 @@ Only selected profile/economic changes take this route. Normal movement, shots, 
 
 - `crates/server/src/main.rs`: loop polling, scheduler and final network flush.
 - `crates/server/src/transport.rs`: adapter events, generations, ingress/output buffers, poll/drain/send/flush.
-- `crates/server/src/sessions.rs`: session lifecycle, message match, staging and action dispatch.
+- `crates/server/src/sessions/mod.rs`: session lifecycle, message match, staging and action dispatch.
 - `crates/server/src/tick.rs`: fixed gameplay order.
 - `crates/server/src/systems/mod.rs`: concrete system resources; no dynamic scheduler.
-- `crates/server/src/systems/movement.rs`: consumes tick-indexed inputs and writes authoritative motor state.
+- `crates/server/src/systems/movement/mod.rs`: consumes tick-indexed inputs and writes authoritative motor state.
 - `crates/server/src/systems/combat.rs`: direct mutations/reactions and new outbound WorldEvents.
 - `crates/server/src/systems/chat.rs`: retained chat history, join/leave tracking and reliable broadcasts.
-- `crates/server/src/replication.rs`: envelope outbox, derived state publishing, visibility and budgets.
+- `crates/server/src/replication/mod.rs`: envelope outbox, derived state publishing, visibility and budgets.
 - `crates/server/src/admission.rs`, `persistence.rs`: profile cache, worker commands and completions.
 - `apps/client/src/net/session.ts`, `world/replica.ts`: client message dispatch, event deduplication and replicated samples.
 - Pinned net source: `src/queue.rs`, `src/server/mod.rs`, `src/server/connection.rs` in the Cargo git checkout for revision `a255164`.

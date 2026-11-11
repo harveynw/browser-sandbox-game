@@ -1,20 +1,36 @@
 //! Gameplay systems own rule-specific bookkeeping, separately from world entities.
+pub(crate) mod planning;
+#[cfg(test)]
+use crate::entities::vehicle::Vehicle as VehicleComponent;
+#[cfg(test)]
 use std::result::Result;
 pub mod chat;
 pub mod combat;
+pub(crate) mod impact;
+pub(crate) mod impact_consequences;
+pub(crate) mod lifecycle;
 pub mod missions;
 pub mod movement;
 pub mod police;
 pub mod population;
 pub mod repairs;
+pub(crate) mod weapons;
+#[cfg(test)]
 use crate::world::World;
+#[cfg(test)]
 use combat::CombatSystem;
+#[cfg(test)]
 use missions::MissionSystem;
+#[cfg(test)]
 use movement::MovementSystem;
+#[cfg(test)]
 use police::PoliceSystem;
+#[cfg(test)]
 use population::PopulationSystem;
+#[cfg(test)]
 use repairs::RepairSystem;
-/// Concrete resources passed to the tick in an explicit order; no dynamic scheduler.
+/// Owned resource bundle used only by scenario fixtures.
+#[cfg(test)]
 pub struct Systems {
     pub chat: chat::ChatSystem,
     pub movement: MovementSystem,
@@ -24,6 +40,7 @@ pub struct Systems {
     pub population: PopulationSystem,
     pub repairs: RepairSystem,
 }
+#[cfg(test)]
 impl Systems {
     pub fn new(
         world: &mut World,
@@ -32,11 +49,29 @@ impl Systems {
         let population = PopulationSystem::new(
             &world.content.manifest,
             &world.content.config,
-            world.vehicles.keys().copied(),
+            world
+                .entities
+                .view::<VehicleComponent>()
+                .keys()
+                .copied()
+                .collect::<Vec<_>>()
+                .into_iter(),
             424242,
+            &mut world.entities,
         )?;
-        let mut police = PoliceSystem::new(&world.content.manifest);
-        for (&id, car) in &world.vehicles {
+        let police = PoliceSystem::new(&world.content.manifest);
+        for id in world
+            .entities
+            .view::<VehicleComponent>()
+            .keys()
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            let car = world
+                .entities
+                .view::<VehicleComponent>()
+                .get(&id)
+                .expect("parked vehicle");
             if world.content.manifest.parking.iter().any(|slot| {
                 slot.secured
                     && police::distance(
@@ -44,7 +79,7 @@ impl Systems {
                         car.state.motor.position.0.map(|v| v.0),
                     ) < 0.1
             }) {
-                police.secured.insert(id);
+                world.entities.insert(id, crate::metadata::SecuredVehicle);
             }
         }
         let mut systems = Self {
@@ -63,3 +98,5 @@ impl Systems {
         Ok(systems)
     }
 }
+
+pub(crate) mod startup;

@@ -22,8 +22,8 @@ Port Meridian is an original third-person multiplayer browser game set in a comp
 Install **Node 24**, Rustup and the pinned tools:
 
 ```sh
-rustup toolchain install 1.94.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
-cargo +1.94.0 install wasm-bindgen-cli --version 0.2.129 --locked
+rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy --target wasm32-unknown-unknown
+cargo +1.95.0 install wasm-bindgen-cli --version 0.2.129 --locked
 npm ci
 npm run dev:all
 ```

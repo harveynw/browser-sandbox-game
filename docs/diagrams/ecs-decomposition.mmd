@@ -1,0 +1,12 @@
+%% Focused system decomposition after the completed native ECS migration.
+flowchart TD
+  Publication["✓ Replication publication<br/>Map, visibility, owners, snapshots, status, commit"]
+  Population["✓ Population<br/>Route planning, driving, pedestrian decisions"]
+  Driving["✓ Police driving<br/>Goals, routing, steering, obstacles, recovery"]
+  Perception["✓ Police perception<br/>Crimes, visibility, arrest eligibility, pursuit"]
+  Repairs["✓ Repairs<br/>Results, transitions, submission, status"]
+  Missions["✓ Missions<br/>Objectives, recovery retirement, rewards, cleanup"]
+  Browser["Ready for final browser testing"]
+  Publication --> Population --> Driving --> Perception --> Repairs --> Missions --> Browser
+  classDef complete fill:#d5f5df,stroke:#278344
+  class Publication,Population,Driving,Perception,Repairs,Missions complete

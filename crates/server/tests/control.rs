@@ -1,5 +1,5 @@
 use protocol::DisplayName;
-use server::{admission::Profiles, content_loader::WorldContent, control::Control, world::World};
+use server::{admission::Profiles, content_loader::WorldContent, control::Control, world};
 use std::path::Path;
 #[test]
 fn tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret() {
@@ -40,8 +40,8 @@ fn localhost_origin_cookie_json_and_expiring_readiness_gates_are_explicit() {
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
     )
     .unwrap();
-    let world = World::new(content).unwrap();
-    let mut c = Control::new(&world);
+    let hello = world::build(&content);
+    let mut c = Control::new(hello);
     assert_eq!(
         c.route("POST", "/api/session", None, None, b"{}", 0).code,
         403
@@ -187,7 +187,7 @@ fn appearance_requires_guest_cookie_origin_and_valid_rgb_without_touching_other_
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
     )
     .unwrap();
-    let mut control = Control::new(&World::new(content).unwrap());
+    let mut control = Control::new(world::build(&content));
     let (old, cookie) = control.profiles.session(None).unwrap();
     let cookie = cookie.unwrap();
     let (other, other_cookie) = control.profiles.session(None).unwrap();

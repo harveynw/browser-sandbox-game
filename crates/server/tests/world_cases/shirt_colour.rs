@@ -1,4 +1,5 @@
 use super::*;
+use server::entities::player::Player as PlayerComponent;
 fn join_with_colour(
     w: &mut World,
     a: &mut Profiles,
@@ -43,7 +44,10 @@ fn tshirt_colour_is_committed_and_replicated_to_other_guests_and_resyncs() {
         a.profile(Some(&cookie)).unwrap().tshirt_colour,
         TshirtColour(0x1256ab)
     );
-    assert_eq!(w.core.players[&id].tshirt_colour, TshirtColour(0x1256ab));
+    assert_eq!(
+        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        TshirtColour(0x1256ab)
+    );
     t.sent.clear();
     join_with_colour(&mut w, &mut a, &mut t, q, None, 0xff0044);
     ready(&mut w, &mut a, &mut t, q);
@@ -86,10 +90,16 @@ fn live_tshirt_change_refreshes_every_observer_without_losing_inputs_or_epoch() 
     a.update_tshirt_colour(Some(&cookie), TshirtColour(0x22cc66))
         .unwrap()
         .unwrap();
-    assert_eq!(w.core.players[&id].tshirt_colour, TshirtColour(0x1256ab));
+    assert_eq!(
+        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        TshirtColour(0x1256ab)
+    );
     t.sent.clear();
     step(&mut w, &mut a, &mut t);
-    assert_eq!(w.core.players[&id].tshirt_colour, TshirtColour(0x22cc66));
+    assert_eq!(
+        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        TshirtColour(0x22cc66)
+    );
     assert_eq!(w.sessions.peers[&p].epoch, epoch);
     assert!(w.sessions.peers[&p].inputs.contains_key(&future));
     assert!(w.sessions.peers[&p].visible[&id] > before_p);

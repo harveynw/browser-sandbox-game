@@ -1,0 +1,378 @@
+{
+  "date": "2026-11-06",
+  "baseline_commit": "745b409",
+  "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "platform": "macOS-14.5-arm64-arm-64bit",
+  "workload": "16 synthetic players; 90 measured ticks; 480 shots; memory-backed profiles; identical regression map; one warmup, seven alternating release runs per variant",
+  "notes": [
+    "Rust 1.95 used for both variants to isolate ECS changes.",
+    "Shared developer machine; not a capacity or sustained soak qualification.",
+    "Peak RSS measured with macOS /usr/bin/time -l; includes the test process.",
+    "Timings are medians of per-run percentiles, not pooled samples."
+  ],
+  "runs": [
+    {
+      "variant": "baseline",
+      "round": 0,
+      "max_rss_bytes": 10846208,
+      "tick_p50_ms": 1.304,
+      "tick_p95_ms": 3.861,
+      "tick_max_ms": 4.349,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 0,
+      "max_rss_bytes": 12681216,
+      "tick_p50_ms": 1.518,
+      "tick_p95_ms": 4.049,
+      "tick_max_ms": 4.342,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 1,
+      "max_rss_bytes": 12107776,
+      "tick_p50_ms": 1.523,
+      "tick_p95_ms": 4.06,
+      "tick_max_ms": 4.498,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 1,
+      "max_rss_bytes": 11927552,
+      "tick_p50_ms": 1.288,
+      "tick_p95_ms": 4.049,
+      "tick_max_ms": 4.475,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 2,
+      "max_rss_bytes": 10354688,
+      "tick_p50_ms": 1.29,
+      "tick_p95_ms": 3.878,
+      "tick_max_ms": 4.36,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 2,
+      "max_rss_bytes": 12713984,
+      "tick_p50_ms": 1.501,
+      "tick_p95_ms": 4.075,
+      "tick_max_ms": 4.4,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 3,
+      "max_rss_bytes": 11993088,
+      "tick_p50_ms": 1.492,
+      "tick_p95_ms": 4.0,
+      "tick_max_ms": 4.598,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 3,
+      "max_rss_bytes": 10272768,
+      "tick_p50_ms": 1.318,
+      "tick_p95_ms": 3.872,
+      "tick_max_ms": 4.388,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 4,
+      "max_rss_bytes": 11223040,
+      "tick_p50_ms": 1.336,
+      "tick_p95_ms": 3.908,
+      "tick_max_ms": 4.281,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 4,
+      "max_rss_bytes": 12582912,
+      "tick_p50_ms": 1.478,
+      "tick_p95_ms": 4.036,
+      "tick_max_ms": 4.395,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 5,
+      "max_rss_bytes": 12304384,
+      "tick_p50_ms": 1.501,
+      "tick_p95_ms": 4.109,
+      "tick_max_ms": 4.601,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 5,
+      "max_rss_bytes": 11091968,
+      "tick_p50_ms": 1.268,
+      "tick_p95_ms": 3.902,
+      "tick_max_ms": 4.437,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "baseline",
+      "round": 6,
+      "max_rss_bytes": 10698752,
+      "tick_p50_ms": 1.295,
+      "tick_p95_ms": 3.873,
+      "tick_max_ms": 4.173,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    },
+    {
+      "variant": "ecs",
+      "round": 6,
+      "max_rss_bytes": 11583488,
+      "tick_p50_ms": 1.501,
+      "tick_p95_ms": 4.106,
+      "tick_max_ms": 4.606,
+      "aggregate_json_egress_bytes_per_second": 1313906.0
+    }
+  ],
+  "median": {
+    "baseline": {
+      "tick_p50_ms": 1.295,
+      "tick_p95_ms": 3.878,
+      "tick_max_ms": 4.36,
+      "aggregate_json_egress_bytes_per_second": 1313906.0,
+      "max_rss_bytes": 10846208
+    },
+    "ecs": {
+      "tick_p50_ms": 1.501,
+      "tick_p95_ms": 4.06,
+      "tick_max_ms": 4.498,
+      "aggregate_json_egress_bytes_per_second": 1313906.0,
+      "max_rss_bytes": 12304384
+    }
+  },
+  "trace": {
+    "records": 9118,
+    "equal": true,
+    "sha256": "edfe1f1a7be944c838b70ca7d6f25caf1641fc8bd45cf309a0e896ebd60b4736",
+    "normalization": "Only world_id and session_id values replaced by null; entity state, message content, peer identity, delivery and ordering retained."
+  },
+  "before_template_sharing": {
+    "regression": {
+      "baseline": {
+        "tick_p50_ms": 1.253,
+        "tick_p95_ms": 3.706,
+        "tick_max_ms": 4.056,
+        "aggregate_json_egress_bytes_per_second": 1313906.0,
+        "max_rss_bytes": 10420224
+      },
+      "ecs": {
+        "tick_p50_ms": 1.452,
+        "tick_p95_ms": 3.859,
+        "tick_max_ms": 4.413,
+        "aggregate_json_egress_bytes_per_second": 1313906.0,
+        "max_rss_bytes": 11812864
+      }
+    },
+    "full_city": {
+      "baseline": {
+        "tick_p50_ms": 1.564,
+        "tick_p95_ms": 4.316,
+        "tick_max_ms": 6.849,
+        "aggregate_json_egress_bytes_per_second": 1320031.0,
+        "max_rss_bytes": 15745024
+      },
+      "ecs": {
+        "tick_p50_ms": 1.893,
+        "tick_p95_ms": 4.77,
+        "tick_max_ms": 7.139,
+        "aggregate_json_egress_bytes_per_second": 1320031.0,
+        "max_rss_bytes": 16809984
+      }
+    }
+  },
+  "full_city": {
+    "date": "2026-11-06",
+    "baseline_commit": "745b409",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "platform": "macOS-14.5-arm64-arm-64bit",
+    "workload": "16 synthetic players; 90 measured ticks; 480 shots; memory-backed profiles; identical full city with ambient traffic/pedestrians and patrols; one warmup, seven alternating release runs per variant",
+    "notes": [
+      "Rust 1.95 used for both variants to isolate ECS changes.",
+      "Shared developer machine; not a capacity or sustained soak qualification.",
+      "Peak RSS measured with macOS /usr/bin/time -l; includes the test process.",
+      "Timings are medians of per-run percentiles, not pooled samples."
+    ],
+    "runs": [
+      {
+        "variant": "baseline",
+        "round": 0,
+        "max_rss_bytes": 15368192,
+        "tick_p50_ms": 1.589,
+        "tick_p95_ms": 4.566,
+        "tick_max_ms": 7.261,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 0,
+        "max_rss_bytes": 16285696,
+        "tick_p50_ms": 1.897,
+        "tick_p95_ms": 4.907,
+        "tick_max_ms": 7.543,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 1,
+        "max_rss_bytes": 16613376,
+        "tick_p50_ms": 1.83,
+        "tick_p95_ms": 4.748,
+        "tick_max_ms": 9.759,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 1,
+        "max_rss_bytes": 15335424,
+        "tick_p50_ms": 1.586,
+        "tick_p95_ms": 4.434,
+        "tick_max_ms": 6.828,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 2,
+        "max_rss_bytes": 14270464,
+        "tick_p50_ms": 1.592,
+        "tick_p95_ms": 4.35,
+        "tick_max_ms": 6.821,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 2,
+        "max_rss_bytes": 15597568,
+        "tick_p50_ms": 1.823,
+        "tick_p95_ms": 4.726,
+        "tick_max_ms": 8.043,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 3,
+        "max_rss_bytes": 15761408,
+        "tick_p50_ms": 1.848,
+        "tick_p95_ms": 4.66,
+        "tick_max_ms": 7.131,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 3,
+        "max_rss_bytes": 14483456,
+        "tick_p50_ms": 1.596,
+        "tick_p95_ms": 4.396,
+        "tick_max_ms": 7.052,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 4,
+        "max_rss_bytes": 15089664,
+        "tick_p50_ms": 1.588,
+        "tick_p95_ms": 4.376,
+        "tick_max_ms": 7.5,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 4,
+        "max_rss_bytes": 17006592,
+        "tick_p50_ms": 1.855,
+        "tick_p95_ms": 4.635,
+        "tick_max_ms": 7.405,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 5,
+        "max_rss_bytes": 16859136,
+        "tick_p50_ms": 1.828,
+        "tick_p95_ms": 4.604,
+        "tick_max_ms": 7.155,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 5,
+        "max_rss_bytes": 15450112,
+        "tick_p50_ms": 1.551,
+        "tick_p95_ms": 4.415,
+        "tick_max_ms": 7.221,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "baseline",
+        "round": 6,
+        "max_rss_bytes": 15237120,
+        "tick_p50_ms": 1.572,
+        "tick_p95_ms": 4.398,
+        "tick_max_ms": 7.007,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      },
+      {
+        "variant": "ecs",
+        "round": 6,
+        "max_rss_bytes": 14434304,
+        "tick_p50_ms": 1.861,
+        "tick_p95_ms": 4.586,
+        "tick_max_ms": 7.177,
+        "aggregate_json_egress_bytes_per_second": 1320031.0
+      }
+    ],
+    "median": {
+      "baseline": {
+        "tick_p50_ms": 1.588,
+        "tick_p95_ms": 4.398,
+        "tick_max_ms": 7.052,
+        "aggregate_json_egress_bytes_per_second": 1320031.0,
+        "max_rss_bytes": 15237120
+      },
+      "ecs": {
+        "tick_p50_ms": 1.848,
+        "tick_p95_ms": 4.66,
+        "tick_max_ms": 7.405,
+        "aggregate_json_egress_bytes_per_second": 1320031.0,
+        "max_rss_bytes": 16285696
+      }
+    },
+    "trace": {
+      "records": 9278,
+      "equal": true,
+      "sha256": "b262c65691edc3f069cdb739ee796d9d823cc5475ac979478b2ae6b5455672c8",
+      "normalization": "Only world_id and session_id values replaced by null; entity state, message content, peer identity, delivery and ordering retained."
+    },
+    "actor_counts_first": {
+      "vehicle": 26,
+      "police": 4,
+      "player": 16,
+      "pedestrian": 26
+    },
+    "actor_counts_last": {
+      "vehicle": 40,
+      "police": 8,
+      "player": 16,
+      "pedestrian": 32
+    }
+  },
+  "checks": {
+    "server_clippy_new_findings": [],
+    "server_clippy_preexisting": 19,
+    "format_preexisting": ["level-editor.html", "previous.html"]
+  },
+  "optimization": "Vehicle components share immutable authored templates through Arc; AI observation snapshots no longer deep-copy template vectors/strings."
+}
