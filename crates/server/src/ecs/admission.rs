@@ -9,15 +9,14 @@ pub(super) struct AdmissionSchedules {
     appearance: Schedule,
 }
 fn protocol_checkpoint() -> bevy_ecs::schedule::ScheduleConfigs<bevy_ecs::system::ScheduleSystem> {
-    use crate::sessions::{ingress as protocol, native};
+    use crate::sessions::ingress as protocol;
     (
         protocol::replace_guests,
-        native::disconnect_requested,
-        native::retire_disconnects,
+        crate::ecs::checkpoints::disconnects(),
         protocol::admit,
         protocol::baselines,
-        native::disconnect_requested,
-        native::retire_disconnects,
+        crate::ecs::checkpoints::ready(),
+        crate::ecs::checkpoints::disconnects(),
         crate::systems::missions::native::refresh_proxies,
         protocol::retire,
     )
@@ -30,8 +29,7 @@ impl Default for AdmissionSchedules {
         begin.add_systems(
             (
                 protocol::drain,
-                native::disconnect_requested,
-                native::retire_disconnects,
+                crate::ecs::checkpoints::disconnects(),
                 crate::systems::missions::native::refresh_proxies,
                 protocol::open,
             )

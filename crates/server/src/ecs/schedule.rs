@@ -126,8 +126,7 @@ pub(crate) fn build() -> Schedule {
     schedule.add_systems(
         (
             crate::sessions::native::failed_motors,
-            crate::sessions::native::disconnect_requested.run_if(crate::ecs::healthy),
-            crate::sessions::native::retire_disconnects,
+            crate::ecs::checkpoints::disconnects().run_if(crate::ecs::healthy),
             crate::systems::missions::native::refresh_proxies.run_if(crate::ecs::healthy),
         )
             .chain()

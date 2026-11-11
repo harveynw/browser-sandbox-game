@@ -1,9 +1,9 @@
 //! Native impact calculation and health systems; control/replication consequences follow.
 use crate::{
+    components::{Pedestrian, Vehicle},
     ecs::runtime::Scratch,
     ecs::state::Clock,
     ecs::{GameId, TickOutcome},
-    entities::{pedestrian::Pedestrian, vehicle::Vehicle},
     gameplay_messages::{PedestrianImpactDamage, VehicleContactDamage, VehicleImpact},
 };
 use bevy_ecs::prelude::*;
@@ -137,7 +137,7 @@ pub(crate) struct DamageActors<'w, 's> {
         ),
     >,
     pedestrians: Query<'w, 's, (&'static GameId, &'static mut Pedestrian)>,
-    players: Query<'w, 's, &'static crate::entities::player::Player>,
+    players: Query<'w, 's, &'static crate::components::Player>,
     index: Res<'w, crate::ecs::EntityIndex>,
     collision: NonSend<'w, crate::ecs::state::Collision>,
     clock: Res<'w, Clock>,
@@ -195,13 +195,13 @@ impl DamageActors<'_, '_> {
         attacker: Option<protocol::EntityId>,
     ) -> Option<([f32; 3], bool)> {
         let (_, mut car, police) = self.cars.get_mut(entity).ok()?;
-        if !car.apply_damage(amount, attacker) {
+        if !crate::systems::damage::vehicle_damage(&mut car, amount, attacker) {
             return None;
         }
         if car.state.health.0 == 0 {
             self.commands
                 .entity(entity)
-                .insert_if_new(crate::metadata::DisabledVehicle((
+                .insert_if_new(crate::components::DisabledVehicle((
                     self.clock.0.saturating_add(900),
                     0,
                 )));
@@ -301,13 +301,13 @@ pub(crate) fn apply_pedestrian_damage(
         if id.0 != impact.pedestrian {
             continue;
         }
-        ped.apply_damage(impact.damage);
+        crate::systems::damage::pedestrian_damage(&mut ped, impact.damage);
         let position = ped.state.motor.position.0.map(|v| v.0);
         if ped.state.health.0 == 0 {
             actors
                 .commands
                 .entity(impact.pedestrian_entity)
-                .insert_if_new(crate::metadata::Incapacitated(
+                .insert_if_new(crate::components::Incapacitated(
                     impact.tick.saturating_add(300),
                 ));
         }
@@ -338,8 +338,8 @@ pub(crate) fn apply_pedestrian_damage(
 mod health_tests {
     use super::*;
     use crate::{
+        components::{DisabledVehicle, Incapacitated},
         gameplay_messages::ImpactApplied,
-        metadata::{DisabledVehicle, Incapacitated},
     };
     use protocol::*;
 

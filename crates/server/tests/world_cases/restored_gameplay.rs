@@ -1,8 +1,8 @@
 //! Restored gameplay scenarios against concrete system owners.
 
 use super::*;
-use server::entities::player::Player as PlayerComponent;
-use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::components::Player as PlayerComponent;
+use server::components::Vehicle as VehicleComponent;
 use server::systems::police::Officer as OfficerComponent;
 use server::systems::police::Unit as PoliceUnitComponent;
 use server::systems::police::Wanted as WantedComponent;
@@ -20,14 +20,14 @@ fn courier_acceptance_is_private_scoped_cached_and_survives_resync() {
     courier_action(&w, &mut t, p, 1);
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.code==ActionCode::OutOfRange)));
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     courier_action(&w, &mut t, p, 2);
     step(&mut w, &mut a, &mut t);
-    let instance = w.entities.values::<server::metadata::PlayerMission>()
+    let instance = w.entities.values::<server::components::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -36,7 +36,7 @@ fn courier_acceptance_is_private_scoped_cached_and_survives_resync() {
     courier_action(&w, &mut t, p, 2);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .id,
@@ -56,7 +56,7 @@ fn courier_acceptance_is_private_scoped_cached_and_survives_resync() {
     step(&mut w, &mut a, &mut t);
     ready(&mut w, &mut a, &mut t, p);
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .id,
@@ -76,7 +76,7 @@ fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoi
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     courier_action(&w, &mut t, p, 1);
     step(&mut w, &mut a, &mut t);
-    let instance = w.entities.values::<server::metadata::PlayerMission>()
+    let instance = w.entities.values::<server::components::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -90,7 +90,7 @@ fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoi
     place(&mut w, p, [-44.0, 0.02, 60.0]);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .dwell,
@@ -103,7 +103,7 @@ fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoi
     let profile = a.profile(Some(&cookie)).unwrap();
     assert_eq!((profile.credits.0, profile.completed_jobs), (150, 1));
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -119,7 +119,7 @@ fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoi
         step(&mut w, &mut a, &mut t);
     }
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     assert_eq!(a.profile(Some(&cookie)).unwrap().completed_jobs, 1);
@@ -132,7 +132,7 @@ fn courier_requires_continuous_slow_dwell_and_awards_once_across_retry_and_rejoi
         150
     );
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&q].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&q].player_id()]
             .is_none()
     );
 }
@@ -152,7 +152,7 @@ fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
         let mission_player = w.sessions.peers[&p].player_id();
         // Arrange success on the next tick so terminal failures must win.
         w.entities
-            .value_mut::<server::metadata::PlayerMission>(&(mission_player))
+            .value_mut::<server::components::PlayerMission>(&(mission_player))
             .expect("admitted mission state")
             .as_mut()
             .unwrap()
@@ -161,7 +161,7 @@ fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
             "cancel" => vehicle_action(&w, &mut t, p, 2, 1, Action::CancelMission(Empty {})),
             "timeout" => {
                 w.entities
-                    .value_mut::<server::metadata::PlayerMission>(&(mission_player))
+                    .value_mut::<server::components::PlayerMission>(&(mission_player))
                     .expect("admitted mission state")
                     .as_mut()
                     .unwrap()
@@ -194,7 +194,7 @@ fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
         assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 0, "{cause}");
         if cause == "fast" {
             assert_eq!(
-                w.entities.values::<server::metadata::PlayerMission>()
+                w.entities.values::<server::components::PlayerMission>()
                     [&w.sessions.peers[&p].player_id()]
                     .as_ref()
                     .unwrap()
@@ -203,7 +203,7 @@ fn courier_cancel_timeout_death_disconnect_and_fast_delivery_do_not_pay() {
             );
         } else if cause != "disconnect" {
             assert_eq!(
-                w.entities.values::<server::metadata::PlayerMission>()
+                w.entities.values::<server::components::PlayerMission>()
                     [&w.sessions.peers[&p].player_id()]
                     .as_ref()
                     .unwrap()
@@ -246,7 +246,11 @@ fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driv
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     assert_eq!(
@@ -264,7 +268,11 @@ fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driv
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==2 && r.code==ActionCode::Cooldown)));
@@ -279,7 +287,11 @@ fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driv
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     while w.tick < end - 1 {
@@ -288,23 +300,34 @@ fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driv
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         12
     );
     let id = w.sessions.peers[&p].player_id();
-    w.core
-        .entities
-        .get_mut_by_id::<PlayerComponent>(&id)
-        .unwrap()
-        .weapon
-        .magazine = 0;
+    {
+        let player = w
+            .core
+            .entities
+            .get_mut_by_id::<PlayerComponent>(&id)
+            .unwrap();
+        player.weapon.slots[player.weapon.equipped.index()].magazine = 0;
+    }
+
     fire(&w, &mut t, p, 5, 0.0);
     step(&mut w, &mut a, &mut t);
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==5 && r.code==ActionCode::NoAmmo)));
@@ -333,7 +356,11 @@ fn pistol_is_idempotent_authoritative_and_reload_is_delayed_and_canceled_by_driv
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         0
     );
 }
@@ -355,7 +382,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
     courier_action(&w, &mut t, p, 1);
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_some()
     );
     at_door(&mut w, p, 1);
@@ -398,7 +425,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
     );
     assert_eq!(w.sessions.peers[&p].epoch, 3);
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -437,7 +464,11 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         12
     );
     assert!(
@@ -448,7 +479,7 @@ fn fatal_crash_cancels_job_changes_epoch_respawns_safely_and_retains_profile() {
             > w.tick
     );
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     let fresh = w.entities.view::<PlayerComponent>()[&player]
@@ -519,7 +550,11 @@ fn police_hear_real_shots_once_publish_private_heat_and_clear_targets_on_rejoin(
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     assert!(t.sent.iter().any(|(target,_,m)| *target==p && matches!(&m.message,ServerMessage::PlayerStatus(s) if s.heat.0==1 && s.pursuit==Pursuit::Pursuing)));
@@ -537,7 +572,11 @@ fn police_hear_real_shots_once_publish_private_heat_and_clear_targets_on_rejoin(
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         10
     );
     assert!(
@@ -640,7 +679,7 @@ fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss()
     courier_action(&w, &mut t, p, 1);
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_some()
     );
     let unit = *w
@@ -693,7 +732,7 @@ fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss()
     );
     assert_eq!(w.sessions.peers[&p].epoch, epoch + 1);
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -745,11 +784,15 @@ fn police_arrest_cancels_mission_changes_epoch_and_respawns_without_money_loss()
     assert_eq!(
         w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
             .weapon
-            .magazine,
+            .slots[w.core.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player_id()]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         12
     );
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
 }
@@ -1011,7 +1054,7 @@ fn all_blocked_exit_candidates_preserve_occupancy_and_epoch() {
         .unwrap()
         .state
         .driver_id = Some(id);
-    let seat = w.entities.view::<VehicleComponent>()[&car].seat();
+    let seat = crate::systems::vehicle::seat(&w.entities.view::<VehicleComponent>()[&car]);
     let player = w
         .core
         .entities
@@ -1350,10 +1393,10 @@ fn native_control_replication_refreshes_both_observers_once_without_legacy_resou
 #[test]
 fn native_vehicle_restoration_preserves_deadline_retries_and_releases_reservations_once() {
     use crate::{
+        components::{DisabledVehicle, VehicleHome},
         ecs::TickOutcome,
         ecs::state::Clock,
         gameplay_messages::VehicleRestored,
-        metadata::{DisabledVehicle, VehicleHome},
     };
     use bevy_ecs::prelude::*;
     let (mut w, mut a, mut t) = setup();
@@ -1456,7 +1499,7 @@ fn native_respawn_retries_safe_spawn_resets_state_and_expires_protection_exactly
     player.lifecycle.respawn = Some(100);
     player.lifecycle.protected_until = None;
     player.weapon.shot_sequence = 17;
-    player.weapon.magazine = 0;
+    player.weapon.slots[player.weapon.equipped.index()].magazine = 0;
     player.weapon.reload_end = Some(200);
     w.entities
         .get_mut_by_id::<crate::systems::police::Wanted>(&id.0)
@@ -1700,10 +1743,11 @@ fn native_automatic_shots_observe_earlier_damage_and_do_not_replay() {
     );
     assert_eq!(host.resource::<Messages<ShotEmitted>>().len(), 1);
     // Cooldown is lifted only for this test: the second ray must pass the dead blocker.
-    host.get_mut::<PlayerComponent>(entities[0])
-        .unwrap()
-        .weapon
-        .next_fire = tick;
+    {
+        let mut player = host.get_mut::<PlayerComponent>(entities[0]).unwrap();
+        let index = player.weapon.equipped.index();
+        player.weapon.slots[index].next_fire = tick;
+    }
     host.write_message(request);
     schedule.run(&mut host);
     let messages = host.resource::<Messages<ShotEmitted>>();
@@ -1827,9 +1871,13 @@ fn admission_weapon_actions_commit_before_later_packets() {
         100
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&ids[0]]
+        w.entities.view::<PlayerComponent>()[&ids[0]].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&ids[0]]
             .weapon
-            .magazine,
+            .equipped
+            .index()]
+        .magazine,
         11
     );
     assert_eq!(
@@ -1837,9 +1885,13 @@ fn admission_weapon_actions_commit_before_later_packets() {
         0
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&ids[1]]
+        w.entities.view::<PlayerComponent>()[&ids[1]].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&ids[1]]
             .weapon
-            .magazine,
+            .equipped
+            .index()]
+        .magazine,
         12
     );
     assert!(t.sent.iter().any(|(p, _, m)| *p == peer(1)
@@ -1905,7 +1957,7 @@ fn native_weapon_actions_reject_stale_entities_and_epochs_without_spending_ammo(
     );
     schedule.run(&mut host);
     let p = host.get::<PlayerComponent>(entity).unwrap();
-    assert_eq!(p.weapon.magazine, 12);
+    assert_eq!(p.weapon.slots[p.weapon.equipped.index()].magazine, 12);
     assert_eq!(p.weapon.shot_sequence, 0);
     let codes: Vec<_> = host
         .resource::<Sessions>()
@@ -1927,8 +1979,8 @@ fn native_weapon_actions_reject_stale_entities_and_epochs_without_spending_ammo(
 #[test]
 fn native_reward_commit_rejects_stale_identity_and_replay() {
     use crate::{
+        components::PlayerMission,
         ecs::state::Clock,
-        metadata::PlayerMission,
         systems::missions::{
             Phase,
             native::{RewardCommitted, RewardRequested},

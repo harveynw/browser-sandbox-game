@@ -55,8 +55,7 @@ pub(crate) fn egress() -> Schedule {
         (
             send,
             (
-                crate::sessions::native::disconnect_requested,
-                crate::sessions::native::retire_disconnects,
+                crate::ecs::checkpoints::disconnects(),
                 crate::systems::missions::native::refresh_proxies,
                 crate::systems::repairs::native::update.run_if(crate::ecs::healthy),
                 crate::replication::native::sync_visible.run_if(crate::ecs::healthy),
@@ -68,4 +67,23 @@ pub(crate) fn egress() -> Schedule {
             .chain(),
     );
     schedule
+}
+
+/// Read every departure before committing deferred entity removal.
+pub(crate) fn disconnects() -> ScheduleConfigs<ScheduleSystem> {
+    (
+        crate::sessions::native::disconnect_requested,
+        crate::systems::chat::player_leaving,
+        crate::systems::police::player_leaving,
+        crate::sessions::native::finish_leaving,
+        crate::sessions::native::retire_leaving,
+        crate::sessions::native::retire_disconnects,
+    )
+        .chain()
+}
+pub(crate) fn ready() -> ScheduleConfigs<ScheduleSystem> {
+    (crate::systems::chat::player_ready, retire_ready).chain()
+}
+fn retire_ready(mut messages: ResMut<Messages<crate::gameplay_messages::PlayerBecameReady>>) {
+    messages.clear();
 }

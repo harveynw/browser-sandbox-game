@@ -72,7 +72,12 @@ pub(crate) fn direct_actors(
             positions.insert(id.0.0, p);
         }
     }
-    collision.set_vehicle_proxies(&cars.values().map(|(_, c)| c.proxy()).collect::<Vec<_>>())?;
+    collision.set_vehicle_proxies(
+        &cars
+            .values()
+            .map(|(_, c)| crate::systems::vehicle::proxy(c))
+            .collect::<Vec<_>>(),
+    )?;
     if observers.is_empty() {
         return Ok(());
     }
@@ -126,14 +131,18 @@ pub(crate) fn direct_actors(
             (
                 car.clone(),
                 brain,
-                crate::metadata::PoolMembership(VehiclePool::Traffic),
+                crate::components::PoolMembership(VehiclePool::Traffic),
             ),
         );
         cars.insert(id, (Entity::PLACEHOLDER, car));
         count += 1;
         population.metrics.spawned += 1;
-        collision
-            .set_vehicle_proxies(&cars.values().map(|(_, c)| c.proxy()).collect::<Vec<_>>())?;
+        collision.set_vehicle_proxies(
+            &cars
+                .values()
+                .map(|(_, c)| crate::systems::vehicle::proxy(c))
+                .collect::<Vec<_>>(),
+        )?;
     }
     for _ in 0..population.sidewalk.candidates.len().min(256) {
         if positions.len() >= PEDESTRIAN_CAP || population.sidewalk.candidates.is_empty() {

@@ -48,6 +48,7 @@ pub(crate) struct Protocol<'w, 's> {
     actors: ParamSet<'w, 's, (LifecycleActors<'w, 's>, Actors<'w, 's>)>,
     index: Res<'w, EntityIndex>,
     chat: ResMut<'w, ChatSystem>,
+    participants: Query<'w, 's, &'static mut crate::components::ChatParticipant>,
     admissions: MessageWriter<'w, AdmissionRequested>,
     baselines: MessageWriter<'w, BaselineRequested>,
     disconnects: MessageWriter<'w, DisconnectRequested>,
@@ -55,6 +56,7 @@ pub(crate) struct Protocol<'w, 's> {
     weapons: MessageWriter<'w, WeaponActionRequested>,
     jobs: MessageWriter<'w, JobActionRequested>,
     possession: MessageWriter<'w, PossessionRequested>,
+    ready: MessageWriter<'w, crate::gameplay_messages::PlayerBecameReady>,
 }
 impl Protocol<'_, '_> {
     fn send(
@@ -89,17 +91,22 @@ impl Protocol<'_, '_> {
             &self.actors.p1().view(self.clock.0, &self.identity.0),
         )
     }
-    fn chat_ready(&mut self, peer: PeerKey, session: &Session) {
-        let actors = self.actors.p1();
-        let player = actors.player(session.player);
-        self.chat.on_ready(
-            peer,
-            session,
-            player,
-            self.clock.0,
-            &self.identity.0,
-            &mut self.sessions,
-        );
+    fn player_ready(&mut self, peer: PeerKey, session: &Session) {
+        if session.baseline != 1 {
+            return;
+        }
+        if let (Some(player), Some(sid)) = (session.player, session.id.as_ref())
+            && let Some(&entity) = self.index.0.get(&player.0)
+        {
+            self.ready
+                .write(crate::gameplay_messages::PlayerBecameReady {
+                    peer,
+                    player,
+                    entity,
+                    session: sid.clone(),
+                    tick: self.clock.0,
+                });
+        }
     }
     fn chat_message(
         &mut self,
@@ -109,12 +116,17 @@ impl Protocol<'_, '_> {
         now: u64,
     ) -> Result<(), &'static str> {
         let actors = self.actors.p1();
+        let participant = session
+            .player
+            .and_then(|id| self.index.0.get(&id.0))
+            .and_then(|&entity| self.participants.get_mut(entity).ok());
+        let player = actors.player(session.player).zip(participant);
         self.chat.handle_message(
             peer,
             session,
             text,
             now,
-            actors.player(session.player),
+            player.map(|(player, participant)| (player, participant.into_inner())),
             self.clock.0,
             &self.identity.0,
             &mut self.sessions,
@@ -248,7 +260,7 @@ fn handle(
             );
             let status = ctx.status(s).map_err(|_| "status unavailable")?;
             ctx.reliable(peer, s.id.as_deref(), ServerMessage::PlayerStatus(status));
-            ctx.chat_ready(peer, s);
+            ctx.player_ready(peer, s);
         }
         ClientMessage::Chat(text) => ctx.chat_message(peer, s, text, now)?,
         ClientMessage::InputBatch(batch) => {

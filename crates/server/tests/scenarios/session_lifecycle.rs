@@ -1,6 +1,6 @@
 use super::*;
-use server::entities::player::Player as PlayerComponent;
-use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::components::Player as PlayerComponent;
+use server::components::Vehicle as VehicleComponent;
 #[test]
 fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins() {
     let (mut w, mut a, mut t) = setup();

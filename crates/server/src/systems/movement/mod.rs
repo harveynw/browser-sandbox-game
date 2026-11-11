@@ -15,3 +15,5 @@ pub(crate) struct MovementFrame {
 #[cfg(test)]
 #[derive(Default, bevy_ecs::prelude::Resource)]
 pub struct MovementSystem;
+
+pub(crate) mod pedestrians;

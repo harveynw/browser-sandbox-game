@@ -1,7 +1,7 @@
 //! Startup entity construction and authored metadata assignment.
 use crate::{
+    components::Vehicle,
     ecs::{TickOutcome, state::*},
-    entities::vehicle::Vehicle,
     systems::{self, population::VehiclePool},
 };
 use bevy_ecs::prelude::*;
@@ -70,7 +70,7 @@ pub(crate) fn parked(
                 template: template.into(),
                 idle_ticks: 30,
             };
-            proxies.push(car.proxy());
+            proxies.push(crate::systems::vehicle::proxy(&car));
             systems::planning::spawn(&mut commands, id.0, car);
             collision.0.set_vehicle_proxies(&proxies)?;
         }
@@ -88,7 +88,7 @@ pub(crate) fn tag_parked(
     for (entity, car) in &cars {
         commands
             .entity(entity)
-            .insert(crate::metadata::PoolMembership(VehiclePool::Parked));
+            .insert(crate::components::PoolMembership(VehiclePool::Parked));
         if content.0.manifest.parking.iter().any(|slot| {
             slot.secured
                 && systems::police::distance(
@@ -98,7 +98,7 @@ pub(crate) fn tag_parked(
         }) {
             commands
                 .entity(entity)
-                .insert(crate::metadata::SecuredVehicle);
+                .insert(crate::components::SecuredVehicle);
         }
     }
 }

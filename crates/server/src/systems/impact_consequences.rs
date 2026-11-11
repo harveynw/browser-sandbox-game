@@ -1,8 +1,8 @@
 //! Native consumers for impact presentation, occupant recovery, and crash missions.
 use crate::{
+    components::{Pedestrian, Player, Vehicle},
     ecs::state::{Clock, Collision, Content, WorldIdentity},
     ecs::{EntityIndex, GameId},
-    entities::{pedestrian::Pedestrian, player::Player, vehicle::Vehicle},
     gameplay_messages::{
         ControlTransitionRequested, CrashEjected, DisabledVehicleOccupant, ImpactApplied,
     },
@@ -187,7 +187,7 @@ pub(crate) fn recover_occupants(
         }
         let near = car.state.motor.position.0.map(|v| v.0);
         actors.collision.0.exclude_vehicle(Some(message.car.0));
-        let exit = crate::entities::vehicle::safe_exit_with(
+        let exit = crate::systems::vehicle::safe_exit_with(
             actors.cars.get(message.car_entity).unwrap().1,
             &actors.collision.0,
             |p| actors.clear(p, message.player),
@@ -198,7 +198,7 @@ pub(crate) fn recover_occupants(
         let session = actors.sessions.peers.get_mut(&message.peer).unwrap();
         if player.state.health.0 > 0 {
             player.state.health = CharacterHealth(0);
-            player.weapon.cancel();
+            crate::systems::weapons::state::cancel(&mut player.weapon);
             player.lifecycle.respawn = Some(message.tick.saturating_add(150));
             player.lifecycle.protected_until = None;
             session.status_dirty = true;
@@ -211,7 +211,7 @@ pub(crate) fn recover_occupants(
             player.state.mode = CharacterMode::Downed;
             player.state.vehicle_id = None;
             player.state.motor = sim_core::spawn_character(exit, 0.0).expect("safe exit");
-            player.weapon.cancel();
+            crate::systems::weapons::state::cancel(&mut player.weapon);
             player
                 .lifecycle
                 .respawn
@@ -235,7 +235,7 @@ pub(crate) fn recover_occupants(
 }
 pub(crate) fn fail_crash_missions(
     mut messages: MessageReader<CrashEjected>,
-    mut missions: Query<(&GameId, &mut crate::metadata::PlayerMission)>,
+    mut missions: Query<(&GameId, &mut crate::components::PlayerMission)>,
     clock: Res<Clock>,
 ) {
     for message in messages.read() {

@@ -1,8 +1,8 @@
 pub(crate) mod native;
 mod transactions;
 use crate::admission::{EconomicError, Profiles};
-use crate::entities::player::Player as PlayerComponent;
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Player as PlayerComponent;
+use crate::components::Vehicle as VehicleComponent;
 use crate::sessions::{Session, SessionPhase, Sessions};
 use crate::systems::police::Wanted as WantedComponent;
 use protocol::*;

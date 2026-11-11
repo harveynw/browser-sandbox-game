@@ -217,3 +217,13 @@ Refresh/rejoin at http://localhost:5173/. Repair a damaged vehicle while station
 ### Final decomposition checkpoint
 
 All six focused refactors are complete. Refresh/rejoin at http://localhost:5173/ for the final browser test. Exercise courier completion/cancellation, time-trial gates, recovery delivery and driver ejection, reward credits and rejoining; also check repairs, police pursuit/arrest, traffic/pedestrians and two-client visibility. Automated scenarios cover blocked recovery exits, reward replay/stale identity, recovery cleanup and durable profile restore. Backtraces remain enabled.
+
+
+### Player lifecycle messages checkpoint
+
+Refresh/rejoin at http://localhost:5173/. With two clients, check one join announcement, chat-history replay, one leave announcement, reconnection/profile replacement, and vehicles/police releasing a departed player. Resync and loading-only disconnects should not announce another join/leave. Native checkpoint tests verify pre-despawn subscriber access, duplicate suppression, stale readiness validation and message retirement.
+
+
+### Chat participant checkpoint
+
+With two clients at http://localhost:5173/, check chat history, the one-second sending limit, join/leave announcements and reconnecting. Resync keeps the current player's chat state; rejoining creates fresh state. Participant data is removed by entity despawn rather than a shared-map cleanup hook.

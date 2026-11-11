@@ -1,9 +1,9 @@
 //! Native repair validation and durable transaction progression.
 use super::*;
 use crate::{
+    components::PlayerMission,
     ecs::state::{Clock, Content},
     ecs::{GameId, TickOutcome},
-    metadata::PlayerMission,
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;

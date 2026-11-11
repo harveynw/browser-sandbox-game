@@ -1,10 +1,10 @@
 //! Explicit planning checkpoints. Observations are tick-local; actor state stays in components.
 use crate::{
+    components::{Pedestrian, Player, Vehicle},
+    components::{PlayerMission, PoolMembership, VehicleHome},
     ecs::runtime::Scratch,
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId, TickOutcome, TickPhase},
-    entities::{pedestrian::Pedestrian, player::Player, vehicle::Vehicle},
-    metadata::{PlayerMission, PoolMembership, VehicleHome},
     performance::WorldTimings,
     sessions::{SessionPhase, Sessions},
     systems::{
@@ -118,7 +118,7 @@ pub(crate) fn prepare_geometry(
     if let Err(e) = collision.0.set_vehicle_proxies(
         &cars
             .iter()
-            .map(|(_, _, c, _, _)| c.proxy())
+            .map(|(_, _, c, _, _)| crate::systems::vehicle::proxy(c))
             .collect::<Vec<_>>(),
     ) {
         outcome.fail(e);

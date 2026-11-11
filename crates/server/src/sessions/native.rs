@@ -2,10 +2,10 @@
 use super::*;
 use crate::{admission::Profiles, replication::Replication};
 use crate::{
+    components::{PlayerMission, RecoveryReservation, SecuredVehicle},
     ecs::state::{Clock, Collision, WorldIdentity},
     ecs::{EntityIndex, GameId},
     gameplay_messages::{ControlTransitionRequested, CrimeReported},
-    metadata::{PlayerMission, RecoveryReservation, SecuredVehicle},
     systems::{
         police::{CrimeId, CrimeKind},
         population::{Traffic, TrafficPhase},
@@ -115,7 +115,7 @@ impl PossessionActors<'_, '_> {
                     return ActionCode::TooFast;
                 }
                 let feet = p.state.motor.position.0.map(|v| v.0);
-                let entry = car.entry();
+                let entry = crate::systems::vehicle::entry(car);
                 if feet
                     .iter()
                     .zip(entry)
@@ -128,7 +128,7 @@ impl PossessionActors<'_, '_> {
                 }
                 let secured = secured.is_some();
                 self.collision.0.exclude_vehicle(Some(car_id.0));
-                let clear = crate::entities::vehicle::clear_segment(
+                let clear = crate::systems::vehicle::clear_segment(
                     &self.collision.0,
                     [feet[0], feet[1] + 1.45, feet[2]],
                     [entry[0], entry[1] + 0.9, entry[2]],
@@ -166,12 +166,15 @@ impl PossessionActors<'_, '_> {
                     }
                 }
                 let (_, mut car, _, _, _, _) = self.cars.get_mut(car_entity).unwrap();
-                let motor = sim_core::spawn_character(car.seat(), car.state.motor.yaw.0)
-                    .expect("validated seat");
+                let motor = sim_core::spawn_character(
+                    crate::systems::vehicle::seat(&car),
+                    car.state.motor.yaw.0,
+                )
+                .expect("validated seat");
                 car.state.driver_id = Some(id);
                 car.idle_ticks = 0;
                 let (_, mut p, _) = self.players.get_mut(entity).unwrap();
-                p.weapon.cancel();
+                crate::systems::weapons::state::cancel(&mut p.weapon);
                 p.lifecycle.protected_until = None;
                 s.status_dirty = true;
                 p.state.mode = CharacterMode::Driving;
@@ -196,7 +199,7 @@ impl PossessionActors<'_, '_> {
                     return ActionCode::TooFast;
                 }
                 self.collision.0.exclude_vehicle(Some(id.0));
-                let exit = crate::entities::vehicle::safe_exit(car, &self.collision.0);
+                let exit = crate::systems::vehicle::safe_exit(car, &self.collision.0);
                 self.collision.0.exclude_vehicle(None);
                 let Some(exit) = exit else {
                     return ActionCode::ExitBlocked;
@@ -204,7 +207,7 @@ impl PossessionActors<'_, '_> {
                 let yaw = car.state.motor.yaw.0;
                 let (_, mut car, _, _, _, _) = self.cars.get_mut(car_entity).unwrap();
                 car.state.driver_id = None;
-                car.stop();
+                crate::systems::vehicle::stop(&mut car);
                 let (_, mut p, _) = self.players.get_mut(entity).unwrap();
                 p.state.mode = CharacterMode::OnFoot;
                 p.state.vehicle_id = None;
@@ -343,11 +346,11 @@ pub(crate) fn remove_player(id: EntityId, actors: &mut LifecycleActors) {
             crate::systems::planning::despawn(&mut actors.commands, car_id.0.0, entity);
         } else if car.state.driver_id == Some(id) {
             car.state.driver_id = None;
-            car.stop();
+            crate::systems::vehicle::stop(&mut car);
         }
     }
     for mut unit in actors.units.iter_mut().filter(|u| u.target == Some(id.0)) {
-        unit.release_target();
+        crate::systems::police::state::release_target(&mut unit);
     }
     if let Some((entity, _, _)) = actors.players.iter().find(|(_, actual, _)| actual.0 == id) {
         crate::systems::planning::despawn(&mut actors.commands, id.0, entity);
@@ -376,7 +379,7 @@ pub(crate) fn create_player(
         (
             Player {
                 tshirt_colour: profile.tshirt_colour,
-                weapon: Default::default(),
+                weapon: crate::systems::weapons::state::loadout(),
                 lifecycle: Default::default(),
                 id,
                 display_name: profile.display_name.clone(),
@@ -389,8 +392,9 @@ pub(crate) fn create_player(
                     vehicle_id: None,
                 },
             },
-            WantedComponent::default(),
+            crate::systems::police::state::clear_wanted(),
             PlayerMission(None),
+            crate::components::ChatParticipant::default(),
         ),
     );
     Ok(id)
@@ -432,7 +436,7 @@ pub(crate) fn freeze_on_resync(
         else {
             return Err("missing car");
         };
-        car.stop();
+        crate::systems::vehicle::stop(&mut car);
     }
     Ok(())
 }
@@ -475,25 +479,23 @@ pub(crate) struct DisconnectRequested {
 }
 pub(crate) fn disconnect_requested(
     mut requests: MessageReader<DisconnectRequested>,
-    mut actors: LifecycleActors,
+    players: Query<(Entity, &GameId, &Player)>,
     mut sessions: ResMut<Sessions>,
     mut io: NonSendMut<crate::ecs::runtime::TickIo>,
-    mut chat: ResMut<crate::systems::chat::ChatSystem>,
-    mut police: ResMut<crate::systems::police::PoliceSystem>,
+    mut leaving: MessageWriter<crate::gameplay_messages::PlayerLeaving>,
     clock: Res<Clock>,
-    identity: Res<WorldIdentity>,
 ) {
     for request in requests.read().filter(|r| r.tick == clock.0) {
         if let Some(session) = sessions.peers.remove(&request.peer) {
             if let Some(id) = session.player {
-                let name = actors
-                    .players
-                    .iter()
-                    .find(|(_, actual, _)| actual.0 == id)
-                    .map(|(_, _, p)| p.display_name.clone());
-                chat.left(id.0, name, clock.0, &identity.0, &mut sessions);
-                remove_player(id, &mut actors);
-                police.forget_crimes(id.0);
+                let player = players.iter().find(|(_, actual, _)| actual.0 == id);
+                leaving.write(crate::gameplay_messages::PlayerLeaving {
+                    peer: request.peer,
+                    player: id,
+                    entity: player.map(|(entity, _, _)| entity),
+                    name: player.map(|(_, _, p)| p.display_name.clone()),
+                    tick: clock.0,
+                });
             }
             if let (Some(profile), Some(sid)) = (&session.profile, &session.id) {
                 io.profiles.deactivate(&profile.profile_id.0, sid);
@@ -501,6 +503,29 @@ pub(crate) fn disconnect_requested(
         }
         sessions.closing.insert(request.peer, request.reason);
     }
+}
+/// Commit actor retirement only after all leave subscribers have run.
+pub(crate) fn finish_leaving(
+    mut leaving: MessageReader<crate::gameplay_messages::PlayerLeaving>,
+    mut actors: LifecycleActors,
+    clock: Res<Clock>,
+) {
+    for message in leaving.read().filter(|m| m.tick == clock.0) {
+        if let Some(entity) = message.entity
+            && !actors
+                .players
+                .get(entity)
+                .is_ok_and(|(_, id, _)| id.0 == message.player)
+        {
+            continue;
+        }
+        remove_player(message.player, &mut actors);
+    }
+}
+pub(crate) fn retire_leaving(
+    mut messages: ResMut<Messages<crate::gameplay_messages::PlayerLeaving>>,
+) {
+    messages.clear();
 }
 pub(crate) fn retire_disconnects(mut requests: ResMut<Messages<DisconnectRequested>>) {
     requests.clear();

@@ -1,8 +1,8 @@
 use crate as server;
 use protocol::*;
-use server::entities::pedestrian::Pedestrian as PedestrianComponent;
-use server::entities::player::Player as PlayerComponent;
-use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::components::Pedestrian as PedestrianComponent;
+use server::components::Player as PlayerComponent;
+use server::components::Vehicle as VehicleComponent;
 use server::systems::police::Unit as PoliceUnitComponent;
 use server::systems::population::Traffic as TrafficComponent;
 use server::{
@@ -722,7 +722,7 @@ fn vehicle_action(
     );
 }
 fn at_door(w: &mut World, p: PeerKey, car: u32) {
-    let position = w.entities.view::<VehicleComponent>()[&car].entry();
+    let position = crate::systems::vehicle::entry(&w.entities.view::<VehicleComponent>()[&car]);
     let id = w.sessions.peers[&p].player.unwrap().0;
     w.entities
         .get_mut_by_id::<PlayerComponent>(&id)
@@ -981,7 +981,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     let mut t = FakeTransport::default();
     assert_eq!(
         w.entities
-            .values::<server::metadata::PoolMembership>()
+            .values::<server::components::PoolMembership>()
             .len(),
         16
     );
@@ -1000,7 +1000,7 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     );
     for id in w
         .entities
-        .values::<server::metadata::PoolMembership>()
+        .values::<server::components::PoolMembership>()
         .keys()
         .copied()
         .collect::<Vec<_>>()
@@ -1051,12 +1051,14 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         .collect();
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::Snapshot(s) if s.records.iter().any(|r|pedestrian_ids.contains(&r.entity_id.0)))));
     let car_id = *w.entities.view::<TrafficComponent>().keys().next().unwrap();
-    w.entities
-        .get_mut_by_id::<VehicleComponent>(&car_id)
-        .unwrap()
-        .stop();
+    crate::systems::vehicle::stop(
+        &mut w
+            .entities
+            .get_mut_by_id::<VehicleComponent>(&car_id)
+            .unwrap(),
+    );
     let player = w.sessions.peers[&p].player.unwrap().0;
-    let entry = w.entities.view::<VehicleComponent>()[&car_id].entry();
+    let entry = crate::systems::vehicle::entry(&w.entities.view::<VehicleComponent>()[&car_id]);
     w.entities
         .get_mut_by_id::<PlayerComponent>(&player)
         .unwrap()
@@ -1086,10 +1088,12 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         .get_mut_by_id::<TrafficComponent>(&car_id)
         .unwrap()
         .phase = server::systems::population::TrafficPhase::Available;
-    w.entities
-        .get_mut_by_id::<VehicleComponent>(&car_id)
-        .unwrap()
-        .stop();
+    crate::systems::vehicle::stop(
+        &mut w
+            .entities
+            .get_mut_by_id::<VehicleComponent>(&car_id)
+            .unwrap(),
+    );
     at_door(&mut w, p, car_id);
     vehicle_action(
         &w,
@@ -1109,7 +1113,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         Some(EntityId(player))
     );
     assert_eq!(
-        w.entities.values::<server::metadata::PoolMembership>()[&car_id],
+        w.entities.values::<server::components::PoolMembership>()[&car_id],
         server::systems::population::VehiclePool::Traffic
     );
     let before = w.entities.view::<VehicleComponent>()[&car_id]
@@ -1136,7 +1140,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         None
     );
     assert_eq!(
-        w.entities.values::<server::metadata::PoolMembership>()[&car_id],
+        w.entities.values::<server::components::PoolMembership>()[&car_id],
         server::systems::population::VehiclePool::Traffic
     );
     assert!(
@@ -1199,10 +1203,10 @@ fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
 }
 
 fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
-    if w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0]
-        .weapon
-        .definition()
-        .automatic
+    if crate::systems::weapons::state::definition(
+        &w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0].weapon,
+    )
+    .automatic
     {
         send(
             w,
@@ -1854,7 +1858,13 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     fire(&w, &mut t, p, 2, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         20
     );
     for _ in 0..15 {
@@ -1887,13 +1897,25 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         20
     );
     fire(&w, &mut t, p, 5, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         19
     );
     assert_eq!(
@@ -1916,7 +1938,13 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         19
     );
     send(
@@ -1930,13 +1958,27 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     step(&mut w, &mut a, &mut t);
     ready(&mut w, &mut a, &mut t, p);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         19
     );
-    assert_eq!(w.entities.view::<PlayerComponent>()[&id].weapon.reserve, 40);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id]
-            .public_state()
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .reserve,
+        40
+    );
+    assert_eq!(
+        crate::replication::projection::public_state(&w.entities.view::<PlayerComponent>()[&id])
             .equipment
             .unwrap()
             .weapon_id,
@@ -1967,14 +2009,26 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         45
     );
     for _ in 0..15 {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         45
     );
     fire(&w, &mut t, p, 2, 0.0);
@@ -1994,12 +2048,24 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         }),
     );
     step(&mut w, &mut a, &mut t);
-    let ammo = w.entities.view::<PlayerComponent>()[&id].weapon.magazine;
+    let ammo = w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+        .entities
+        .view::<PlayerComponent>()[&id]
+        .weapon
+        .equipped
+        .index()]
+    .magazine;
     for _ in 0..10 {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.magazine,
+        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+            .entities
+            .view::<PlayerComponent>()[&id]
+            .weapon
+            .equipped
+            .index()]
+        .magazine,
         ammo
     );
 }
@@ -2445,3 +2511,5 @@ fn player_map_includes_distant_online_players_and_removes_disconnected_players()
 }
 
 mod replication_publication;
+
+mod player_lifecycle;

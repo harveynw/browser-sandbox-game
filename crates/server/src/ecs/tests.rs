@@ -1,4 +1,5 @@
 use super::*;
+use protocol::EntityId;
 #[derive(Component, Debug, PartialEq)]
 struct Position(i32);
 #[test]
@@ -83,7 +84,7 @@ fn ordered_mutation_survives_archetype_changes_and_reused_slots() {
 }
 #[test]
 fn metadata_values_keep_first_home_and_share_actor_lifecycle() {
-    use crate::metadata::{DisabledVehicle, PoolMembership, VehicleHome};
+    use crate::components::{DisabledVehicle, PoolMembership, VehicleHome};
     use crate::systems::population::VehiclePool;
     let mut store = EntityStore::new();
     store.insert(8, Position(0));

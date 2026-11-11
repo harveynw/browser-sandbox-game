@@ -1,10 +1,10 @@
 //! Native actor lifecycle systems. Removal and identity bookkeeping commit together.
 pub(crate) mod players;
 use crate::{
+    components::Incapacitated,
+    components::Pedestrian,
     ecs::state::Clock,
     ecs::{EntityIndex, GameId},
-    entities::pedestrian::Pedestrian,
-    metadata::Incapacitated,
 };
 use bevy_ecs::prelude::*;
 
@@ -63,7 +63,7 @@ pub(crate) fn remove_orphaned_incapacitation(orphans: Orphans<'_, '_>, mut comma
 
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RestorationSpace<'w, 's> {
-    players: Query<'w, 's, &'static crate::entities::player::Player>,
+    players: Query<'w, 's, &'static crate::components::Player>,
     pedestrians: Query<'w, 's, &'static Pedestrian>,
     collision: NonSendMut<'w, crate::ecs::state::Collision>,
     content: Res<'w, crate::ecs::state::Content>,
@@ -75,9 +75,9 @@ type RestorableVehicles<'w, 's> = Query<
     (
         Entity,
         &'static GameId,
-        &'static mut crate::metadata::DisabledVehicle,
-        Option<&'static mut crate::entities::vehicle::Vehicle>,
-        Option<&'static crate::metadata::VehicleHome>,
+        &'static mut crate::components::DisabledVehicle,
+        Option<&'static mut crate::components::Vehicle>,
+        Option<&'static crate::components::VehicleHome>,
         Has<crate::systems::police::Unit>,
     ),
 >;
@@ -108,7 +108,7 @@ pub(crate) fn restore_vehicles(
                 }
                 world
                     .entity_mut(entity)
-                    .remove::<crate::metadata::DisabledVehicle>();
+                    .remove::<crate::components::DisabledVehicle>();
                 if world.entity(entity).archetype().components().len() == 1 {
                     despawn_indexed(world, entity, id);
                 }
@@ -167,7 +167,7 @@ pub(crate) fn restore_vehicles(
             car.idle_ticks = 30;
             commands
                 .entity(entity)
-                .remove::<crate::metadata::DisabledVehicle>();
+                .remove::<crate::components::DisabledVehicle>();
             restored.write(crate::gameplay_messages::VehicleRestored {
                 vehicle: id.0,
                 entity,

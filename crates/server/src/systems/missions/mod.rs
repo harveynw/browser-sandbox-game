@@ -2,9 +2,9 @@
 use crate::world::World;
 pub(crate) mod native;
 use crate::admission::random_id;
-use crate::entities::pedestrian::Pedestrian as PedestrianComponent;
-use crate::entities::player::Player as PlayerComponent;
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Pedestrian as PedestrianComponent;
+use crate::components::Player as PlayerComponent;
+use crate::components::Vehicle as VehicleComponent;
 use crate::{
     sessions::{Session, SessionPhase, Sessions},
     systems::repairs::RepairSystem,
@@ -36,7 +36,7 @@ impl MissionSystem {
                     .entities
                     .view::<VehicleComponent>()
                     .values()
-                    .map(|v| v.proxy())
+                    .map(|v| crate::systems::vehicle::proxy(&v))
                     .collect::<Vec<_>>(),
             )
             .expect("validated job vehicle proxies");

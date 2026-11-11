@@ -5,8 +5,7 @@ pub(crate) fn schedules() -> (Schedule, Schedule) {
     retire.add_systems(
         (
             crate::shutdown::request_all,
-            crate::sessions::native::disconnect_requested,
-            crate::sessions::native::retire_disconnects,
+            crate::ecs::checkpoints::disconnects(),
             crate::systems::missions::native::refresh_proxies,
         )
             .chain(),

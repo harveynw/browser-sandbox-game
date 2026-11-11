@@ -1,10 +1,10 @@
 //! Read-only projections for the HTTP control plane; never detach resources or
 //! borrow the gameplay world through a mutable legacy wrapper.
 use crate::{
+    components::PoolMembership,
+    components::{Pedestrian, Player, Vehicle},
     ecs::GameId,
     ecs::state::{Clock, WorldIdentity},
-    entities::{pedestrian::Pedestrian, player::Player, vehicle::Vehicle},
-    metadata::PoolMembership,
     sessions::{SessionPhase, Sessions},
     systems::{
         police::{Officer, PoliceSystem, Unit, Wanted},

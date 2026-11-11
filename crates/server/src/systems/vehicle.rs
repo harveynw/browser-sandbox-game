@@ -1,56 +1,27 @@
-//! Vehicle entities and local geometry helpers.
-//! Vehicle state and safe possession geometry. Transactions are owned by World.
-use protocol::{EntityId, VehicleState};
-use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
-#[derive(bevy_ecs::prelude::Component, Clone)]
-pub struct Vehicle {
-    pub id: EntityId,
-    /// Immutable authored geometry/mechanics shared with read-only AI observations.
-    pub template: std::sync::Arc<content::VehicleTemplate>,
-    pub state: VehicleState,
-    pub idle_ticks: u32,
-}
-impl Vehicle {
-    pub(crate) fn apply_damage(
-        &mut self,
-        amount: u16,
-        attacker: Option<protocol::EntityId>,
-    ) -> bool {
-        if self.state.disabled
-            || self.state.health.0 == 0
-            || attacker.is_some_and(|a| self.state.driver_id.is_some_and(|driver| driver != a))
-        {
-            return false;
-        }
-        self.state.health.0 = self.state.health.0.saturating_sub(amount);
-        self.idle_ticks = 0;
-        if self.state.health.0 == 0 {
-            self.state.disabled = self.state.driver_id.is_none();
-            self.stop();
-        }
-        true
-    }
+//! Shared vehicle motor and possession/collision geometry helpers.
+use crate::components::*;
 
-    pub fn stop(&mut self) {
-        self.state.motor.speed = protocol::Scalar(0.0);
-        self.state.motor.velocity = protocol::Vec3([protocol::Scalar(0.0); 3]);
-        self.state.motor.steering = protocol::Steering(0.0);
-    }
-    pub fn seat(&self) -> [f32; 3] {
-        sim_core::anchor(&self.state.motor, self.template.seat_offset)
-    }
-    pub fn entry(&self) -> [f32; 3] {
-        sim_core::anchor(&self.state.motor, self.template.exit_offsets[0])
-    }
-    pub fn proxy(&self) -> sim_core::collision::VehicleProxy {
-        sim_core::collision::VehicleProxy {
-            entity_id: self.id.0,
-            position: self.state.motor.position.0.map(|v| v.0),
-            yaw: self.state.motor.yaw.0,
-            dimensions: self.template.dimensions.map(|v| v as f32),
-        }
+pub(crate) fn stop(car: &mut Vehicle) {
+    car.state.motor.speed = protocol::Scalar(0.0);
+    car.state.motor.velocity = protocol::Vec3([protocol::Scalar(0.0); 3]);
+    car.state.motor.steering = protocol::Steering(0.0);
+}
+pub(crate) fn seat(car: &Vehicle) -> [f32; 3] {
+    sim_core::anchor(&car.state.motor, car.template.seat_offset)
+}
+pub(crate) fn entry(car: &Vehicle) -> [f32; 3] {
+    sim_core::anchor(&car.state.motor, car.template.exit_offsets[0])
+}
+pub(crate) fn proxy(car: &Vehicle) -> sim_core::collision::VehicleProxy {
+    sim_core::collision::VehicleProxy {
+        entity_id: car.id.0,
+        position: car.state.motor.position.0.map(|v| v.0),
+        yaw: car.state.motor.yaw.0,
+        dimensions: car.template.dimensions.map(|v| v as f32),
     }
 }
+
+use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
 pub fn clear_segment(collision: &CollisionWorld, a: [f32; 3], b: [f32; 3]) -> bool {
     let delta: [f32; 3] = std::array::from_fn(|i| b[i] - a[i]);
     let distance = delta.iter().map(|v| v * v).sum::<f32>().sqrt();

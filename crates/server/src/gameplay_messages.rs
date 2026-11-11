@@ -4,6 +4,25 @@ use crate::systems::police::{CrimeId, CrimeReport};
 use bevy_ecs::prelude::*;
 use protocol::{DisplayName, EntityId};
 
+/// First successful transition into gameplay, after the initial baseline.
+#[derive(Message, Clone)]
+pub(crate) struct PlayerBecameReady {
+    pub peer: crate::transport::PeerKey,
+    pub player: EntityId,
+    pub entity: Entity,
+    pub session: String,
+    pub tick: u32,
+}
+/// The session is detached; subscribers run before entity cleanup/despawn.
+#[derive(Message, Clone)]
+pub(crate) struct PlayerLeaving {
+    pub peer: crate::transport::PeerKey,
+    pub player: EntityId,
+    pub entity: Option<Entity>,
+    pub name: Option<DisplayName>,
+    pub tick: u32,
+}
+
 #[derive(Message, Clone)]
 pub(crate) struct ShotEmitted {
     pub event: protocol::Shot,
@@ -146,6 +165,9 @@ pub(crate) fn clear_batch(
 /// A failed tick is not rolled back. Discard any undelivered facts rather than
 /// replaying stale side effects on a later step; production exits on tick failure.
 pub(crate) fn clear(world: &mut World) {
+    world.resource_mut::<Messages<PlayerBecameReady>>().clear();
+    world.resource_mut::<Messages<PlayerLeaving>>().clear();
+
     world
         .resource_mut::<Messages<crate::sessions::ingress::AdmissionRequested>>()
         .clear();

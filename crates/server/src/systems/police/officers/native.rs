@@ -159,9 +159,10 @@ pub(crate) fn deploy(
                 } else {
                     WeaponId::Pistol
                 },
-                ..Weapon::default()
+                ..crate::systems::weapons::state::loadout()
             };
-            weapon.reserve = u16::from(weapon.definition().capacity) * 2;
+            weapon.slots[weapon.equipped.index()].reserve =
+                u16::from(crate::systems::weapons::state::definition(&weapon).capacity) * 2;
             officers.insert(
                 id_new,
                 Pending::Spawn(Officer {
@@ -523,9 +524,9 @@ pub(crate) fn decide(
         // Pure readiness preview lets AI reserve its per-target firing slot.
         // The native weapon consumer commits timers, ammunition and presentation.
         let mut ready_weapon = officer.weapon.clone();
-        ready_weapon.advance(tick);
-        if ready_weapon.magazine == 0 {
-            ready_weapon.reload(tick);
+        crate::systems::weapons::state::advance(&mut ready_weapon, tick);
+        if ready_weapon.slots[ready_weapon.equipped.index()].magazine == 0 {
+            crate::systems::weapons::state::reload(&mut ready_weapon, tick);
         }
         let origin = [p[0], p[1] + 1.45, p[2]];
         let pitch = (look[1] - origin[1])
@@ -540,8 +541,8 @@ pub(crate) fn decide(
         if !may_fire
             || tick.saturating_sub(since) < 12
             || ready_weapon.reload_end.is_some()
-            || ready_weapon.magazine == 0
-            || tick < ready_weapon.next_fire
+            || ready_weapon.slots[ready_weapon.equipped.index()].magazine == 0
+            || tick < ready_weapon.slots[ready_weapon.equipped.index()].next_fire
             || tick
                 < engagements
                     .get(&target)
@@ -555,7 +556,7 @@ pub(crate) fn decide(
             .entry(target)
             .or_insert((wanted.fire_authorized, wanted.next_officer_shot))
             .1 = tick + 12;
-        let definition = officer.weapon.definition();
+        let definition = crate::systems::weapons::state::definition(&officer.weapon);
         let seed = id.wrapping_mul(0x9e3779b9) ^ tick.wrapping_mul(0x85ebca6b);
         let jitter = |shift| ((seed.rotate_left(shift) & 255) as f32 / 255.0 - 0.5) * 0.045;
         let (sin, cos) = (yaw + jitter(0)).sin_cos();

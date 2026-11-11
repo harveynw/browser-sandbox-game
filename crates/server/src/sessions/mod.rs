@@ -3,8 +3,8 @@ pub(crate) mod ingress;
 pub(crate) mod native;
 #[cfg(test)]
 use crate::admission::Profiles;
-use crate::entities::player::Player;
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Player;
+use crate::components::Vehicle as VehicleComponent;
 use crate::replication::{Budget, InputRate};
 use crate::systems::police::Unit as PoliceUnitComponent;
 use crate::systems::police::Wanted as WantedComponent;

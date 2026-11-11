@@ -1,5 +1,5 @@
 use super::*;
-use server::entities::player::Player as PlayerComponent;
+use server::components::Player as PlayerComponent;
 #[test]
 fn chat_is_reliable_authoritative_and_replayed_to_new_players() {
     let (mut w, mut profiles, mut t) = setup();
@@ -194,5 +194,80 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
     assert!(
         !t.sent.iter().any(|(_, _, packet)| matches!(&packet.message,
         ServerMessage::Chat(line) if line.text.0 == "Alice eliminated Bob"))
+    );
+}
+
+#[test]
+fn chat_participant_survives_resync_and_rejoin_gets_fresh_entity_state() {
+    use crate::components::ChatParticipant;
+    let (mut w, mut profiles, mut transport) = setup();
+    let p = peer(0);
+    let cookie = join(&mut w, &mut profiles, &mut transport, p, None);
+    let id = w.sessions.peers[&p].player.unwrap();
+    assert!(
+        w.entities
+            .get::<ChatParticipant>(id)
+            .unwrap()
+            .announced_name
+            .is_none()
+    );
+    ready(&mut w, &mut profiles, &mut transport, p);
+    send(
+        &w,
+        &mut transport,
+        p,
+        ClientMessage::Chat(ChatText("Hello".into())),
+    );
+    step(&mut w, &mut profiles, &mut transport);
+    let last = w.entities.get::<ChatParticipant>(id).unwrap().last_sent;
+    assert!(last.is_some());
+    send(
+        &w,
+        &mut transport,
+        p,
+        ClientMessage::ResyncRequest(ResyncRequest {
+            reason: ResyncReason::Stale,
+        }),
+    );
+    step(&mut w, &mut profiles, &mut transport);
+    ready(&mut w, &mut profiles, &mut transport, p);
+    assert_eq!(
+        w.entities.get::<ChatParticipant>(id).unwrap().last_sent,
+        last
+    );
+    assert!(
+        w.entities
+            .get::<ChatParticipant>(id)
+            .unwrap()
+            .announced_name
+            .is_some()
+    );
+    transport.events.push_back(TransportEvent::Closed {
+        peer: p,
+        reason: "test",
+    });
+    step(&mut w, &mut profiles, &mut transport);
+    assert!(w.entities.get::<ChatParticipant>(id).is_none());
+    let q = peer(1);
+    join(&mut w, &mut profiles, &mut transport, q, Some(&cookie));
+    let replacement = w.sessions.peers[&q].player.unwrap();
+    assert_ne!(id, replacement);
+    let participant = w.entities.get::<ChatParticipant>(replacement).unwrap();
+    assert!(participant.last_sent.is_none());
+    assert!(participant.announced_name.is_none());
+    ready(&mut w, &mut profiles, &mut transport, q);
+    send(
+        &w,
+        &mut transport,
+        q,
+        ClientMessage::Chat(ChatText("Back".into())),
+    );
+    step(&mut w, &mut profiles, &mut transport);
+    assert!(
+        w.entities
+            .get::<ChatParticipant>(replacement)
+            .unwrap()
+            .last_sent
+            .is_some()
     );
 }

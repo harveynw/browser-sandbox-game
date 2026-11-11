@@ -408,7 +408,7 @@ pub(crate) fn arrest(
             }
             let near = car.state.motor.position.0.map(|v| v.0);
             actors.collision.0.exclude_vehicle(Some(car_id.0));
-            position = crate::entities::vehicle::safe_exit_with(
+            position = crate::systems::vehicle::safe_exit_with(
                 actors.cars.get(car_entity).unwrap().1,
                 &actors.collision.0,
                 |p| actors.clear(p, message.player),
@@ -431,27 +431,28 @@ pub(crate) fn arrest(
             if let Some(e) = car_entity {
                 let (_, mut car) = actors.cars.get_mut(e).unwrap();
                 car.state.driver_id = None;
-                car.stop();
+                crate::systems::vehicle::stop(&mut car);
             }
             let (_, mut player) = actors.players.get_mut(message.entity).unwrap();
             player.state.mode = CharacterMode::Arrested;
             player.state.vehicle_id = None;
             player.state.motor = motor;
-            player.weapon.cancel();
+            crate::systems::weapons::state::cancel(&mut player.weapon);
             player.lifecycle.protected_until = None;
             player.lifecycle.respawn = Some(message.tick.saturating_add(150));
-            *wanted.get_mut(message.entity).unwrap() = Wanted::default();
+            *wanted.get_mut(message.entity).unwrap() =
+                crate::systems::police::state::clear_wanted();
             for mut unit in units
                 .iter_mut()
                 .filter(|u| u.target == Some(message.player.0))
             {
-                unit.release_target();
+                crate::systems::police::state::release_target(&mut unit);
             }
             police.crimes.retain(|(id, _), _| *id != message.player.0);
             true
         } else {
             if let Some(e) = car_entity {
-                actors.cars.get_mut(e).unwrap().1.stop();
+                crate::systems::vehicle::stop(&mut actors.cars.get_mut(e).unwrap().1);
             }
             actors
                 .sessions
@@ -465,7 +466,7 @@ pub(crate) fn arrest(
             w.arrest_pending = true;
             if first {
                 let (_, mut p) = actors.players.get_mut(message.entity).unwrap();
-                p.weapon.cancel();
+                crate::systems::weapons::state::cancel(&mut p.weapon);
                 p.lifecycle.protected_until = None;
             }
             first
@@ -494,7 +495,7 @@ pub(crate) fn arrest(
 }
 pub(crate) fn fail_arrested_missions(
     mut messages: MessageReader<ArrestStarted>,
-    mut missions: Query<(&GameId, &mut crate::metadata::PlayerMission)>,
+    mut missions: Query<(&GameId, &mut crate::components::PlayerMission)>,
     clock: Res<Clock>,
 ) {
     for message in messages.read() {

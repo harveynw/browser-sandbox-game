@@ -2,6 +2,8 @@
 use crate::gameplay_messages::*;
 use bevy_ecs::prelude::*;
 pub(crate) fn register(world: &mut World) {
+    world.init_resource::<Messages<PlayerBecameReady>>();
+    world.init_resource::<Messages<PlayerLeaving>>();
     world.init_resource::<Messages<crate::sessions::ingress::AdmissionRequested>>();
     world.init_resource::<Messages<crate::sessions::ingress::BaselineRequested>>();
     world.init_resource::<Messages<crate::sessions::native::DisconnectRequested>>();

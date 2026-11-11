@@ -1,6 +1,6 @@
 use super::*;
-use crate::entities::player::Player as PlayerComponent;
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Player as PlayerComponent;
+use crate::components::Vehicle as VehicleComponent;
 use crate::systems::police::Unit as PoliceUnitComponent;
 
 fn city() -> (World, Sessions, crate::systems::Systems) {
@@ -37,7 +37,7 @@ fn retired_patrol_replacement_preserves_all_home_districts() {
                 &w.entities
                     .view::<VehicleComponent>()
                     .values()
-                    .map(Vehicle::proxy)
+                    .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
             )
             .unwrap();
@@ -100,7 +100,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
                 &w.entities
                     .view::<VehicleComponent>()
                     .values()
-                    .map(Vehicle::proxy)
+                    .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
             )
             .unwrap();
@@ -171,7 +171,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
                     &w.entities
                         .view::<VehicleComponent>()
                         .values()
-                        .map(Vehicle::proxy)
+                        .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
@@ -233,7 +233,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         player,
         PlayerComponent {
             tshirt_colour: Default::default(),
-            weapon: Default::default(),
+            weapon: crate::systems::weapons::state::loadout(),
             lifecycle: Default::default(),
             id: EntityId(player),
             display_name: DisplayName("fixture".into()),
@@ -377,7 +377,7 @@ fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors
         actor.0,
         PlayerComponent {
             tshirt_colour: Default::default(),
-            weapon: Default::default(),
+            weapon: crate::systems::weapons::state::loadout(),
             lifecycle: Default::default(),
             id: actor,
             display_name: DisplayName("fixture".into()),

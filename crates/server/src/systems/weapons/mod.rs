@@ -1,8 +1,8 @@
 //! Native weapon intent, ordered shot execution, damage and presentation.
 use crate::{
+    components::Player,
     ecs::state::Clock,
     ecs::{EntityIndex, GameId},
-    entities::player::Player,
     gameplay_messages::AutomaticShotRequested,
     sessions::{SessionPhase, Sessions},
     systems::police::Wanted,
@@ -36,8 +36,12 @@ pub(crate) fn request_automatic_shots(
             player.weapon.trigger = None;
             continue;
         }
-        if let Some(aim) = player.weapon.automatic_aim(clock.0, session.epoch)
-            && player.weapon.can_fire(&aim, true, clock.0).is_ok()
+        if let Some(aim) = crate::systems::weapons::state::automatic_aim(
+            &mut player.weapon,
+            clock.0,
+            session.epoch,
+        ) && crate::systems::weapons::state::can_fire(&player.weapon, &aim, true, clock.0)
+            .is_ok()
         {
             shots.write(AutomaticShotRequested {
                 peer,
@@ -97,8 +101,8 @@ pub(crate) fn retire_shots(mut shots: ResMut<Messages<crate::gameplay_messages::
 }
 
 use crate::{
+    components::{Pedestrian, Vehicle},
     ecs::state::{Collision, WorldIdentity},
-    entities::{pedestrian::Pedestrian, vehicle::Vehicle},
     gameplay_messages::{
         ActorEliminated, CrimeReported, NoiseEmitted, PlayerDeathRequested, ShotEmitted,
     },
@@ -264,13 +268,15 @@ impl Weapons<'_, '_> {
         match target {
             ShotTarget::Vehicle(id) => {
                 let (_, game_id, mut car, _) = self.cars.get_mut(entity).ok()?;
-                if game_id.0 != EntityId(id) || !car.apply_damage(amount, attacker) {
+                if game_id.0 != EntityId(id)
+                    || !crate::systems::damage::vehicle_damage(&mut car, amount, attacker)
+                {
                     return None;
                 }
                 if car.state.health.0 == 0 {
                     self.commands
                         .entity(entity)
-                        .insert_if_new(crate::metadata::DisabledVehicle((
+                        .insert_if_new(crate::components::DisabledVehicle((
                             self.clock.0.saturating_add(900),
                             0,
                         )));
@@ -282,11 +288,11 @@ impl Weapons<'_, '_> {
                 if game_id.0 != EntityId(id) {
                     return None;
                 }
-                p.apply_damage(amount as u8);
+                crate::systems::damage::pedestrian_damage(&mut p, amount as u8);
                 if p.state.health.0 == 0 {
                     self.commands
                         .entity(entity)
-                        .insert_if_new(crate::metadata::Incapacitated(
+                        .insert_if_new(crate::components::Incapacitated(
                             self.clock.0.saturating_add(300),
                         ));
                 }
@@ -417,38 +423,42 @@ impl Weapons<'_, '_> {
         }
         match action {
             Action::EquipWeapon(request) => {
-                let code = self
-                    .players
-                    .get_mut(entity)
-                    .unwrap()
-                    .2
-                    .weapon
-                    .equip(request.weapon_id, self.clock.0);
+                let code = crate::systems::weapons::state::equip(
+                    &mut self.players.get_mut(entity).unwrap().2.weapon,
+                    request.weapon_id,
+                    self.clock.0,
+                );
                 self.sessions.peers.get_mut(&peer).unwrap().status_dirty = true;
                 code
             }
             Action::Reload(_) => {
-                let code = self
-                    .players
-                    .get_mut(entity)
-                    .unwrap()
-                    .2
-                    .weapon
-                    .reload(self.clock.0);
+                let code = crate::systems::weapons::state::reload(
+                    &mut self.players.get_mut(entity).unwrap().2.weapon,
+                    self.clock.0,
+                );
                 self.sessions.peers.get_mut(&peer).unwrap().status_dirty = true;
                 code
             }
             Action::Fire(aim) => {
                 let (origin, direction, definition, sequence, weapon) = {
                     let (_, _, mut player) = self.players.get_mut(entity).unwrap();
-                    let definition = match player.weapon.begin_fire(aim, automatic, self.clock.0) {
+                    let definition = match crate::systems::weapons::state::begin_fire(
+                        &mut player.weapon,
+                        aim,
+                        automatic,
+                        self.clock.0,
+                    ) {
                         Ok(d) => d,
                         Err(code) => return code,
                     };
                     player.lifecycle.protected_until = None;
-                    let (origin, direction) = player.shot_ray(aim, self.clock.0);
-                    player.weapon.bloom = (player.weapon.bloom + definition.bloom_per_shot as f32)
-                        .min(definition.bloom_max as f32);
+                    let (origin, direction) =
+                        crate::systems::weapons::geometry::shot_ray(&player, aim, self.clock.0);
+                    let slot_index = player.weapon.equipped.index();
+                    player.weapon.slots[slot_index].bloom =
+                        (player.weapon.slots[player.weapon.equipped.index()].bloom
+                            + definition.bloom_per_shot as f32)
+                            .min(definition.bloom_max as f32);
                     player.weapon.shot_sequence += 1;
                     (
                         origin,
@@ -637,16 +647,17 @@ pub(crate) fn execute_officer_shots(
             || officer.mounted
             || officer.state.health.0 == 0
             || officer.weapon.reload_end.is_some()
-            || officer.weapon.magazine == 0
-            || weapons.clock.0 < officer.weapon.next_fire
+            || officer.weapon.slots[officer.weapon.equipped.index()].magazine == 0
+            || weapons.clock.0 < officer.weapon.slots[officer.weapon.equipped.index()].next_fire
             || officer.weapon.shot_sequence.checked_add(1) != Some(shot.sequence)
         {
             continue;
         }
-        let definition = officer.weapon.definition();
+        let definition = crate::systems::weapons::state::definition(&officer.weapon);
         officer.weapon.shot_sequence = shot.sequence;
-        officer.weapon.magazine -= 1;
-        officer.weapon.next_fire = weapons.clock.0.saturating_add(
+        let slot_index = officer.weapon.equipped.index();
+        officer.weapon.slots[slot_index].magazine -= 1;
+        officer.weapon.slots[slot_index].next_fire = weapons.clock.0.saturating_add(
             definition.fire_ticks.max(12)
                 + if shot.sequence.is_multiple_of(3) {
                     24
@@ -745,7 +756,11 @@ pub(crate) fn receive_triggers(
             && player.state.mode == CharacterMode::OnFoot
             && player.state.health.0 > 0
         {
-            player.weapon.trigger_intent(&message.intent, clock.0);
+            crate::systems::weapons::state::trigger_intent(
+                &mut player.weapon,
+                &message.intent,
+                clock.0,
+            );
         }
     }
 }
@@ -772,9 +787,9 @@ pub(crate) fn update_officer_weapons(
         if id.0 != message.officer || officer.mounted || officer.state.health.0 == 0 {
             continue;
         }
-        officer.weapon.advance(clock.0);
-        if officer.weapon.magazine == 0 {
-            officer.weapon.reload(clock.0);
+        crate::systems::weapons::state::advance(&mut officer.weapon, clock.0);
+        if officer.weapon.slots[officer.weapon.equipped.index()].magazine == 0 {
+            crate::systems::weapons::state::reload(&mut officer.weapon, clock.0);
         }
         officer.state.equipment = Some(EquipmentView {
             weapon_id: officer.weapon.equipped,
@@ -785,3 +800,6 @@ pub(crate) fn update_officer_weapons(
         });
     }
 }
+
+mod geometry;
+pub(crate) mod state;

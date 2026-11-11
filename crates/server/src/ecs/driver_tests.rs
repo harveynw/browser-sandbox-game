@@ -26,9 +26,9 @@ fn driver() -> TickDriver {
 #[test]
 fn native_startup_and_read_only_diagnostics_share_the_live_actor_world() {
     use crate::{
+        components::PoolMembership,
+        components::Vehicle,
         ecs::{EntityIndex, GameId},
-        entities::vehicle::Vehicle,
-        metadata::PoolMembership,
         systems::police::Unit,
     };
     let content = WorldContent::load_index(
@@ -113,7 +113,7 @@ fn native_shutdown_restores_profile_owner_and_clears_scoped_state() {
 #[derive(Resource, Default)]
 struct ObservedActors(Vec<(u32, usize)>);
 fn observe_actors(
-    cars: Query<&crate::entities::vehicle::Vehicle>,
+    cars: Query<&crate::components::Vehicle>,
     clock: Res<crate::ecs::state::Clock>,
     mut observed: ResMut<ObservedActors>,
 ) {
@@ -124,7 +124,7 @@ fn scheduled_queries_see_live_actors_and_resources_on_every_tick() {
     let mut driver = driver();
     let count = driver
         .host
-        .query::<&crate::entities::vehicle::Vehicle>()
+        .query::<&crate::components::Vehicle>()
         .iter(&driver.host)
         .count();
     assert!(count > 0);

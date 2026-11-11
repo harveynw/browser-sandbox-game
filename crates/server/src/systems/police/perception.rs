@@ -59,11 +59,12 @@ pub(crate) fn perceive(
                     .heat
                     > 0
                 {
-                    **wanted.get_mut(&id.0).expect("wanted component") = Wanted::default();
+                    **wanted.get_mut(&id.0).expect("wanted component") =
+                        crate::systems::police::state::clear_wanted();
                     s.status_dirty = true;
                 }
                 for unit in units.values_mut().filter(|u| u.target == Some(id.0)) {
-                    unit.release_target();
+                    crate::systems::police::state::release_target(unit);
                 }
             } else {
                 let before = (
@@ -141,7 +142,7 @@ fn ingest_crimes(
 ) {
     for (&(actor, cause), &report) in crimes {
         if actor == player {
-            wanted.observe(cause, tick, report);
+            crate::systems::police::state::observe(&mut *wanted, cause, tick, report);
         }
     }
 }
@@ -250,5 +251,5 @@ fn advance_pursuit(
             }
         });
     }
-    wanted.advance(tick, seen, arrest)
+    crate::systems::police::state::advance(&mut *wanted, tick, seen, arrest)
 }

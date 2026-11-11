@@ -1,5 +1,5 @@
 use super::*;
-use server::entities::player::Player as PlayerComponent;
+use server::components::Player as PlayerComponent;
 fn join_with_colour(
     w: &mut World,
     a: &mut Profiles,

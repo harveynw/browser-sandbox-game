@@ -1,7 +1,7 @@
 //! Gameplay systems own rule-specific bookkeeping, separately from world entities.
 pub(crate) mod planning;
 #[cfg(test)]
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Vehicle as VehicleComponent;
 #[cfg(test)]
 use std::result::Result;
 pub mod chat;
@@ -79,7 +79,7 @@ impl Systems {
                         car.state.motor.position.0.map(|v| v.0),
                     ) < 0.1
             }) {
-                world.entities.insert(id, crate::metadata::SecuredVehicle);
+                world.entities.insert(id, crate::components::SecuredVehicle);
             }
         }
         let mut systems = Self {
@@ -100,3 +100,6 @@ impl Systems {
 }
 
 pub(crate) mod startup;
+
+pub(crate) mod damage;
+pub(crate) mod vehicle;

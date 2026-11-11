@@ -11,7 +11,7 @@ flowchart TD
   Network --> Ingress["sessions/ingress.rs<br/>Scope, budgets, packet ordering<br/>Admission and baseline messages"]
   Ingress --> Driver
   ECS --> Gameplay["Native query systems<br/>Planning → movement → combat → police<br/>Failed peers → repairs → missions"]
-  Gameplay <--> Actors["Components<br/>Player / vehicle / pedestrian / officer<br/>AI controllers, wanted, missions, lifecycle"]
+  Gameplay <--> Actors["components.rs · data only<br/>Player / vehicle / pedestrian / officer<br/>AI controllers, wanted, missions, lifecycle"]
   Gameplay <--> Messages["Typed ECS messages<br/>Actions, impacts, crime, lifecycle<br/>Control transitions and rewards"]
   Gameplay <--> Resources["Shared coordination resources<br/>Navigation, RNG, reservations<br/>Cooldowns, metrics and session protocol state"]
   Gameplay --> Collision["sim-core<br/>Shared motors and collision queries"]

@@ -1,10 +1,10 @@
 //! Construct the authoritative Bevy world, then commit startup actors through
 //! the same indexed lifecycle commands and police roster used by live systems.
 use crate::{
+    components::Vehicle,
     content_loader::WorldContent,
     ecs::state::*,
     ecs::{EntityIndex, TickOutcome},
-    entities::vehicle::Vehicle,
     systems::{self, police::PoliceSystem, population::PopulationSystem},
     world::Metrics,
 };

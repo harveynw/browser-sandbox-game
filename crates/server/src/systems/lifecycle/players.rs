@@ -1,10 +1,10 @@
 //! Player respawn and protection timers, with independent consequence readers.
 use crate::{
+    components::PlayerMission,
+    components::{Pedestrian, Player},
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId},
-    entities::{pedestrian::Pedestrian, player::Player, weapon::Weapon},
     gameplay_messages::{ControlTransitionRequested, PlayerRespawned},
-    metadata::PlayerMission,
     sessions::Sessions,
 };
 use bevy_ecs::prelude::*;
@@ -105,7 +105,7 @@ pub(crate) fn respawn_players(
         player.state.health = CharacterHealth(100);
         player.state.mode = CharacterMode::OnFoot;
         player.state.vehicle_id = None;
-        player.weapon = Weapon::default();
+        player.weapon = crate::systems::weapons::state::loadout();
         player.weapon.shot_sequence = sequence;
         player.lifecycle.protected_until = Some(clock.0.saturating_add(90));
         player.lifecycle.respawn = None;
@@ -165,7 +165,7 @@ pub(crate) fn down_players(
         }
         player.state.mode = CharacterMode::Downed;
         player.state.motor.velocity = Vec3([Scalar(0.0); 3]);
-        player.weapon.cancel();
+        crate::systems::weapons::state::cancel(&mut player.weapon);
         player.lifecycle.protected_until = None;
         player.lifecycle.respawn = Some(death.tick.saturating_add(150));
         downed.write(crate::gameplay_messages::PlayerDowned(*death));
@@ -215,7 +215,7 @@ pub(crate) fn advance_weapon_timers(
             continue;
         };
         if let Ok(mut player) = players.get_mut(*entity)
-            && player.weapon.advance(clock.0)
+            && crate::systems::weapons::state::advance(&mut player.weapon, clock.0)
         {
             session.status_dirty = true;
         }

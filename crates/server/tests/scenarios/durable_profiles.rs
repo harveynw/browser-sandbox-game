@@ -1,6 +1,6 @@
 use super::*;
-use server::entities::player::Player as PlayerComponent;
-use server::entities::vehicle::Vehicle as VehicleComponent;
+use server::components::Player as PlayerComponent;
+use server::components::Vehicle as VehicleComponent;
 use server::systems::police::Wanted as WantedComponent;
 use std::{
     thread,
@@ -310,18 +310,18 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         }),
     );
     step(&mut w, &mut a, &mut t);
-    let instance = w.entities.values::<server::metadata::PlayerMission>()
+    let instance = w.entities.values::<server::components::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .id
         .clone();
-    let reward = w.entities.values::<server::metadata::PlayerMission>()
+    let reward = w.entities.values::<server::components::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .reward;
-    let target = w.entities.values::<server::metadata::PlayerMission>()
+    let target = w.entities.values::<server::components::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -334,7 +334,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -353,7 +353,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         pump(&mut w, &mut a, &mut t, p);
     }
     assert_eq!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -387,7 +387,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         1
     );
     assert!(
-        w.entities.values::<server::metadata::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     assert_eq!(

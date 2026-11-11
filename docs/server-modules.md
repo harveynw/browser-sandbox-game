@@ -31,12 +31,12 @@ flowchart TB
         repairs["repairs/mod.rs: RepairSystem"]
         police_tests["police/tests.rs: test-only child of police"]
     end
-    subgraph entities["entities/"]
-        entitymod["mod.rs: entity module declarations"]
-        player["player.rs: Player"]
-        vehicle["vehicle.rs: Vehicle and geometry"]
-        pedestrian["pedestrian.rs: Pedestrian"]
-        weapon["weapon.rs: Weapon"]
+    subgraph entities["components.rs · data only"]
+        entitymod["All 15 ECS component definitions"]
+        player["Player data"]
+        vehicle["Vehicle data"]
+        pedestrian["Pedestrian data"]
+        weapon["Weapon / Slot / Lifecycle payloads"]
     end
 
     main -. "uses library" .-> lib

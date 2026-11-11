@@ -2,9 +2,9 @@ mod control_transitions;
 pub(crate) mod egress;
 pub(crate) mod native;
 pub(crate) mod publication;
-use crate::entities::pedestrian::Pedestrian as PedestrianComponent;
-use crate::entities::player::Player as PlayerComponent;
-use crate::entities::vehicle::Vehicle as VehicleComponent;
+use crate::components::Pedestrian as PedestrianComponent;
+use crate::components::Player as PlayerComponent;
+use crate::components::Vehicle as VehicleComponent;
 use crate::sessions::{Session, SessionPhase, Sessions};
 use crate::systems::police::Officer as OfficerComponent;
 use crate::systems::police::Unit as PoliceUnitComponent;
@@ -282,3 +282,5 @@ impl SnapshotBuffer {
         Ok(bytes)
     }
 }
+
+pub(crate) mod projection;

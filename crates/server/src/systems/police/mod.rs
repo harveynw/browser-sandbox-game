@@ -2,18 +2,19 @@
 use crate::systems::population::PopulationSystem;
 #[cfg(test)]
 use crate::world::World;
+use bevy_ecs::prelude::{MessageReader, Query, Res, ResMut, With};
 pub(crate) mod driving;
 pub(crate) mod native;
 pub(crate) mod perception;
-use crate::entities::pedestrian::Pedestrian as PedestrianComponent;
-use crate::entities::player::Player as PlayerComponent;
+use crate::components::Pedestrian as PedestrianComponent;
+use crate::components::Player as PlayerComponent;
 pub(crate) mod officers;
-use crate::entities::vehicle::Vehicle;
+pub(crate) use crate::components::Officer;
+use crate::components::Vehicle;
 use crate::sessions::{SessionPhase, Sessions};
 use crate::systems::population::{Navigation, hidden};
 #[cfg(test)]
 use crate::systems::{combat::CombatSystem, population::Observer};
-pub(crate) use officers::Officer;
 pub(crate) use officers::OfficerShot;
 use protocol::*;
 use sim_core::CollisionWorld;
@@ -86,150 +87,8 @@ pub(crate) struct CrimeReport {
     confirmed: bool,
 }
 
-#[derive(bevy_ecs::prelude::Component, Clone)]
-pub struct Wanted {
-    pub heat: u8,
-    pub pursuit: Pursuit,
-    pub last_known: [f32; 3],
-    pub last_seen: u32,
-    vehicle_sighting: Option<VehicleSighting>,
-    search_since: Option<u32>,
-    points: u8,
-    last_police_attack: Option<u32>,
-    last_gunfire: Option<u32>,
-    next_officer_shot: u32,
-    fire_authorized: bool,
-    last_noise_increase: Option<u32>,
-    arrest_ticks: u32,
-    pub(crate) arrest_pending: bool,
-    pub(crate) surrendering: bool,
-    seen: VecDeque<CrimeId>,
-}
-impl Default for Wanted {
-    fn default() -> Self {
-        Self {
-            heat: 0,
-            pursuit: Pursuit::Clear,
-            last_known: [0.0; 3],
-            last_seen: 0,
-            vehicle_sighting: None,
-            search_since: None,
-            points: 0,
-            last_police_attack: None,
-            last_gunfire: None,
-            next_officer_shot: 0,
-            fire_authorized: false,
-            last_noise_increase: None,
-            arrest_ticks: 0,
-            arrest_pending: false,
-            surrendering: false,
-            seen: VecDeque::new(),
-        }
-    }
-}
-impl Wanted {
-    fn observe(&mut self, event: CrimeId, tick: u32, report: CrimeReport) {
-        if self.seen.contains(&event) {
-            return;
-        }
-        self.seen.push_back(event);
-        if self.seen.len() > 64 {
-            self.seen.pop_front();
-        }
-        if matches!(event, CrimeId::Shot(_))
-            && matches!(report.kind, CrimeKind::PoliceCar(_) | CrimeKind::Officer)
-        {
-            self.last_police_attack = Some(tick);
-            self.fire_authorized = true;
-        }
-        if matches!(event, CrimeId::Shot(_)) {
-            self.last_gunfire = Some(tick);
-        }
-        let noise = matches!(report.kind, CrimeKind::Shot);
-        if !noise
-            || self
-                .last_noise_increase
-                .is_none_or(|t| tick.saturating_sub(t) >= 30)
-        {
-            let ceiling = match report.kind {
-                CrimeKind::Shot => STAR_POINTS[1] - 1,
-                CrimeKind::Theft | CrimeKind::Harm => STAR_POINTS[2] - 1,
-                CrimeKind::PoliceCar(_) | CrimeKind::Officer => STAR_POINTS[2],
-            }
-            .max(self.points);
-            self.points = self
-                .points
-                .saturating_add(report.kind.points())
-                .min(ceiling);
-            self.heat = STAR_POINTS
-                .iter()
-                .filter(|&&threshold| self.points >= threshold)
-                .count() as u8;
-            if noise {
-                self.last_noise_increase = Some(tick);
-            }
-        }
-        // A noise report opens an investigation but cannot refresh visual contact.
-        if report.confirmed || self.pursuit == Pursuit::Clear {
-            self.last_seen = tick;
-            self.last_known = report.position;
-            self.search_since = None;
-            self.pursuit = Pursuit::Pursuing;
-        }
-    }
-    fn advance(&mut self, tick: u32, sight: Option<[f32; 3]>, arrest: bool) -> bool {
-        if self.arrest_pending {
-            return true;
-        }
-        if self.heat == 0 {
-            return false;
-        }
-        if let Some(position) = sight {
-            self.last_seen = tick;
-            self.last_known = position;
-            self.search_since = None;
-            self.pursuit = Pursuit::Pursuing;
-        } else if tick.saturating_sub(self.last_seen) >= 150 && self.search_since.is_none() {
-            self.search_since = Some(tick);
-            self.pursuit = Pursuit::Searching;
-        }
-        if self.search_since.is_some_and(|t| {
-            tick.saturating_sub(t) >= RESPONSE[usize::from(self.heat - 1)].search_ticks
-        }) {
-            self.heat -= 1;
-            self.points = if self.heat == 0 {
-                0
-            } else {
-                STAR_POINTS[usize::from(self.heat - 1)]
-            };
-            self.search_since = Some(tick);
-            if self.heat == 0 {
-                self.last_police_attack = None;
-                self.fire_authorized = false;
-                self.last_gunfire = None;
-                self.pursuit = Pursuit::Clear;
-                self.search_since = None;
-            }
-        }
-        if arrest && self.heat > 0 {
-            self.arrest_ticks = self.arrest_ticks.saturating_add(1);
-            self.pursuit = Pursuit::Arresting;
-        } else {
-            self.arrest_ticks = 0;
-            // Arresting is transient, not a state that survives failed conditions.
-            if self.pursuit == Pursuit::Arresting {
-                self.pursuit = if self.search_since.is_some() {
-                    Pursuit::Searching
-                } else {
-                    Pursuit::Pursuing
-                };
-            }
-        }
-        self.arrest_ticks >= 90
-    }
-}
 #[derive(Clone, Copy)]
-struct VehicleSighting {
+pub(crate) struct VehicleSighting {
     id: u32,
     tick: u32,
     position: [f32; 3],
@@ -238,7 +97,7 @@ struct VehicleSighting {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-enum Role {
+pub(crate) enum Role {
     #[default]
     Patrol,
     Lead,
@@ -296,53 +155,6 @@ fn approach_speed(gap: f32, brake: f32, lead_speed: f32) -> f32 {
     stopping_limit.min(following_limit)
 }
 
-#[derive(bevy_ecs::prelude::Component)]
-pub struct Unit {
-    pub target: Option<u32>,
-    role: Role,
-    intercept_retry: u32,
-    intercepting: bool,
-    home: [f32; 3],
-    route: VecDeque<u32>,
-    input: InputFrame,
-    target_speed: f32,
-    blocked: bool,
-    blocked_since: Option<u32>,
-    reverse_until: u32,
-    retry_after: u32,
-    avoided_node: Option<u32>,
-    avoid_until: u32,
-    route_goal: Option<u32>,
-    lane_entry: Option<[f32; 3]>,
-    next_plan: u32,
-    progress_at: u32,
-    progress_position: [f32; 3],
-    wreck_until: Option<u32>,
-    patrol_leg: usize,
-    search_leg: Option<usize>,
-}
-impl Unit {
-    pub(crate) fn release_target(&mut self) {
-        self.target = None;
-        self.route.clear();
-        self.lane_entry = None;
-        self.blocked_since = None;
-        self.reverse_until = 0;
-        self.avoided_node = None;
-        self.next_plan = 0;
-    }
-
-    pub(crate) fn motor_input(&self, tick: u32, speed: f32) -> InputFrame {
-        let mut input = self.input.clone();
-        input.tick = tick;
-        input.move_z = InputAxis(
-            ((self.target_speed - speed) * 2.0)
-                .clamp(-1.0, 1.0)
-                .mul_add(32767.0, 0.0) as i16,
-        );
-        input
-    }
-}
 #[derive(bevy_ecs::prelude::Resource)]
 pub struct PoliceSystem {
     sidewalk: Navigation,
@@ -383,7 +195,7 @@ impl PoliceSystem {
             .entities
             .view::<Unit>()
             .get(&id)
-            .map(|unit| unit.motor_input(tick, speed))
+            .map(|unit| crate::systems::police::state::motor_input(&unit, tick, speed))
     }
 }
 pub(crate) fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
@@ -548,16 +360,16 @@ mod tests {
 
     #[test]
     fn causal_dedup_cooldown_search_reacquisition_and_decay_are_exact() {
-        let mut w = Wanted::default();
+        let mut w = crate::systems::police::state::clear_wanted();
         let a = [10.0, 0.0, 20.0];
         let shot = CrimeReport {
             kind: CrimeKind::Shot,
             position: a,
             confirmed: false,
         };
-        w.observe(CrimeId::Shot(1), 0, shot);
+        crate::systems::police::state::observe(&mut w, CrimeId::Shot(1), 0, shot);
         for tick in 1..=90 {
-            w.observe(CrimeId::Shot(tick + 1), tick, shot);
+            crate::systems::police::state::observe(&mut w, CrimeId::Shot(tick + 1), tick, shot);
         }
         assert_eq!((w.heat, w.last_seen, w.last_known), (1, 0, a));
         let harm = CrimeReport {
@@ -565,41 +377,42 @@ mod tests {
             position: a,
             confirmed: true,
         };
-        w.observe(CrimeId::Shot(100), 91, harm);
+        crate::systems::police::state::observe(&mut w, CrimeId::Shot(100), 91, harm);
         assert_eq!(w.heat, 2);
         let attack = CrimeReport {
             kind: CrimeKind::PoliceCar(1),
             position: a,
             confirmed: true,
         };
-        w.observe(CrimeId::Shot(100), 92, attack);
+        crate::systems::police::state::observe(&mut w, CrimeId::Shot(100), 92, attack);
         assert_eq!(w.heat, 2);
         for id in 110..120 {
-            w.observe(CrimeId::Shot(id), 92, harm);
+            crate::systems::police::state::observe(&mut w, CrimeId::Shot(id), 92, harm);
             assert_eq!(w.heat, 2);
         }
-        w.observe(CrimeId::Shot(101), 92, attack);
-        w.observe(CrimeId::Shot(120), 92, harm);
+        crate::systems::police::state::observe(&mut w, CrimeId::Shot(101), 92, attack);
+        crate::systems::police::state::observe(&mut w, CrimeId::Shot(120), 92, harm);
         assert_eq!(w.heat, 3);
-        w.advance(242, None, false);
+        crate::systems::police::state::advance(&mut w, 242, None, false);
         assert_eq!(w.pursuit, Pursuit::Searching);
-        w.advance(1741, None, false);
+        crate::systems::police::state::advance(&mut w, 1741, None, false);
         assert_eq!(w.heat, 3);
-        w.advance(1742, None, false);
+        crate::systems::police::state::advance(&mut w, 1742, None, false);
         assert_eq!(w.heat, 2);
-        w.advance(1800, Some(a), false);
+        crate::systems::police::state::advance(&mut w, 1800, Some(a), false);
         assert_eq!(w.pursuit, Pursuit::Pursuing);
-        w.advance(1950, None, false);
-        w.advance(3000, None, false);
+        crate::systems::police::state::advance(&mut w, 1950, None, false);
+        crate::systems::police::state::advance(&mut w, 3000, None, false);
         assert_eq!(w.heat, 1);
-        w.advance(3600, None, false);
+        crate::systems::police::state::advance(&mut w, 3600, None, false);
         assert_eq!((w.heat, w.pursuit), (0, Pursuit::Clear));
         assert!(w.seen.len() <= 64);
     }
     #[test]
     fn arrest_requires_ninety_continuous_ticks_and_resets_on_any_invalid_tick() {
-        let mut w = Wanted::default();
-        w.observe(
+        let mut w = crate::systems::police::state::clear_wanted();
+        crate::systems::police::state::observe(
+            &mut w,
             CrimeId::Shot(1),
             0,
             CrimeReport {
@@ -609,16 +422,27 @@ mod tests {
             },
         );
         for tick in 1..90 {
-            assert!(!w.advance(tick, Some([0.0; 3]), true));
+            assert!(!crate::systems::police::state::advance(
+                &mut w,
+                tick,
+                Some([0.0; 3]),
+                true
+            ));
         }
         assert_eq!(w.pursuit, Pursuit::Arresting);
-        assert!(!w.advance(90, None, false));
+        assert!(!crate::systems::police::state::advance(
+            &mut w, 90, None, false
+        ));
         assert_eq!(w.arrest_ticks, 0);
         assert_eq!(w.pursuit, Pursuit::Pursuing);
         for tick in 91..180 {
-            assert!(!w.advance(tick, None, true));
+            assert!(!crate::systems::police::state::advance(
+                &mut w, tick, None, true
+            ));
         }
-        assert!(w.advance(180, None, true));
+        assert!(crate::systems::police::state::advance(
+            &mut w, 180, None, true
+        ));
     }
 }
 
@@ -641,7 +465,7 @@ pub(crate) fn observe_crime(
         .and_then(|id| {
             world
                 .entities
-                .view::<crate::entities::vehicle::Vehicle>()
+                .view::<crate::components::Vehicle>()
                 .get(&id.0)
         })
         .map_or(player.state.motor.position.0, |car| {
@@ -657,7 +481,7 @@ pub(crate) fn observe_crime(
             .view::<Unit>()
             .keys()
             .map(|id| {
-                let car = &world.entities.view::<crate::entities::vehicle::Vehicle>()[id];
+                let car = &world.entities.view::<crate::components::Vehicle>()[id];
                 (
                     *id,
                     car.state.health.0,
@@ -713,9 +537,9 @@ pub(crate) fn observe_crime_snapshot(
 }
 
 pub(crate) fn receive_crimes(
-    mut messages: bevy_ecs::prelude::MessageReader<crate::gameplay_messages::CrimeReported>,
-    mut police: bevy_ecs::prelude::ResMut<PoliceSystem>,
-    actors: bevy_ecs::prelude::Query<&crate::ecs::GameId, bevy_ecs::prelude::With<PlayerComponent>>,
+    mut messages: MessageReader<crate::gameplay_messages::CrimeReported>,
+    mut police: ResMut<PoliceSystem>,
+    actors: Query<&crate::ecs::GameId, With<PlayerComponent>>,
 ) {
     for message in messages.read() {
         // A disconnect or entity replacement cannot revive a stale report.
@@ -729,11 +553,11 @@ pub(crate) fn receive_crimes(
 }
 
 pub(crate) fn reset_respawned_players(
-    mut messages: bevy_ecs::prelude::MessageReader<crate::gameplay_messages::PlayerRespawned>,
-    mut actors: bevy_ecs::prelude::Query<(&crate::ecs::GameId, &mut Wanted)>,
-    mut units: bevy_ecs::prelude::Query<&mut Unit>,
-    mut police: bevy_ecs::prelude::ResMut<PoliceSystem>,
-    clock: bevy_ecs::prelude::Res<crate::ecs::state::Clock>,
+    mut messages: MessageReader<crate::gameplay_messages::PlayerRespawned>,
+    mut actors: Query<(&crate::ecs::GameId, &mut Wanted)>,
+    mut units: Query<&mut Unit>,
+    mut police: ResMut<PoliceSystem>,
+    clock: Res<crate::ecs::state::Clock>,
 ) {
     for message in messages.read() {
         if message.tick != clock.0 {
@@ -745,7 +569,7 @@ pub(crate) fn reset_respawned_players(
         if id.0 != message.player {
             continue;
         }
-        *wanted = Default::default();
+        *wanted = crate::systems::police::state::clear_wanted();
         for mut unit in &mut units {
             if unit.target != Some(message.player.0) {
                 continue;
@@ -759,5 +583,25 @@ pub(crate) fn reset_respawned_players(
             unit.next_plan = 0;
         }
         police.crimes.retain(|(id, _), _| *id != message.player.0);
+    }
+}
+
+pub(crate) mod state;
+pub use crate::components::{Unit, Wanted};
+
+pub(crate) fn player_leaving(
+    mut messages: MessageReader<crate::gameplay_messages::PlayerLeaving>,
+    players: Query<&crate::components::GameId, With<PlayerComponent>>,
+    mut police: ResMut<PoliceSystem>,
+    clock: Res<crate::ecs::state::Clock>,
+) {
+    for message in messages.read().filter(|m| m.tick == clock.0) {
+        if message
+            .entity
+            .is_some_and(|entity| !players.get(entity).is_ok_and(|id| id.0 == message.player))
+        {
+            continue;
+        }
+        police.forget_crimes(message.player.0);
     }
 }

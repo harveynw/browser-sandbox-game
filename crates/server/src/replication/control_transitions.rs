@@ -1,11 +1,11 @@
 //! Native message consumer for control epochs and reliable replica refreshes.
 use super::Replication;
 use crate::{
+    components::SecuredVehicle,
+    components::{Pedestrian, Player, Vehicle},
     ecs::state::{Clock, WorldIdentity},
     ecs::{EntityIndex, GameId, TickOutcome},
-    entities::{pedestrian::Pedestrian, player::Player, vehicle::Vehicle},
     gameplay_messages::ControlTransitionRequested,
-    metadata::SecuredVehicle,
     sessions::Sessions,
     systems::police::{Officer, Unit},
 };
@@ -41,7 +41,7 @@ impl Replicas<'_, '_> {
                     template_id: TemplateId("player_greybox".into()),
                     display_name: Some(player.display_name.clone()),
                 },
-                EntityState::Character(player.public_state()),
+                EntityState::Character(crate::replication::projection::public_state(player)),
             ));
         }
         if let Ok((vehicle, police, secured)) = self.vehicles.get(entity) {
@@ -128,7 +128,7 @@ pub(crate) fn apply_control_transitions(
                 .get(message.player_entity)
                 .map_err(|_| "missing player")?
                 .1;
-            let player_state = player.public_state();
+            let player_state = crate::replication::projection::public_state(player);
             let controlled_entity_id = player.state.vehicle_id.unwrap_or(message.player);
             let state = if controlled_entity_id == message.player {
                 EntityState::Character(player_state.clone())

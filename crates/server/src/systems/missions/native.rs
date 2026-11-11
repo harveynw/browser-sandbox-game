@@ -1,10 +1,10 @@
 //! Native mission progression, recovery lifecycle and durable reward messages.
 use super::*;
 use crate::{
+    components::{PlayerMission, RecoveryReservation},
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId, TickOutcome},
     gameplay_messages::ControlTransitionRequested,
-    metadata::{PlayerMission, RecoveryReservation},
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
@@ -97,14 +97,16 @@ impl JobActors<'_, '_> {
         }
         let id = s.player.ok_or("recovery owner missing")?;
         if self.player(id.0).state.vehicle_id == Some(EntityId(car)) {
-            self.cars
-                .get_mut(self.index.0[&car])
-                .map_err(|_| "recovery car missing")?
-                .1
-                .stop();
+            crate::systems::vehicle::stop(
+                &mut self
+                    .cars
+                    .get_mut(self.index.0[&car])
+                    .map_err(|_| "recovery car missing")?
+                    .1,
+            );
             self.collision.0.exclude_vehicle(Some(car));
             let exit =
-                crate::entities::vehicle::safe_exit_with(self.car(car), &self.collision.0, |p| {
+                crate::systems::vehicle::safe_exit_with(self.car(car), &self.collision.0, |p| {
                     self.clear(p, id.0)
                 });
             self.collision.0.exclude_vehicle(None);
@@ -122,7 +124,7 @@ impl JobActors<'_, '_> {
             p.state.vehicle_id = None;
             p.state.mode = CharacterMode::OnFoot;
             p.state.motor = sim_core::spawn_character(exit, yaw)?;
-            p.weapon.cancel();
+            crate::systems::weapons::state::cancel(&mut p.weapon);
             s.status_dirty = true;
             self.controls.write(ControlTransitionRequested {
                 peer,
@@ -220,10 +222,12 @@ pub(crate) fn refresh_proxies(
     mut outcome: ResMut<TickOutcome>,
 ) {
     let cars: BTreeMap<_, _> = cars.iter().map(|(id, c)| (id.0.0, c)).collect();
-    if let Err(e) = collision
-        .0
-        .set_vehicle_proxies(&cars.values().map(|c| c.proxy()).collect::<Vec<_>>())
-    {
+    if let Err(e) = collision.0.set_vehicle_proxies(
+        &cars
+            .values()
+            .map(|c| crate::systems::vehicle::proxy(c))
+            .collect::<Vec<_>>(),
+    ) {
         outcome.fail(e);
     }
 }
@@ -235,7 +239,7 @@ pub(crate) struct AcceptanceActors<'w, 's> {
     peds: Query<'w, 's, (&'static GameId, &'static PedestrianComponent)>,
     missions: Query<'w, 's, &'static mut PlayerMission>,
     reservations: Query<'w, 's, (&'static GameId, &'static RecoveryReservation)>,
-    pools: Query<'w, 's, (&'static GameId, &'static crate::metadata::PoolMembership)>,
+    pools: Query<'w, 's, (&'static GameId, &'static crate::components::PoolMembership)>,
     commands: Commands<'w, 's>,
 }
 fn accept(
@@ -456,8 +460,8 @@ fn accept(
             };
             let bundle = (
                 vehicle,
-                crate::metadata::PoolMembership(crate::systems::population::VehiclePool::Parked),
-                crate::metadata::RecoveryReservation(Reservation {
+                crate::components::PoolMembership(crate::systems::population::VehiclePool::Parked),
+                crate::components::RecoveryReservation(Reservation {
                     slot: slot.id,
                     owner: id.0,
                 }),
@@ -466,7 +470,7 @@ fn accept(
                 crate::systems::planning::spawn(
                     &mut actors.commands,
                     car,
-                    (bundle, crate::metadata::SecuredVehicle),
+                    (bundle, crate::components::SecuredVehicle),
                 );
             } else {
                 crate::systems::planning::spawn(&mut actors.commands, car, bundle);
@@ -695,7 +699,7 @@ pub(crate) fn publish_status(
             s.id.clone(),
             PlayerStatus {
                 equipped_weapon: p.weapon.equipped,
-                inventory: p.weapon.views(),
+                inventory: crate::replication::projection::views(&p.weapon),
                 equip_end_tick: p.weapon.equip_end,
                 revision: Revision(next),
                 server_tick: clock.0,
@@ -704,7 +708,7 @@ pub(crate) fn publish_status(
                 completed_jobs: profile.completed_jobs,
                 heat: Heat(w.heat),
                 pursuit: w.pursuit,
-                magazine: Magazine(p.weapon.magazine),
+                magazine: Magazine(p.weapon.slots[p.weapon.equipped.index()].magazine),
                 reload_end_tick: p.weapon.reload_end,
                 mission: m.0.as_ref().map(|m| m.view()),
                 respawn_tick: p.lifecycle.respawn,

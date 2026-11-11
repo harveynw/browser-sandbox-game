@@ -2,9 +2,9 @@
 //! view below borrows components for one call; it is never retained as a resource.
 use super::*;
 use crate::{
+    components::{PlayerMission, SecuredVehicle},
     ecs::state::{Clock, WorldIdentity},
     ecs::{GameId, TickOutcome},
-    metadata::{PlayerMission, SecuredVehicle},
 };
 use bevy_ecs::{prelude::*, system::SystemParam};
 use std::result::Result;
@@ -134,8 +134,10 @@ impl Projection {
                 .state
                 .vehicle_id
                 .map(|car| EntityState::Vehicle(world.cars[&car.0].state.clone()))
-                .unwrap_or_else(|| EntityState::Character(player.public_state())),
-            player_state: player.public_state(),
+                .unwrap_or_else(|| {
+                    EntityState::Character(crate::replication::projection::public_state(player))
+                }),
+            player_state: crate::replication::projection::public_state(player),
         })
     }
     pub(crate) fn entities(world: &View) -> BTreeMap<u32, (EntityDescriptor, EntityState)> {
@@ -153,7 +155,7 @@ impl Projection {
                             template_id: TemplateId("player_greybox".into()),
                             display_name: Some(p.display_name.clone()),
                         },
-                        EntityState::Character(p.public_state()),
+                        EntityState::Character(crate::replication::projection::public_state(p)),
                     ),
                 )
             })
@@ -269,7 +271,7 @@ impl Projection {
         let p = s.profile.as_ref().ok_or("profile missing")?;
         Ok(PlayerStatus {
             equipped_weapon: world.players[&s.player_id()].weapon.equipped,
-            inventory: world.players[&s.player_id()].weapon.views(),
+            inventory: crate::replication::projection::views(&world.players[&s.player_id()].weapon),
             equip_end_tick: world.players[&s.player_id()].weapon.equip_end,
             revision: Revision(s.status_revision),
             server_tick: tick,
@@ -288,7 +290,11 @@ impl Projection {
                 .get(&(s.player_id()))
                 .expect("admitted wanted state")
                 .pursuit,
-            magazine: Magazine(world.players[&s.player_id()].weapon.magazine),
+            magazine: Magazine(
+                world.players[&s.player_id()].weapon.slots
+                    [world.players[&s.player_id()].weapon.equipped.index()]
+                .magazine,
+            ),
             reload_end_tick: world.players[&s.player_id()].weapon.reload_end,
             mission: world
                 .missions

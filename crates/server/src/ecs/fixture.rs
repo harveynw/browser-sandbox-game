@@ -1,6 +1,7 @@
 //! Test-only convenience access to the authoritative Bevy world.
 
 use super::*;
+use protocol::EntityId;
 pub struct EntityStore {
     pub(super) world: Box<World>,
 }
@@ -124,25 +125,25 @@ impl EntityStore {
             }
         }
     }
-    pub fn values<C: crate::metadata::ComponentValue>(&self) -> ValueView<'_, C> {
+    pub fn values<C: crate::ecs::values::ComponentValue>(&self) -> ValueView<'_, C> {
         ValueView {
             inner: self.view::<C>(),
         }
     }
-    pub fn value_mut<C: crate::metadata::ComponentValue>(
+    pub fn value_mut<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: &u32,
     ) -> Option<&mut C::Value> {
         self.get_mut_by_id::<C>(id).map(C::value_mut)
     }
-    pub fn insert_value<C: crate::metadata::ComponentValue>(
+    pub fn insert_value<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: u32,
         value: C::Value,
     ) -> Option<C> {
         self.insert(id, C::new(value))
     }
-    pub fn value_or_insert<C: crate::metadata::ComponentValue>(
+    pub fn value_or_insert<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: u32,
         value: C::Value,
@@ -152,7 +153,7 @@ impl EntityStore {
         }
         self.value_mut::<C>(&id).expect("inserted metadata")
     }
-    pub fn retain_value<C: crate::metadata::ComponentValue>(
+    pub fn retain_value<C: crate::ecs::values::ComponentValue>(
         &mut self,
         mut keep: impl FnMut(&u32, &mut C::Value) -> bool,
     ) {
@@ -234,10 +235,10 @@ impl<'w, T: Component> IntoIterator for ComponentView<'w, T> {
 }
 
 /// A read-only payload projection onto named metadata components.
-pub struct ValueView<'w, C: crate::metadata::ComponentValue> {
+pub struct ValueView<'w, C: crate::ecs::values::ComponentValue> {
     inner: ComponentView<'w, C>,
 }
-impl<'w, C: crate::metadata::ComponentValue> ValueView<'w, C> {
+impl<'w, C: crate::ecs::values::ComponentValue> ValueView<'w, C> {
     pub fn get(&self, id: &u32) -> Option<&'w C::Value> {
         self.inner.get(id).map(C::value)
     }
@@ -260,7 +261,7 @@ impl<'w, C: crate::metadata::ComponentValue> ValueView<'w, C> {
         self.inner.is_empty()
     }
 }
-impl<C: crate::metadata::ComponentValue> Index<&u32> for ValueView<'_, C> {
+impl<C: crate::ecs::values::ComponentValue> Index<&u32> for ValueView<'_, C> {
     type Output = C::Value;
     fn index(&self, id: &u32) -> &Self::Output {
         self.get(id).expect("missing entity metadata")

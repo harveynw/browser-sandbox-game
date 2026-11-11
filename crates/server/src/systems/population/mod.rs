@@ -2,7 +2,7 @@
 pub(crate) mod native;
 pub(crate) mod pedestrians;
 pub(crate) mod traffic;
-use crate::entities::vehicle::Vehicle;
+use crate::components::Vehicle;
 use content::{EdgeKind, RoadGraph, WorldManifest};
 use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
@@ -42,35 +42,8 @@ pub struct Observer {
     pub position: [f32; 3],
     pub yaw: f32,
 }
-#[derive(bevy_ecs::prelude::Component)]
-pub struct Traffic {
-    pub phase: TrafficPhase,
-    route: VecDeque<u32>,
-    input: InputFrame,
-    target_speed: f32,
-    next_plan: u32,
-    progress_at: u32,
-    progress_position: [f32; 3],
-    far_since: Option<u32>,
-    parking: Option<usize>,
-    born: u32,
-}
-impl Traffic {
-    pub(crate) fn motor_input(&self, tick: u32, speed: f32) -> Option<InputFrame> {
-        if self.phase == TrafficPhase::Available {
-            return None;
-        }
-        let mut input = self.input.clone();
-        input.tick = tick;
-        input.move_z = InputAxis(
-            ((self.target_speed - speed) * 2.0)
-                .clamp(-1.0, 1.0)
-                .mul_add(32767.0, 0.0) as i16,
-        );
-        Some(input)
-    }
-}
-use crate::entities::pedestrian::Pedestrian;
+
+use crate::components::Pedestrian;
 #[derive(Default, Debug)]
 pub struct PopulationMetrics {
     pub spawned: u64,
@@ -220,7 +193,7 @@ impl PopulationSystem {
         let parked: Vec<_> = parked.collect();
         let population = Self::from_content(manifest, config, parked.len(), seed)?;
         for id in parked {
-            vehicles.insert_value::<crate::metadata::PoolMembership>(id, VehiclePool::Parked);
+            vehicles.insert_value::<crate::components::PoolMembership>(id, VehiclePool::Parked);
         }
         Ok(population)
     }
@@ -307,10 +280,9 @@ impl PopulationSystem {
         speed: f32,
         vehicles: &crate::ecs::EntityStore,
     ) -> Option<InputFrame> {
-        vehicles
-            .view::<Traffic>()
-            .get(&id)
-            .and_then(|traffic| traffic.motor_input(tick, speed))
+        vehicles.view::<Traffic>().get(&id).and_then(|traffic| {
+            crate::systems::population::input::motor_input(&traffic, tick, speed)
+        })
     }
     #[cfg(test)]
     pub fn decide(
@@ -360,7 +332,7 @@ impl PopulationSystem {
         vehicles: &mut crate::ecs::EntityStore,
     ) -> Result<(), String> {
         for ped in vehicles.values_mut::<Pedestrian>() {
-            ped.step_motor(tick, collision, config)?;
+            crate::systems::movement::pedestrians::step_motor(&mut *ped, tick, collision, config)?;
         }
         Ok(())
     }
@@ -665,7 +637,7 @@ mod tests {
                 &cars
                     .view::<Vehicle>()
                     .values()
-                    .map(Vehicle::proxy)
+                    .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
             )
             .unwrap();
@@ -705,7 +677,7 @@ mod tests {
                     &cars
                         .view::<Vehicle>()
                         .values()
-                        .map(Vehicle::proxy)
+                        .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
@@ -738,7 +710,7 @@ mod tests {
         let id = *cars.view::<Vehicle>().keys().next().unwrap();
         cars.retain::<Vehicle>(|k, _| *k == id);
         cars.retain::<Traffic>(|k, _| *k == id);
-        cars.retain_value::<crate::metadata::PoolMembership>(|k, _| *k == id);
+        cars.retain_value::<crate::components::PoolMembership>(|k, _| *k == id);
         cars.clear::<Pedestrian>();
         let slot = c.manifest.parking[0].position.map(|v| v as f32);
         cars.get_mut_by_id::<Vehicle>(&id).unwrap().state.motor =
@@ -752,7 +724,7 @@ mod tests {
                     &cars
                         .view::<Vehicle>()
                         .values()
-                        .map(Vehicle::proxy)
+                        .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
                 )
                 .unwrap();
@@ -782,7 +754,7 @@ mod tests {
                 assert!(distance(car.state.motor.position.0.map(|v| v.0), slot) < 2.0);
                 assert!(car.state.motor.speed.0.abs() < 0.3);
                 assert_eq!(
-                    cars.values::<crate::metadata::PoolMembership>()[&id],
+                    cars.values::<crate::components::PoolMembership>()[&id],
                     VehiclePool::Traffic
                 );
                 return;
@@ -932,13 +904,13 @@ mod tests {
         cars.get_mut_by_id::<Traffic>(&id).unwrap().phase = TrafficPhase::Available;
         assert!(p.can_enter(id, &cars));
         cars.get_mut_by_id::<Vehicle>(&id).unwrap().state.driver_id = Some(EntityId(1000));
-        let tag = cars.values::<crate::metadata::PoolMembership>()[&id];
+        let tag = cars.values::<crate::components::PoolMembership>()[&id];
         p.direct(1500, &[], &mut cars, &c.manifest, &mut collision, &mut next)
             .unwrap();
         p.direct(3000, &[], &mut cars, &c.manifest, &mut collision, &mut next)
             .unwrap();
         assert!(cars.view::<Vehicle>().contains_key(&id));
-        assert_eq!(cars.values::<crate::metadata::PoolMembership>()[&id], tag);
+        assert_eq!(cars.values::<crate::components::PoolMembership>()[&id], tag);
         assert_eq!(cars.view::<Traffic>().len(), 1);
         assert!(cars.view::<Pedestrian>().is_empty());
     }
@@ -980,7 +952,7 @@ mod tests {
             assert!(cars.view::<Pedestrian>().len() <= PEDESTRIAN_CAP);
             assert_eq!(
                 cars.view::<Vehicle>().len(),
-                cars.values::<crate::metadata::PoolMembership>()
+                cars.values::<crate::components::PoolMembership>()
                     .values()
                     .filter(|p| **p == VehiclePool::Traffic)
                     .count()
@@ -1043,7 +1015,10 @@ mod tests {
         }
         assert!(cars.view::<Vehicle>().is_empty());
         assert!(cars.view::<Pedestrian>().is_empty());
-        assert!(cars.values::<crate::metadata::PoolMembership>().is_empty());
+        assert!(
+            cars.values::<crate::components::PoolMembership>()
+                .is_empty()
+        );
     }
     #[test]
     fn sensor_brakes_and_unreachable_graph_stops_without_moving_through_static_geometry() {
@@ -1090,7 +1065,7 @@ mod tests {
                 &cars
                     .view::<Vehicle>()
                     .values()
-                    .map(Vehicle::proxy)
+                    .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
             )
             .unwrap();
@@ -1250,3 +1225,6 @@ pub(crate) fn release_restored_vehicles(
         population.intersections.release(message.vehicle.0);
     }
 }
+
+pub(crate) mod input;
+pub use crate::components::Traffic;

@@ -1,9 +1,9 @@
 //! Native ECS motor systems. They require neither the legacy adapter nor subsystem managers.
 use crate::{
+    components::{Pedestrian, Vehicle},
     ecs::runtime::Scratch,
     ecs::state::{Collision, SimulationConfig},
     ecs::{GameId, TickOutcome, TickPhase},
-    entities::{pedestrian::Pedestrian, vehicle::Vehicle},
     gameplay_messages::VehicleImpact,
     performance::WorldTimings,
     systems::{police::Unit, population::Traffic},
@@ -29,7 +29,12 @@ pub(crate) fn move_pedestrians(
         let mut actors: Vec<_> = pedestrians.iter_mut().collect();
         actors.sort_by_key(|(id, _)| id.0.0);
         for (_, mut ped) in actors {
-            ped.step_motor(tick, &collision.0, &config.0)?;
+            crate::systems::movement::pedestrians::step_motor(
+                &mut ped,
+                tick,
+                &collision.0,
+                &config.0,
+            )?;
         }
         Ok(())
     })();
@@ -67,7 +72,7 @@ pub(crate) fn move_vehicles(
                 let (entity, id, car, police, traffic) = &mut actors[i];
                 if car.state.disabled || car.state.health.0 == 0 {
                     car.idle_ticks = car.idle_ticks.saturating_add(1);
-                    car.stop();
+                    crate::systems::vehicle::stop(&mut *car);
                     continue;
                 }
                 collision.0.exclude_vehicle(Some(car.id.0));
@@ -77,10 +82,22 @@ pub(crate) fn move_vehicles(
                     .get(&car.id.0)
                     .cloned()
                     .or_else(|| {
-                        police.map(|unit| unit.motor_input(frame.next, car.state.motor.speed.0))
+                        police.map(|unit| {
+                            crate::systems::police::state::motor_input(
+                                unit,
+                                frame.next,
+                                car.state.motor.speed.0,
+                            )
+                        })
                     })
                     .or_else(|| {
-                        traffic.and_then(|ai| ai.motor_input(frame.next, car.state.motor.speed.0))
+                        traffic.and_then(|ai| {
+                            crate::systems::population::input::motor_input(
+                                ai,
+                                frame.next,
+                                car.state.motor.speed.0,
+                            )
+                        })
                     })
                     .unwrap_or_else(|| sim_core::neutral_input(frame.next, car.state.motor.yaw));
                 match sim_core::step_vehicle(
@@ -109,7 +126,7 @@ pub(crate) fn move_vehicles(
                         };
                     }
                     Err(_) => {
-                        car.stop();
+                        crate::systems::vehicle::stop(&mut *car);
                         if let Some(driver) = car.state.driver_id
                             && let Some(peer) = frame.owners.get(&driver.0)
                         {
@@ -122,7 +139,7 @@ pub(crate) fn move_vehicles(
             collision.0.set_vehicle_proxies(
                 &actors
                     .iter()
-                    .map(|(_, _, car, _, _)| car.proxy())
+                    .map(|(_, _, car, _, _)| crate::systems::vehicle::proxy(car))
                     .collect::<Vec<_>>(),
             )?;
         }
@@ -137,8 +154,8 @@ pub(crate) fn move_vehicles(
 
 /// Player motors follow vehicle commits; owners retain deterministic game-ID order.
 pub(crate) fn move_players(
-    mut players: Query<&mut crate::entities::player::Player>,
-    vehicles: Query<&crate::entities::vehicle::Vehicle>,
+    mut players: Query<&mut crate::components::Player>,
+    vehicles: Query<&crate::components::Vehicle>,
     index: Res<crate::ecs::EntityIndex>,
     collision: NonSend<crate::ecs::state::Collision>,
     config: Res<crate::ecs::state::SimulationConfig>,
@@ -160,7 +177,7 @@ pub(crate) fn move_players(
                         .get(*entity)
                         .map_err(|_| "controlled vehicle missing")?;
                     let mut motor = sim_core::vehicle::presentation_motor(&car.state.motor);
-                    motor.position = Vec3(car.seat().map(Scalar));
+                    motor.position = Vec3(crate::systems::vehicle::seat(car).map(Scalar));
                     Ok::<_, String>(motor)
                 })
                 .transpose()?;
