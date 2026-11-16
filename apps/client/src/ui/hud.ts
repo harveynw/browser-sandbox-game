@@ -1,4 +1,19 @@
 import type { MissionCard } from "../game/courier";
+type WeaponId = "pistol" | "rifle" | "machine_gun";
+const weaponArt: Record<WeaponId, { name: string; path: string }> = {
+  pistol: {
+    name: "Pistol",
+    path: "M17 18H77V23H82V29H49L45 34H39L35 51H22L27 30H17ZM43 30L41 36H50L53 30H49L47 33H45L46 30Z",
+  },
+  rifle: {
+    name: "Rifle",
+    path: "M3 26L23 29H34V23H48V18H57V23H79V25H96V29H80V32H61L56 37L61 48H49L45 35H38L33 44H25L28 33L3 38ZM58 33H66V38H60ZM68 30H75V48H66Z",
+  },
+  machine_gun: {
+    name: "Machine gun",
+    path: "M2 25L22 28H31V22H44V18H58V22H72V25H96V29H73V33H57L53 37L56 49H45L42 35H34L30 42H24L26 33L2 38ZM59 34H74V46H59ZM77 30L88 49H84L75 34ZM44 15H61V18H44Z",
+  },
+};
 export interface HudModel {
   guidance: string;
   objectiveLabel: string;
@@ -7,16 +22,21 @@ export interface HudModel {
   health: number;
   heat: number;
   pursuit: string;
-  ammo: string;
   magazine: number;
+  totalAmmo: number;
+  totalAmmoCapacity: number;
   capacity?: number;
-  vehicle: string;
+  speedMph?: number | null;
+  weapons?: readonly { id: WeaponId; equipped: boolean; owned: boolean }[];
   vehicleHealth: { current: number; maximum: number } | null;
   warning: string;
 }
 /** Values are read-only presentation snapshots, refreshed by the app at at most 10 Hz. */
 export class GameHud {
   readonly element = document.createElement("section");
+  get lowerPanels(): readonly HTMLElement[] {
+    return [this.vitals, this.speedometer];
+  }
   private objective = document.createElement("div");
   private objectiveLabel = document.createElement("span");
   private contractTitle = document.createElement("h2");
@@ -33,10 +53,17 @@ export class GameHud {
   private ammoFill = document.createElement("i");
   private healthBar = document.createElement("div");
   private ammoBar = document.createElement("div");
+  private ammoRow = document.createElement("div");
   private vehicleFill = document.createElement("i");
   private vehicleBar = document.createElement("div");
   private vehicleRow = document.createElement("div");
-  private combat = document.createElement("p");
+  private totalAmmoBar = document.createElement("div");
+  private totalAmmoFill = document.createElement("i");
+  private weapons = document.createElement("div");
+  private weaponSlots = new Map<WeaponId, HTMLDivElement>();
+  private speedometer = document.createElement("div");
+  private speedValue = document.createElement("strong");
+  private speedArc: SVGPathElement;
   private wanted = document.createElement("div");
   private warning = document.createElement("p");
   private previousHeat = 0;
@@ -71,16 +98,55 @@ export class GameHud {
     );
     this.wallet.className = "hud-wallet";
     this.vitals.className = "hud-vitals";
+    this.weapons.className = "hud-weapons";
+    this.weapons.setAttribute("role", "group");
+    this.weapons.setAttribute("aria-label", "Weapons and equip keys");
+    for (const [index, id] of (
+      ["pistol", "rifle", "machine_gun"] as const
+    ).entries()) {
+      const slot = document.createElement("div");
+      slot.className = "hud-weapon";
+      slot.title = `${weaponArt[id].name} · ${index + 1} to equip`;
+      // Authored silhouettes are static local SVG; server/player text never becomes markup.
+      slot.innerHTML = `<svg viewBox="0 0 100 64" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${weaponArt[id].path}"/></svg><span class="hud-weapon-key">${index + 1}</span>`;
+      this.weaponSlots.set(id, slot);
+      this.weapons.append(slot);
+    }
+    this.speedometer.className = "hud-speedometer";
+    this.speedometer.hidden = true;
+    this.speedometer.setAttribute("role", "meter");
+    this.speedometer.setAttribute("aria-label", "Vehicle speed");
+    this.speedometer.setAttribute("aria-valuemin", "0");
+    this.speedometer.setAttribute("aria-valuemax", "120");
+    const ticks = Array.from({ length: 25 }, (_, i) => {
+      const angle = ((135 + (i * 270) / 24) * Math.PI) / 180;
+      const inner = i % 4 === 0 ? 41 : 45;
+      return `<line x1="${64 + Math.cos(angle) * inner}" y1="${64 + Math.sin(angle) * inner}" x2="${64 + Math.cos(angle) * 49}" y2="${64 + Math.sin(angle) * 49}"/>`;
+    }).join("");
+    this.speedometer.innerHTML = `<svg viewBox="0 0 128 128" aria-hidden="true"><g class="hud-speed-ticks">${ticks}</g><path class="hud-speed-track" d="M25.11 102.89 A55 55 0 1 1 102.89 102.89"/><path class="hud-speed-arc" pathLength="100" d="M25.11 102.89 A55 55 0 1 1 102.89 102.89"/><text x="23" y="119">0</text><text x="105" y="119">120</text></svg>`;
+    const arc =
+      this.speedometer.querySelector<SVGPathElement>(".hud-speed-arc");
+    if (!arc) throw new Error("Speed dial arc missing");
+    this.speedArc = arc;
+    const speedCenter = document.createElement("div");
+    speedCenter.className = "hud-speed-center";
+    const speedUnit = document.createElement("span");
+    speedUnit.textContent = "mph";
+    speedCenter.append(this.speedValue, speedUnit);
+    this.speedometer.append(speedCenter);
     this.warning.className = "hud-warning";
     this.wanted.className = "hud-wanted";
-    this.combat.className = "hud-combat";
     for (const [label, bar, fill] of [
       ["Health", this.healthBar, this.healthFill],
       ["Ammo", this.ammoBar, this.ammoFill],
       ["Vehicle", this.vehicleBar, this.vehicleFill],
     ] as const) {
       const row =
-        label === "Vehicle" ? this.vehicleRow : document.createElement("div");
+        label === "Vehicle"
+          ? this.vehicleRow
+          : label === "Ammo"
+            ? this.ammoRow
+            : document.createElement("div");
       row.className = "hud-statrow";
       const caption = document.createElement("span");
       caption.textContent = label;
@@ -94,7 +160,19 @@ export class GameHud {
       this.vitals.append(row);
     }
     this.vehicleRow.hidden = true;
-    this.vitals.append(this.combat);
+    const ammoTrack = document.createElement("div");
+    ammoTrack.className = "hud-ammo-split";
+    this.ammoBar.replaceWith(ammoTrack);
+    ammoTrack.append(this.ammoBar, this.totalAmmoBar);
+    this.ammoBar.setAttribute("aria-label", "Magazine");
+    this.ammoBar.title = "Rounds in magazine";
+    this.totalAmmoBar.className = "hud-bar hud-bar-ammo-total";
+    this.totalAmmoBar.setAttribute("aria-label", "Total ammunition");
+    this.totalAmmoBar.setAttribute("role", "progressbar");
+    this.totalAmmoBar.setAttribute("aria-valuemin", "0");
+    this.totalAmmoBar.title = "Total rounds remaining, including magazine";
+    this.totalAmmoBar.append(this.totalAmmoFill);
+    this.vitals.append(this.weapons, this.speedometer);
     this.element.append(
       this.objective,
       this.wallet,
@@ -104,6 +182,33 @@ export class GameHud {
     );
   }
   update(m: HudModel): void {
+    this.ammoRow.hidden = m.speedMph != null;
+    this.weapons.hidden = m.speedMph != null;
+    for (const [id, slot] of this.weaponSlots) {
+      const state = m.weapons?.find((weapon) => weapon.id === id);
+      const equipped = state?.equipped ?? id === "pistol";
+      slot.classList.toggle("equipped", equipped);
+      slot.classList.toggle("unowned", state?.owned === false);
+      slot.setAttribute(
+        "aria-label",
+        `${weaponArt[id].name}${equipped ? ", equipped" : ""}${state?.owned === false ? ", unavailable" : ""}`,
+      );
+    }
+    this.speedometer.hidden = m.speedMph == null;
+    if (m.speedMph != null) {
+      const mph = Math.round(
+        Number.isFinite(m.speedMph) ? Math.max(0, m.speedMph) : 0,
+      );
+      this.speedValue.textContent = String(mph);
+      this.speedometer.setAttribute(
+        "aria-valuenow",
+        String(Math.min(120, mph)),
+      );
+      this.speedometer.setAttribute("aria-valuetext", `${mph} miles per hour`);
+      this.speedArc.style.strokeDashoffset = String(
+        100 - Math.min(1, mph / 120) * 100,
+      );
+    }
     const contract = m.mission;
     this.objectiveLabel.textContent = contract
       ? contract.phase === "completed"
@@ -162,7 +267,16 @@ export class GameHud {
     );
     this.wanted.title = m.pursuit;
     const health = Math.max(0, Math.min(100, m.health));
-    const capacity = m.capacity ?? 12;
+    const totalCapacity = Math.max(1, m.totalAmmoCapacity);
+    const total = Math.max(0, Math.min(totalCapacity, m.totalAmmo));
+    this.totalAmmoFill.style.width = `${(total / totalCapacity) * 100}%`;
+    this.totalAmmoBar.setAttribute("aria-valuemax", String(totalCapacity));
+    this.totalAmmoBar.setAttribute("aria-valuenow", String(total));
+    this.totalAmmoBar.setAttribute(
+      "aria-valuetext",
+      `${total} rounds including the magazine`,
+    );
+    const capacity = Math.max(1, m.capacity ?? 12);
     const magazine = Math.max(0, Math.min(capacity, m.magazine));
     this.ammoBar.setAttribute("aria-valuemax", String(capacity));
     this.healthFill.style.width = `${health}%`;
@@ -177,10 +291,6 @@ export class GameHud {
       this.vehicleBar.setAttribute("aria-valuemax", String(maximum));
       this.vehicleBar.setAttribute("aria-valuenow", String(current));
     }
-    this.combat.textContent = [m.ammo, m.vehicle, heat > 0 ? m.pursuit : ""]
-      .filter(Boolean)
-      .join(" · ");
-    this.combat.hidden = !this.combat.textContent;
     this.warning.textContent =
       m.warning || (performance.now() < this.noticeUntil ? this.notice : "");
     this.warning.hidden = !this.warning.textContent;

@@ -1,6 +1,7 @@
 import { GameAudio } from "../audio/sound";
 import { CityMap } from "../ui/city-map";
 import { GameHud, Tutorial, friendlyProblem } from "../ui/hud";
+import { PlayerList } from "../ui/player-list";
 import { ChatPanel } from "../ui/chat-panel";
 import { ControlsPanel } from "../ui/controls-panel";
 import { SettingsPanel } from "../ui/settings-panel";
@@ -55,12 +56,12 @@ export class GameApp {
   private arrestStart: number | null = null;
   private mode: CharacterMode = "on_foot";
   private reloadEnd: number | null = null;
-  private respawnTick: number | null = null;
-  private protectedUntil: number | null = null;
   private hitUntil = 0;
   private damageUntil = 0;
   private readonly cross = document.createElement("div");
   private readonly hud = new GameHud();
+  private readonly playerList = new PlayerList();
+  private hudLayout: ResizeObserver | undefined;
   private readonly audio = new GameAudio();
   private readonly remoteReloads = new Map<number, number | null>();
   private readonly tutorial = new Tutorial();
@@ -229,10 +230,70 @@ export class GameApp {
       this.cross,
       this.hud.element,
       this.chat.element,
+      this.playerList.element,
       panels,
       this.overlay,
     );
     const options = { signal: this.abort.signal };
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.code === "Escape") this.playerList.element.hidden = true;
+        if (
+          event.code !== "Tab" ||
+          this.phase !== "playing" ||
+          this.chat.focused ||
+          this.cityMap?.open ||
+          !this.overlay.hidden ||
+          event.target instanceof HTMLInputElement ||
+          event.target instanceof HTMLTextAreaElement ||
+          event.target instanceof HTMLSelectElement
+        )
+          return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this.playerList.element.hidden = false;
+      },
+      { ...options, capture: true },
+    );
+    window.addEventListener(
+      "keyup",
+      (event) => {
+        if (event.code === "Tab") this.playerList.element.hidden = true;
+      },
+      options,
+    );
+    window.addEventListener(
+      "blur",
+      () => {
+        this.playerList.element.hidden = true;
+      },
+      options,
+    );
+    document.addEventListener(
+      "pointerlockchange",
+      () => {
+        if (document.pointerLockElement !== this.canvas)
+          this.playerList.element.hidden = true;
+      },
+      options,
+    );
+    const chatAnchors = [this.minimap, ...this.hud.lowerPanels];
+    const positionChat = () => {
+      const tops = chatAnchors.flatMap((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.getClientRects().length && rect.height > 0
+          ? [rect.top]
+          : [];
+      });
+      // Anchor to actual screen bounds, including the dial on narrow layouts.
+      this.chat.element.style.bottom = tops.length
+        ? `${Math.max(0, window.innerHeight - Math.min(...tops)) + 12}px`
+        : "";
+    };
+    this.hudLayout = new ResizeObserver(positionChat);
+    for (const anchor of chatAnchors) this.hudLayout.observe(anchor);
+    window.addEventListener("resize", positionChat, options);
     this.play.addEventListener("click", () => this.join(), options);
     this.resume.addEventListener(
       "click",
@@ -265,6 +326,7 @@ export class GameApp {
       "keydown",
       (e) => {
         if (
+          !this.playerList.element.hidden ||
           e.code !== "KeyT" ||
           e.repeat ||
           this.phase !== "playing" ||
@@ -416,6 +478,7 @@ export class GameApp {
   private setPhase(phase: AppPhase, message?: string): void {
     this.phase = phase;
     this.chat.element.hidden = phase !== "playing";
+    if (phase !== "playing") this.playerList.element.hidden = true;
     if (phase !== "playing") this.chat.blur();
     this.mapButton.hidden = phase !== "playing";
     if (phase !== "playing") {
@@ -584,8 +647,6 @@ export class GameApp {
             if (status.pursuit !== "arresting") this.arrestStart = null;
             this.pursuit = status.pursuit;
             this.reloadEnd = status.reload_end_tick;
-            this.respawnTick = status.respawn_tick;
-            this.protectedUntil = status.protected_until_tick;
           }
         },
       },
@@ -922,9 +983,6 @@ export class GameApp {
           this.phase !== "playing" ||
           mission?.phase !== "active" ||
           mission.target_position === null;
-        const drivingStatus = this.session?.isDriving
-          ? ` · ${(Math.hypot(...(localMotor?.velocity ?? [0, 0, 0])) * 3.6).toFixed(0)} km/h${this.input.active && this.input.down("jump") ? " · Handbrake" : ""}`
-          : "";
         this.debug.update({
           now,
           connection: this.connection,
@@ -939,21 +997,6 @@ export class GameApp {
           remotes,
         });
         const estimated = this.session?.estimatedTick(now) ?? 0;
-        const combat =
-          this.mode === "arrested"
-            ? `Arrested · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
-            : this.health <= 0
-              ? `Downed · respawn ${Math.max(0, Math.ceil(((this.respawnTick ?? estimated) - estimated) / 30))}s`
-              : [
-                  this.reloadEnd !== null ? "Reloading" : "",
-                  this.protectedUntil !== null &&
-                  estimated < this.protectedUntil
-                    ? "Protected"
-                    : "",
-                  now < this.hitUntil ? "Hit confirmed" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ");
         const prompt = this.session?.interactionPrompt(now) ?? "";
         const repair = this.session?.currentRepair;
         this.hud.element.hidden =
@@ -991,6 +1034,10 @@ export class GameApp {
               )
             : "",
         );
+        this.playerList.update(
+          this.session?.onlinePlayers ?? [],
+          this.session?.localPlayerId,
+        );
         this.hud.update({
           guidance: repair ? repairGuidance(repair) : guidance,
           mission: repair
@@ -1026,10 +1073,14 @@ export class GameApp {
                           this.settings.bindings,
                         )
                       : "Pursuit · break sight",
-          ammo: `${this.session?.weaponSummary(now) ?? "Pistol"} · ${controlText(combat, this.settings.bindings)}`,
           capacity: this.session?.weaponCapacity ?? 12,
           magazine: this.magazine,
-          vehicle: drivingStatus.replace(/^ · /, ""),
+          totalAmmo: this.session?.totalAmmo ?? 48,
+          totalAmmoCapacity: this.session?.totalAmmoCapacity ?? 48,
+          weapons: this.session?.weaponSelection ?? [],
+          speedMph: this.session?.isDriving
+            ? Math.hypot(...(localMotor?.velocity ?? [0, 0, 0])) * 2.2369362921
+            : null,
           vehicleHealth:
             this.session?.isDriving && this.carHealth !== null
               ? {
@@ -1095,6 +1146,7 @@ export class GameApp {
     if (this.disposed) return;
     this.disposed = true;
     this.abort.abort();
+    this.hudLayout?.disconnect();
     this.preferences.dispose();
     this.audio.dispose();
     this.unbind.dispose();

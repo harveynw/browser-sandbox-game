@@ -298,6 +298,12 @@ fn handle(
             }
         }
         ClientMessage::Ping(ping) if s.phase != SessionPhase::AwaitHello => {
+            if let Some(rtt) = ping
+                .reported_rtt_ms
+                .filter(|rtt| rtt.0.is_finite() && (0.0..=10_000.0).contains(&rtt.0))
+            {
+                s.reported_ping = Some((rtt.0.round() as u16, ctx.clock.0));
+            }
             // The crate lacks ingress delivery metadata; this existing nonce convention
             // selects only the requested response channel, never asserts ingress type.
             let channel = if ping.nonce & 0x8000_0000 != 0 {
@@ -503,6 +509,7 @@ pub(crate) fn open(
 }
 fn new_session(now: u64) -> Session {
     Session {
+        reported_ping: None,
         traffic: Default::default(),
         id: None,
         profile: None,

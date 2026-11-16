@@ -127,7 +127,10 @@ pub fn positive() -> Result<Vec<Fixture>> {
             "ping",
             "client",
             u,
-            tagged("ping", json!({"nonce":u32::MAX,"client_time_ms":1234.5})),
+            tagged(
+                "ping",
+                json!({"nonce":u32::MAX,"client_time_ms":1234.5,"reported_rtt_ms":42.0}),
+            ),
         ),
         ("leave", "client", r, tagged("leave", json!({}))),
         (
@@ -163,7 +166,7 @@ pub fn positive() -> Result<Vec<Fixture>> {
             r,
             tagged(
                 "player_map",
-                json!([{"player_id":1,"position":[10.0,0.02,20.0]}]),
+                json!([{"player_id":1,"position":[10.0,0.02,20.0],"display_name":"Player One","ping_ms":42}]),
             ),
         ),
         (

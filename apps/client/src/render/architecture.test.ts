@@ -96,6 +96,46 @@ it("adds floors and bays instead of stretching the window modules", () => {
   );
 });
 
+it("fits the Quay roof inside non-overlapping parapets without coplanar exterior strips", () => {
+  const parts = architectureDetails(building, district, roads);
+  const roof = parts.find((part) => part.id.endsWith("-roof"));
+  const parapets = parts.filter((part) => part.id.includes("-parapet-"));
+  if (!roof) throw new Error("Missing Quay roof");
+  expect(parapets).toHaveLength(4);
+  for (const axis of [0, 2] as const) {
+    expect(roof.half_extents[axis]).toBeLessThan(building.half_extents[axis]);
+    for (const sign of [-1, 1]) {
+      const wall = parapets.find((part) =>
+        part.id.endsWith(`-parapet-${axis === 0 ? "x" : "z"}-${sign}`),
+      );
+      if (!wall) throw new Error("Missing parapet wall");
+      const roofEdge = roof.center[axis] + sign * roof.half_extents[axis];
+      const innerWall = wall.center[axis] - sign * wall.half_extents[axis];
+      expect(roofEdge).toBeCloseTo(innerWall);
+    }
+  }
+  const roofParts = [roof, ...parapets];
+  for (let i = 0; i < roofParts.length; i++) {
+    for (const b of roofParts.slice(i + 1)) {
+      const a = roofParts[i];
+      if (!a) continue;
+      const overlap = ([0, 1, 2] as const).every(
+        (axis) =>
+          Math.min(
+            a.center[axis] + a.half_extents[axis],
+            b.center[axis] + b.half_extents[axis],
+          ) -
+            Math.max(
+              a.center[axis] - a.half_extents[axis],
+              b.center[axis] - b.half_extents[axis],
+            ) >
+          1e-8,
+      );
+      expect(overlap).toBe(false);
+    }
+  }
+});
+
 it("keeps all authored neighbourhood recipes bounded at minimum and maximum sizes", () => {
   const source = citySource as unknown as { districts: District[] };
   const signatures = new Map<string, string>();

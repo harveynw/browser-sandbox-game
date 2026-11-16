@@ -196,6 +196,7 @@ async fn run(port: u16, cookie_path: &Path) -> Result {
                         &world,
                         &session,
                         ClientMessage::Ping(Ping {
+                            reported_rtt_ms: None,
                             nonce: if reliable { 1 } else { 0x80000001 },
                             client_time_ms: Milliseconds(started.elapsed().as_secs_f64() * 1000.0),
                         }),

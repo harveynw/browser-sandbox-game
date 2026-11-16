@@ -522,6 +522,17 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "reported_rtt_ms": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Milliseconds"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

@@ -99,6 +99,7 @@ fn reliable_budget_failure_retires_actor_and_hides_it_before_flush_finishes() {
             &mut t,
             failed,
             ClientMessage::Ping(Ping {
+                reported_rtt_ms: None,
                 nonce,
                 client_time_ms: Milliseconds(0.0),
             }),

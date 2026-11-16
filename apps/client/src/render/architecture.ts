@@ -310,7 +310,15 @@ export function architectureDetails(
         accent,
       );
     }
-    box("roof", [x, top + 0.08, z], [hx, 0.08, hz], metal);
+    // The slab fits inside the parapet: full-width sides would be coplanar
+    // with its exterior and flicker as a dark strip below the white coping.
+    const parapetWidth = 0.24;
+    box(
+      "roof",
+      [x, top + 0.08, z],
+      [hx - parapetWidth, 0.08, hz - parapetWidth],
+      metal,
+    );
     // Raised perimeter parapet gives a readable roofline without inventing walkable space.
     for (const sign of [-1, 1]) {
       box(
@@ -322,7 +330,7 @@ export function architectureDetails(
       box(
         `parapet-z-${sign}`,
         [x, top + 0.3, z + sign * (hz - 0.12)],
-        [hx, 0.3, 0.12],
+        [hx - parapetWidth, 0.3, 0.12],
         trim,
       );
     }

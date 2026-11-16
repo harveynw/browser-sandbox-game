@@ -21,6 +21,7 @@ fn ping(nonce: u32) -> Vec<u8> {
         world_id: Some(OpaqueId("diagnostic".into())),
         session_id: Some(OpaqueId("session".into())),
         message: ClientMessage::Ping(Ping {
+            reported_rtt_ms: None,
             nonce,
             client_time_ms: Milliseconds(0.0),
         }),

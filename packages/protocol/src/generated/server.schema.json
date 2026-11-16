@@ -653,6 +653,18 @@
     },
     "PlayerMapEntry": {
       "properties": {
+        "display_name": {
+          "$ref": "#/$defs/DisplayName"
+        },
+        "ping_ms": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "player_id": {
           "$ref": "#/$defs/EntityId"
         },
@@ -667,7 +679,8 @@
       },
       "required": [
         "player_id",
-        "position"
+        "position",
+        "display_name"
       ],
       "type": "object"
     },

@@ -26,6 +26,7 @@ pub struct TrafficCounters {
     pub down_bytes: u64,
 }
 pub struct Session {
+    pub(crate) reported_ping: Option<(u16, u32)>,
     pub traffic: TrafficCounters,
     pub id: Option<String>,
     pub profile: Option<ProfileView>,

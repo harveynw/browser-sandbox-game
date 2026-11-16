@@ -442,9 +442,18 @@ impl Projection {
             .peers
             .values()
             .filter(|s| s.phase == SessionPhase::Playing)
-            .filter_map(|s| s.player.and_then(|id| world.players.get(&id.0)))
-            .map(|p| PlayerMapEntry {
+            .filter_map(|s| {
+                s.player
+                    .and_then(|id| world.players.get(&id.0))
+                    .map(|p| (s, p))
+            })
+            .map(|(s, p)| PlayerMapEntry {
                 player_id: p.id,
+                display_name: p.display_name.clone(),
+                ping_ms: s
+                    .reported_ping
+                    .filter(|(_, tick)| world.tick.saturating_sub(*tick) <= 300)
+                    .map(|(ping, _)| ping),
                 position: p
                     .state
                     .vehicle_id

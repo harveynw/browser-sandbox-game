@@ -11,6 +11,7 @@ import type {
   RepairView,
   Action,
   WorldEvent,
+  PlayerMapEntry,
 } from "@port-meridian/protocol";
 import { loadPackage, type LoadedPackage } from "@port-meridian/content";
 import { BrowserTransport, type Channel } from "./transport";
@@ -137,26 +138,27 @@ export class GameSession {
         ?.capacity ?? 12
     );
   }
-  weaponSummary(now: number): string {
-    const s = this.weaponStatus;
-    if (!s) return "Pistol · 12 / 36";
-    const names = {
-      pistol: "Pistol",
-      rifle: "Rifle",
-      machine_gun: "Machine gun",
-    };
-    const slot = s.inventory.find((w) => w.weapon_id === s.equipped_weapon);
-    const d = this.assets?.manifest.weapons.find(
-      (w) => w.id === s.equipped_weapon,
+  get weaponSelection() {
+    return (["pistol", "rifle", "machine_gun"] as const).map((id) => ({
+      id,
+      equipped: id === this.equippedWeapon,
+      owned:
+        this.weaponStatus?.inventory.some(
+          (slot) => slot.weapon_id === id && slot.owned,
+        ) ?? true,
+    }));
+  }
+  get totalAmmo(): number {
+    const slot = this.weaponStatus?.inventory.find(
+      (slot) => slot.weapon_id === this.equippedWeapon,
     );
-    const until = s.reload_end_tick ?? s.equip_end_tick;
-    const duration =
-      s.reload_end_tick !== null ? d?.reload_ticks : d?.equip_ticks;
-    const progress =
-      until !== null && duration
-        ? ` · ${s.reload_end_tick !== null ? "Reloading" : "Equipping"} ${Math.round(Math.max(0, Math.min(1, 1 - (until - this.estimatedTick(now)) / duration)) * 100)}%`
-        : "";
-    return `${names[s.equipped_weapon]} · ${slot?.magazine ?? 0} / ${slot?.reserve ?? 0}${progress} · ${s.inventory.map((w, i) => `${i + 1}:${w.owned ? names[w.weapon_id] : "—"}`).join("  ")}`;
+    return slot ? slot.magazine + slot.reserve : 48;
+  }
+  get totalAmmoCapacity(): number {
+    const definition = this.assets?.manifest.weapons.find(
+      (weapon) => weapon.id === this.equippedWeapon,
+    );
+    return definition ? definition.capacity + definition.max_reserve : 48;
   }
   selectWeapon(slot: number): void {
     const id = this.weaponStatus?.inventory[slot];
@@ -215,7 +217,11 @@ export class GameSession {
   private equippedWeapon: "pistol" | "rifle" | "machine_gun" = "pistol";
   private actionAt = -Infinity;
   actionMessage = "";
-  mapPlayers: { player_id: number; position: [number, number, number] }[] = [];
+  mapPlayers: PlayerMapEntry[] = [];
+  onlinePlayers: PlayerMapEntry[] = [];
+  get localPlayerId(): number | undefined {
+    return this.player;
+  }
   private motor: CharacterMotor | undefined;
   private ownerLogAt = 0;
   private ownerTick = 0;
@@ -241,6 +247,7 @@ export class GameSession {
       this.local = undefined;
       this.replicas.clear();
       this.mapPlayers = [];
+      this.onlinePlayers = [];
       this.pending.clear();
       this.session = null;
       this.status(`Closed: ${reason}`);
@@ -679,6 +686,7 @@ export class GameSession {
         this.showStatus();
         break;
       case "player_map":
+        this.onlinePlayers = message.data;
         this.mapPlayers = message.data.filter(
           (p) => p.player_id !== this.player,
         );
@@ -806,7 +814,14 @@ export class GameSession {
     const started = performance.now();
     if (
       this.send(
-        { kind: "ping", data: { nonce, client_time_ms: started } },
+        {
+          kind: "ping",
+          data: {
+            nonce,
+            client_time_ms: started,
+            reported_rtt_ms: this.clock.rtt,
+          },
+        },
         channel,
       )
     )

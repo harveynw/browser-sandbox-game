@@ -2465,6 +2465,20 @@ fn player_map_includes_distant_online_players_and_removes_disconnected_players()
     ready(&mut w, &mut a, &mut t, q);
     let other = w.sessions.peers[&q].player_id();
     place(&mut w, q, [300.0, 0.02, 300.0]);
+    w.entities
+        .get_mut::<PlayerComponent>(EntityId(other))
+        .unwrap()
+        .display_name = DisplayName("Distant player".into());
+    send(
+        &w,
+        &mut t,
+        q,
+        ClientMessage::Ping(Ping {
+            nonce: 80,
+            client_time_ms: Milliseconds(0.0),
+            reported_rtt_ms: Some(Milliseconds(72.4)),
+        }),
+    );
     for _ in 0..30 {
         step(&mut w, &mut a, &mut t);
     }
@@ -2483,10 +2497,76 @@ fn player_map_includes_distant_online_players_and_removes_disconnected_players()
         })
         .unwrap();
     assert_eq!(entries.len(), 2);
+    let remote = entries
+        .iter()
+        .find(|entry| entry.player_id.0 == other)
+        .unwrap();
+    assert_eq!(remote.display_name.0, "Distant player");
+    assert_eq!(remote.ping_ms, Some(72));
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.player_id.0 == w.sessions.peers[&p].player_id())
+    );
     assert!(
         entries
             .iter()
             .any(|entry| entry.player_id.0 == other && entry.position.0[0].0 > 299.0)
+    );
+    // Cosmetic reports are bounded, and old readings expire even with live keepalives.
+    send(
+        &w,
+        &mut t,
+        q,
+        ClientMessage::Ping(Ping {
+            nonce: 81,
+            client_time_ms: Milliseconds(0.0),
+            reported_rtt_ms: Some(Milliseconds(20_000.0)),
+        }),
+    );
+    step(&mut w, &mut a, &mut t);
+    assert_eq!(
+        w.sessions.peers[&q].reported_ping.map(|(ping, _)| ping),
+        Some(72)
+    );
+    for i in 0..330 {
+        if i % 30 == 0 {
+            for peer in [p, q] {
+                send(
+                    &w,
+                    &mut t,
+                    peer,
+                    ClientMessage::Ping(Ping {
+                        nonce: 100 + i,
+                        client_time_ms: Milliseconds(0.0),
+                        reported_rtt_ms: None,
+                    }),
+                );
+            }
+        }
+        step(&mut w, &mut a, &mut t);
+    }
+    let entries = t
+        .sent
+        .iter()
+        .rev()
+        .find_map(|(peer, _, message)| {
+            if *peer != p {
+                return None;
+            }
+            match &message.message {
+                ServerMessage::PlayerMap(entries) => Some(entries),
+                _ => None,
+            }
+        })
+        .unwrap();
+    assert_eq!(
+        entries
+            .iter()
+            .find(|entry| entry.player_id.0 == other)
+            .unwrap()
+            .ping_ms,
+        None
     );
     w.disconnect(q, &mut a);
     for _ in 0..30 {

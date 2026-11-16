@@ -362,7 +362,10 @@ wire_struct!(Repair {
 });
 wire_struct!(Ping {
     nonce: u32,
-    client_time_ms: Milliseconds
+    client_time_ms: Milliseconds,
+    // Optional cosmetic telemetry; never used for gameplay or admission.
+    #[serde(default)]
+    reported_rtt_ms: Option<Milliseconds>
 });
 wire_struct!(ResyncRequest {
     reason: ResyncReason
@@ -387,7 +390,9 @@ wire_enum!(ServerMessage {
 });
 wire_struct!(PlayerMapEntry {
     player_id: EntityId,
-    position: Vec3
+    position: Vec3,
+    display_name: DisplayName,
+    ping_ms: Option<u16>
 });
 wire_struct!(ServerHello {
     protocol_version: ProtocolVersion,

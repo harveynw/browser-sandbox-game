@@ -52,6 +52,7 @@ export function controlGroups(bindings: Bindings) {
       rows: [
         [key("job"), "Jobs / repair"],
         [key("map"), "City map"],
+        ["Hold Tab", "Online players / ping"],
         ["Esc", "Pause / menu"],
       ],
     },

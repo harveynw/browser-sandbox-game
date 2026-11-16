@@ -66,7 +66,7 @@ export type ChatText = string;
 
 export type ChatLine = { system?: boolean, id: EventId, username: DisplayName, text: ChatText, server_tick: number, };
 
-export type PlayerMapEntry = { player_id: EntityId, position: Vec3, };
+export type PlayerMapEntry = { player_id: EntityId, position: Vec3, display_name: DisplayName, ping_ms: number | null, };
 
 export type DetailText = string;
 
@@ -102,7 +102,7 @@ export type AcceptMission = { template_id: TemplateId, };
 
 export type Repair = { zone_id: TemplateId, };
 
-export type Ping = { nonce: number, client_time_ms: Milliseconds, };
+export type Ping = { nonce: number, client_time_ms: Milliseconds, reported_rtt_ms: Milliseconds | null, };
 
 export type ResyncRequest = { reason: ResyncReason, };
 

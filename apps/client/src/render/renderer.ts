@@ -213,7 +213,13 @@ export class GameRenderer {
     readonly canvas: HTMLCanvasElement,
     private readonly assets: LoadedPackage,
   ) {
-    this.graphics = new THREE.WebGLRenderer({ canvas, antialias: true });
+    // Keep centimetre-scale facade layers distinct across the 0.05–6000 m
+    // camera range, including distant windows and the surrounding mountains.
+    this.graphics = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      logarithmicDepthBuffer: true,
+    });
     this.graphics.outputColorSpace = THREE.SRGBColorSpace;
     this.graphics.toneMapping = THREE.ACESFilmicToneMapping;
     this.graphics.toneMappingExposure = 1.25;
