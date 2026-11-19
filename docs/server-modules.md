@@ -31,8 +31,8 @@ flowchart TB
         repairs["repairs/mod.rs: RepairSystem"]
         police_tests["police/tests.rs: test-only child of police"]
     end
-    subgraph entities["components.rs · data only"]
-        entitymod["All 15 ECS component definitions"]
+    subgraph entities["component/mod.rs · component data"]
+        entitymod["All 21 live ECS component definitions"]
         player["Player data"]
         vehicle["Vehicle data"]
         pedestrian["Pedestrian data"]

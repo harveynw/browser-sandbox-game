@@ -1,5 +1,5 @@
 //! Weapon initialization, validation and inventory/trigger operations.
-use crate::components::*;
+use crate::component::*;
 use protocol::*;
 
 /// Shared eligibility rules for native intent selection and synchronous actions.
@@ -27,6 +27,7 @@ pub(crate) fn can_fire(
     }
     Ok(definition)
 }
+/// Rechecks firing conditions and commits ammunition, spread, and cooldown changes.
 pub(crate) fn begin_fire(
     weapon: &mut Weapon,
     aim: &Fire,
@@ -39,6 +40,7 @@ pub(crate) fn begin_fire(
     Ok(definition)
 }
 
+/// Updates a trigger lease while rejecting old or duplicate intent sequences.
 pub(crate) fn trigger_intent(weapon: &mut Weapon, intent: &Trigger, tick: u32) {
     if intent.sequence <= weapon.trigger_sequence {
         return;
@@ -71,6 +73,7 @@ pub(crate) fn trigger_intent(weapon: &mut Weapon, intent: &Trigger, tick: u32) {
     }
     weapon.trigger = Some((intent.clone(), tick.saturating_add(15)));
 }
+/// Returns current automatic-fire aim only while its lease and control epoch remain valid.
 pub(crate) fn automatic_aim(weapon: &mut Weapon, tick: u32, epoch: u32) -> Option<Fire> {
     let (intent, until) = weapon.trigger.as_ref()?;
     if tick >= *until || intent.control_epoch.0 != epoch {
@@ -83,15 +86,18 @@ pub(crate) fn automatic_aim(weapon: &mut Weapon, tick: u32, epoch: u32) -> Optio
         aim_pitch: intent.aim_pitch,
     })
 }
+/// Returns the authored definition for the equipped weapon.
 pub(crate) fn definition(weapon: &Weapon) -> WeaponDefinition {
     weapon_catalogue()[weapon.equipped.index()].clone()
 }
+/// Cancels weapon actions and invalidates active trigger intent.
 pub(crate) fn cancel(weapon: &mut Weapon) {
     weapon.aiming = false;
     weapon.trigger = None;
     weapon.reload_end = None;
     weapon.equip_end = None;
 }
+/// Starts a weapon switch only if the actor owns the requested weapon.
 pub(crate) fn equip(weapon: &mut Weapon, id: WeaponId, tick: u32) -> ActionCode {
     if !weapon.slots[id.index()].owned {
         return ActionCode::Unavailable;
@@ -104,6 +110,7 @@ pub(crate) fn equip(weapon: &mut Weapon, id: WeaponId, tick: u32) -> ActionCode 
     weapon.equip_end = Some(tick.saturating_add(definition(weapon).equip_ticks));
     ActionCode::Ok
 }
+/// Starts a reload when ammunition and current action state permit it.
 pub(crate) fn reload(weapon: &mut Weapon, tick: u32) -> ActionCode {
     if weapon.reload_end.is_some()
         || weapon.equip_end.is_some()
@@ -118,6 +125,7 @@ pub(crate) fn reload(weapon: &mut Weapon, tick: u32) -> ActionCode {
     weapon.reload_end = Some(tick.saturating_add(definition(weapon).reload_ticks));
     ActionCode::Ok
 }
+/// Completes reload and equip timers and updates weapon spread.
 pub(crate) fn advance(weapon: &mut Weapon, tick: u32) -> bool {
     for (slot, definition) in weapon.slots.iter_mut().zip(weapon_catalogue()) {
         slot.bloom = (slot.bloom - definition.bloom_recovery as f32 / 30.0).max(0.0);
@@ -138,6 +146,7 @@ pub(crate) fn advance(weapon: &mut Weapon, tick: u32) -> bool {
     }
     changed
 }
+/// Creates the default weapon inventory with full ammunition.
 pub(crate) fn loadout() -> Weapon {
     Weapon {
         trigger: None,
@@ -159,6 +168,7 @@ pub(crate) fn loadout() -> Weapon {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Verifies that default loadout owns every weapon with full ammunition.
     #[test]
     fn default_loadout_owns_every_weapon_with_full_ammunition() {
         let weapon = crate::systems::weapons::state::loadout();
@@ -170,6 +180,7 @@ mod tests {
         }
         assert_eq!(weapon.equipped, WeaponId::Pistol);
     }
+    /// Verifies that partial reload and cancellation preserve rounds for every weapon.
     #[test]
     fn partial_reload_and_cancellation_preserve_rounds_for_every_weapon() {
         for d in weapon_catalogue() {
@@ -218,6 +229,7 @@ mod tests {
             assert_eq!(w.slots[w.equipped.index()].next_fire, 1000);
         }
     }
+    /// Verifies that switching requires ownership and preserves each cooldown.
     #[test]
     fn switching_requires_ownership_and_preserves_each_cooldown() {
         let mut w = crate::systems::weapons::state::loadout();
@@ -254,6 +266,7 @@ mod tests {
 #[cfg(test)]
 mod trigger_tests {
     use super::*;
+    /// Builds a trigger update for weapon lease tests.
     fn intent(sequence: u32, held: bool, pressed: bool) -> Trigger {
         Trigger {
             control_epoch: ControlEpoch(1),
@@ -265,6 +278,7 @@ mod trigger_tests {
             aim_pitch: Pitch(0.0),
         }
     }
+    /// Verifies that leases expire and duplicates old starts and refreshes cannot resurrect them.
     #[test]
     fn leases_expire_and_duplicates_old_starts_and_refreshes_cannot_resurrect_them() {
         let mut w = crate::systems::weapons::state::loadout();
@@ -283,6 +297,7 @@ mod trigger_tests {
         crate::systems::weapons::state::trigger_intent(&mut w, &intent(5, true, true), 120);
         assert!(crate::systems::weapons::state::automatic_aim(&mut w, 121, 2).is_none());
     }
+    /// Verifies that reload equip and epoch changes require fresh press.
     #[test]
     fn reload_equip_and_epoch_changes_require_fresh_press() {
         let mut w = crate::systems::weapons::state::loadout();
@@ -310,6 +325,7 @@ mod trigger_tests {
 #[cfg(test)]
 mod firing_tests {
     use super::*;
+    /// Verifies that firing validation is read only and commit rechecks before spending ammo.
     #[test]
     fn firing_validation_is_read_only_and_commit_rechecks_before_spending_ammo() {
         let mut weapon = crate::systems::weapons::state::loadout();

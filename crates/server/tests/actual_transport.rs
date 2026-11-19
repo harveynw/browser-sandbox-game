@@ -15,6 +15,7 @@ use std::{
     thread,
     time::Duration,
 };
+/// Encodes a client ping with the requested probe nonce.
 fn ping(nonce: u32) -> Vec<u8> {
     encode_client(&ClientEnvelope {
         v: ProtocolVersion(4),
@@ -48,6 +49,7 @@ fn probe_snapshot(nonce: u32) -> ServerEnvelope {
         }],
     )
 }
+/// Waits for the matching transport probe on the requested delivery channel.
 async fn receipt(client: &mut Peer, reliable: bool, nonce: u32) -> Result {
     tokio::time::timeout(rtc::DEADLINE, async {
         loop {
@@ -67,8 +69,11 @@ async fn receipt(client: &mut Peer, reliable: bool, nonce: u32) -> Result {
     })
     .await?
 }
+/// Owns the transport test worker and its stop signal.
 struct Pump {
+    /// Shared signal that asks the worker to stop.
     stop: Arc<AtomicBool>,
+    /// Background worker owned by this handle.
     worker: Option<thread::JoinHandle<()>>,
 }
 impl Drop for Pump {
@@ -79,16 +84,19 @@ impl Drop for Pump {
         }
     }
 }
+/// Verifies that real RTC backpressure and rapid kill reconnect.
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
 async fn real_rtc_backpressure_and_rapid_kill_reconnect() -> Result {
     run_transport(LossProfile::Off).await
 }
+/// Verifies that real RTC loss and blackout recovery.
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
 async fn real_rtc_loss_and_blackout_recovery() -> Result {
     run_transport(LossProfile::Independent).await
 }
+/// Verifies that real RTC periodic loss recovers without unbounded sends.
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds real loopback TCP/UDP; run explicit actual transport suite"]
 async fn real_rtc_periodic_loss_recovers_without_unbounded_sends() -> Result {
@@ -100,6 +108,7 @@ enum LossProfile {
     Independent,
     Periodic,
 }
+/// Exercises real transport delivery under the selected packet-loss profile.
 async fn run_transport(profile: LossProfile) -> Result {
     let loss = profile != LossProfile::Off;
     let listener = TcpListener::bind("127.0.0.1:0")?;

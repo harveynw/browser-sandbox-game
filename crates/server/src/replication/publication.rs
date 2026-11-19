@@ -13,11 +13,15 @@ use crate::{
 use bevy_ecs::prelude::*;
 use std::time::Instant;
 
+/// Stages per-peer replication batches until publication succeeds.
 #[derive(Resource, Default)]
 pub(crate) struct Publication {
+    /// Time when the current phase began.
     started: Option<Instant>,
+    /// Per-peer packets staged for publication.
     batches: PeerPackets,
 }
+/// Starts the current phase and prepares its shared working state.
 pub(crate) fn begin(
     mut publication: ResMut<Publication>,
     mut scratch: ResMut<Scratch>,
@@ -28,6 +32,7 @@ pub(crate) fn begin(
         .enter(TickPhase::Publish, &mut outcome)
         .then(Instant::now);
 }
+/// Builds the map positions of all online players.
 pub(crate) fn player_map(
     actors: OwnerActors,
     clock: Res<Clock>,
@@ -38,6 +43,7 @@ pub(crate) fn player_map(
         Projection::player_map(&actors.view(clock.0, &identity.0), &mut sessions);
     }
 }
+/// Stages authoritative control updates for playing sessions.
 pub(crate) fn owners(
     actors: OwnerActors,
     clock: Res<Clock>,
@@ -52,6 +58,7 @@ pub(crate) fn owners(
         outcome.fail(error);
     }
 }
+/// Builds movement snapshots for the current visible entities.
 pub(crate) fn snapshots(
     actors: PublicActors,
     clock: Res<Clock>,
@@ -68,6 +75,7 @@ pub(crate) fn snapshots(
         Err(error) => outcome.fail(error),
     }
 }
+/// Stages private status updates after snapshot preparation succeeds.
 pub(crate) fn statuses(
     actors: StatusActors,
     clock: Res<Clock>,
@@ -102,6 +110,7 @@ pub(crate) fn statuses(
         ));
     }
 }
+/// Queues staged replication batches only after publication succeeds.
 pub(crate) fn commit(mut publication: ResMut<Publication>, mut sessions: ResMut<Sessions>) {
     // Stable peer order, with each peer's snapshots followed by its periodic status.
     for (peer, packets) in std::mem::take(&mut publication.batches) {
@@ -112,6 +121,7 @@ pub(crate) fn commit(mut publication: ResMut<Publication>, mut sessions: ResMut<
         );
     }
 }
+/// Returns and clears the first recorded tick error.
 pub(crate) fn finish(
     mut publication: ResMut<Publication>,
     outcome: Res<TickOutcome>,

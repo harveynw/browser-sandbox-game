@@ -1,10 +1,15 @@
 use content::{CollisionPackage, PackageIndex, SimConfig, WorldManifest, canonical};
 use std::{collections::BTreeMap, fs::File, io::Read, path::Path};
+/// Holds the validated world manifest, simulation settings, and collision package.
 pub struct WorldContent {
+    /// Validated authored world metadata and asset references.
     pub manifest: WorldManifest,
+    /// Runtime simulation settings.
     pub config: SimConfig,
+    /// Validated collision package loaded from published content.
     pub collision: CollisionPackage,
 }
+/// Reads a content file and rejects data beyond the byte limit.
 fn read(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::new();
     File::open(path)
@@ -17,12 +22,14 @@ fn read(path: &Path, max: u64) -> Result<Vec<u8>, String> {
     }
     Ok(bytes)
 }
+/// Checks that a hash is a lowercase hexadecimal SHA-256 value.
 fn hash(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
+/// Checks that an asset reference is a safe local JSON filename.
 fn asset(value: &str) -> bool {
     !value.contains('/')
         && !value.contains('\\')
@@ -34,6 +41,7 @@ impl WorldContent {
     pub fn load(root: &Path) -> Result<Self, String> {
         Self::load_index(root, "slice.json")
     }
+    /// Loads an indexed content package and verifies paths, hashes, budgets, and geometry.
     pub fn load_index(root: &Path, index_name: &str) -> Result<Self, String> {
         let index: PackageIndex = serde_json::from_slice(&read(&root.join(index_name), 4096)?)
             .map_err(|e| e.to_string())?;

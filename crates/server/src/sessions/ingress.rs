@@ -19,46 +19,78 @@ use crate::{
 use bevy_ecs::{prelude::*, system::SystemParam};
 use std::collections::BTreeSet;
 use std::result::Result;
+/// Requests player creation after a profile has been admitted.
 #[derive(Message, Clone)]
 pub(crate) struct AdmissionRequested {
+    /// Connection incarnation associated with this item.
     peer: PeerKey,
+    /// Committed guest profile.
     profile: ProfileView,
+    /// Simulation tick recorded for this item.
     tick: u32,
 }
+/// Requests a complete baseline for a session.
 #[derive(Message, Clone)]
 pub(crate) struct BaselineRequested {
+    /// Connection incarnation associated with this item.
     peer: PeerKey,
+    /// Simulation tick recorded for this item.
     tick: u32,
 }
+/// Stages transport events and decoded packets for admission.
 #[derive(Resource, Default)]
 pub(crate) struct Ingress {
+    /// Whether profile polling completed work during admission.
     pub completed_profile: bool,
+    /// Pending transport lifecycle events.
     events: Vec<TransportEvent>,
+    /// Connection incarnations closed during this admission batch.
     closed: BTreeSet<PeerKey>,
+    /// Decoded packets waiting for protocol handling.
     pub packets: VecDeque<(PeerKey, ClientEnvelope)>,
 }
+/// Groups session state and message writers needed to handle client packets.
 #[derive(SystemParam)]
 pub(crate) struct Protocol<'w, 's> {
+    /// Live session state used by this system.
     sessions: ResMut<'w, Sessions>,
+    /// Profile storage and admission settings borrowed for this tick.
     io: NonSendMut<'w, TickIo>,
+    /// Current simulation tick resource.
     clock: Res<'w, Clock>,
+    /// Unique world identity used to scope protocol messages.
     identity: Res<'w, WorldIdentity>,
+    /// Validated world content used by this operation.
     content: Res<'w, Content>,
+    /// Measurements collected for server diagnostics.
     metrics: ResMut<'w, crate::world::Metrics>,
+    /// Actor queries used by this operation.
     actors: ParamSet<'w, 's, (LifecycleActors<'w, 's>, Actors<'w, 's>)>,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Chat history and message allocation state.
     chat: ResMut<'w, ChatSystem>,
-    participants: Query<'w, 's, &'static mut crate::components::ChatParticipant>,
+    /// Queries chat participants used by this system.
+    participants: Query<'w, 's, &'static mut crate::component::ChatParticipant>,
+    /// Writer for admitted-player creation requests.
     admissions: MessageWriter<'w, AdmissionRequested>,
+    /// Writer for complete session baseline requests.
     baselines: MessageWriter<'w, BaselineRequested>,
+    /// Writer for session cleanup requests.
     disconnects: MessageWriter<'w, DisconnectRequested>,
+    /// Writer for automatic-fire trigger updates.
     triggers: MessageWriter<'w, WeaponTriggerRequested>,
+    /// Writer for player weapon action requests.
     weapons: MessageWriter<'w, WeaponActionRequested>,
+    /// Writer for mission action requests.
     jobs: MessageWriter<'w, JobActionRequested>,
+    /// Writer for vehicle-control requests.
     possession: MessageWriter<'w, PossessionRequested>,
+    /// Tick when the delayed in-memory transaction can complete.
     ready: MessageWriter<'w, crate::gameplay_messages::PlayerBecameReady>,
 }
 impl Protocol<'_, '_> {
+    /// Queues or submits a message using the required delivery channel.
     fn send(
         &mut self,
         peer: PeerKey,
@@ -75,15 +107,18 @@ impl Protocol<'_, '_> {
             &mut self.sessions,
         );
     }
+    /// Queues a protocol message for ordered reliable delivery.
     fn reliable(&mut self, peer: PeerKey, sid: Option<&str>, message: ServerMessage) {
         self.send(peer, sid, Delivery::Reliable, message);
     }
+    /// Builds or queues the authoritative state of the entity controlled by a session.
     fn owner(&mut self, session: &Session) -> Result<OwnerState, String> {
         Projection::owner(
             session,
             &self.actors.p1().view(self.clock.0, &self.identity.0),
         )
     }
+    /// Builds or queues private gameplay status for a session.
     fn status(&mut self, session: &Session) -> Result<PlayerStatus, String> {
         Projection::status(
             self.clock.0,
@@ -91,6 +126,7 @@ impl Protocol<'_, '_> {
             &self.actors.p1().view(self.clock.0, &self.identity.0),
         )
     }
+    /// Publishes readiness effects for the current player identity.
     fn player_ready(&mut self, peer: PeerKey, session: &Session) {
         if session.baseline != 1 {
             return;
@@ -108,6 +144,7 @@ impl Protocol<'_, '_> {
                 });
         }
     }
+    /// Handles a client chat message through the participant's rate limit.
     fn chat_message(
         &mut self,
         peer: PeerKey,
@@ -120,7 +157,8 @@ impl Protocol<'_, '_> {
             .player
             .and_then(|id| self.index.0.get(&id.0))
             .and_then(|&entity| self.participants.get_mut(entity).ok());
-        let player = actors.player(session.player).zip(participant);
+        let snapshot = actors.player(session.player).map(|p| p.to_snapshot());
+        let player = snapshot.as_ref().zip(participant);
         self.chat.handle_message(
             peer,
             session,
@@ -134,6 +172,7 @@ impl Protocol<'_, '_> {
     }
 }
 use crate::world::build;
+/// Checks message scope and rate limits before dispatching a client packet.
 pub(crate) fn receive_packet(mut ctx: Protocol, mut ingress: ResMut<Ingress>) {
     let Some((peer, message)) = ingress.packets.pop_front() else {
         return;
@@ -151,6 +190,7 @@ pub(crate) fn receive_packet(mut ctx: Protocol, mut ingress: ResMut<Ingress>) {
             .write(DisconnectRequested { peer, reason, tick });
     }
 }
+/// Dispatches an admitted client message to its gameplay handler.
 fn handle(
     ctx: &mut Protocol,
     peer: PeerKey,
@@ -431,6 +471,7 @@ fn handle(
     }
     Ok(())
 }
+/// Removes the next bounded batch of pending work.
 pub(crate) fn drain(
     mut network: NonSendMut<Network>,
     mut io: NonSendMut<TickIo>,
@@ -470,6 +511,7 @@ pub(crate) fn drain(
         }
     }
 }
+/// Opens the underlying service and prepares its state for use.
 pub(crate) fn open(
     mut ingress: ResMut<Ingress>,
     mut sessions: ResMut<Sessions>,
@@ -507,6 +549,7 @@ pub(crate) fn open(
     messages.sort_by_key(|(peer, _)| *peer);
     ingress.packets = messages.into();
 }
+/// Creates bounded initial state for a newly opened peer.
 fn new_session(now: u64) -> Session {
     Session {
         reported_ping: None,
@@ -538,6 +581,7 @@ fn new_session(now: u64) -> Session {
         last_replicated: BTreeMap::new(),
     }
 }
+/// Polls pending profile loads before admitting their players.
 pub(crate) fn pending_profiles(
     mut ingress: ResMut<Ingress>,
     mut sessions: ResMut<Sessions>,
@@ -628,6 +672,7 @@ pub(crate) fn replace_guests(
         }
     }
 }
+/// Creates players for validated admission requests.
 pub(crate) fn admit(
     mut admissions: MessageReader<AdmissionRequested>,
     mut sessions: ResMut<Sessions>,
@@ -694,6 +739,7 @@ pub(crate) fn admit(
         }
     }
 }
+/// Publishes requested full baselines for current sessions.
 pub(crate) fn baselines(
     mut requests: MessageReader<BaselineRequested>,
     actors: Actors,
@@ -719,6 +765,7 @@ pub(crate) fn baselines(
         }
     }
 }
+/// Applies committed profile appearance changes to live players.
 pub(crate) fn appearance(
     mut actors: ParamSet<(LifecycleActors, Actors)>,
     mut sessions: ResMut<Sessions>,
@@ -738,6 +785,7 @@ pub(crate) fn appearance(
         outcome.fail(error);
     }
 }
+/// Clears staged admission events and decoded packets after processing.
 pub(crate) fn retire(
     mut admissions: ResMut<Messages<AdmissionRequested>>,
     mut baselines: ResMut<Messages<BaselineRequested>>,

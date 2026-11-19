@@ -1,7 +1,6 @@
 //! Construct the authoritative Bevy world, then commit startup actors through
 //! the same indexed lifecycle commands and police roster used by live systems.
 use crate::{
-    components::Vehicle,
     content_loader::WorldContent,
     ecs::state::*,
     ecs::{EntityIndex, TickOutcome},
@@ -11,6 +10,7 @@ use crate::{
 use bevy_ecs::prelude::*;
 use std::result::Result;
 
+/// Builds the ECS world with validated content and shared resources.
 pub(crate) fn base(content: WorldContent) -> Result<World, String> {
     let config = sim_core::SimConfig::from_content(&content.config)?;
     let collision = sim_core::CollisionWorld::from_content(&content.collision, &config)?;
@@ -33,9 +33,13 @@ pub(crate) fn base(content: WorldContent) -> Result<World, String> {
     world.resource_mut::<TickOutcome>().finish()?;
     Ok(world)
 }
+/// Initialises gameplay resources and commits the initial parked vehicles and police roster.
 pub(crate) fn build(content: WorldContent) -> Result<World, String> {
     let mut world = base(content)?;
-    let count = world.query::<&Vehicle>().iter(&world).count();
+    let count = world
+        .query::<crate::component::queries::VehicleQueryReadOnly>()
+        .iter(&world)
+        .count();
     let content = &world.resource::<Content>().0;
     let population =
         PopulationSystem::from_content(&content.manifest, &content.config, count, 424242)?;

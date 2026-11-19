@@ -6,14 +6,46 @@ use crate::{
     ecs::state::{Clock, Collision},
 };
 use bevy_ecs::prelude::*;
+/// Borrows actors needed to update police perception and arrest progress.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct PerceptionActors<'w, 's> {
-    players: Query<'w, 's, (Entity, &'static GameId, &'static PlayerComponent)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, (&'static GameId, &'static mut Wanted)>,
-    cars: Query<'w, 's, (&'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries police units used by this system.
     units: Query<'w, 's, (&'static GameId, &'static mut Unit)>,
-    officers: Query<'w, 's, (&'static GameId, &'static Officer)>,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::OfficerQueryReadOnly,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
 }
+/// Updates suspect sightings, pursuit state, and continuous arrest progress.
 pub(crate) fn perceive(
     mut actors: PerceptionActors,
     mut police: ResMut<PoliceSystem>,
@@ -94,11 +126,11 @@ pub(crate) fn perceive(
                     collision: &collision.0,
                 };
                 let seen = witnesses.sees(s.phase, clock.0, p);
-                let arrest = witnesses.can_arrest(id.0, s.phase, player, p);
+                let arrest = witnesses.can_arrest(id.0, s.phase, &player.to_protocol(), p);
                 if advance_pursuit(
                     wanted.get_mut(&id.0).expect("wanted component"),
                     clock.0,
-                    player,
+                    &player.to_protocol(),
                     &witnesses,
                     seen.then_some(p),
                     arrest,
@@ -129,11 +161,16 @@ pub(crate) fn perceive(
 
 // Borrowed query views scoped to one perception invocation; no persistent snapshots.
 struct Witnesses<'a, 'b> {
-    cars: &'a BTreeMap<u32, &'b Vehicle>,
+    /// Vehicle state available to this operation.
+    cars: &'a BTreeMap<u32, crate::component::queries::VehicleQueryReadOnlyItem<'b, 'b>>,
+    /// Police unit state indexed by stable gameplay ID.
     units: &'a BTreeMap<u32, &'b mut Unit>,
-    officers: &'a BTreeMap<u32, &'b Officer>,
+    /// Police officer state available to this operation.
+    officers: &'a BTreeMap<u32, crate::component::queries::OfficerQueryReadOnlyItem<'b, 'b>>,
+    /// Collision queries used to validate movement and placement.
     collision: &'a CollisionWorld,
 }
+/// Applies queued evidence for one suspect while rejecting duplicate causes.
 fn ingest_crimes(
     player: u32,
     tick: u32,
@@ -147,6 +184,7 @@ fn ingest_crimes(
     }
 }
 impl Witnesses<'_, '_> {
+    /// Checks whether an eligible police witness can see the suspect.
     fn sees(&self, phase: SessionPhase, tick: u32, p: [f32; 3]) -> bool {
         let Self {
             cars,
@@ -171,6 +209,7 @@ impl Witnesses<'_, '_> {
                     && sight(collision, car.state.motor.position.0.map(|v| v.0), p, 70.0)
             }))
     }
+    /// Checks suspect state, range, and witness conditions for an arrest.
     fn can_arrest(
         &self,
         player_id: u32,

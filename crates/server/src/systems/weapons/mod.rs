@@ -1,6 +1,5 @@
 //! Native weapon intent, ordered shot execution, damage and presentation.
 use crate::{
-    components::Player,
     ecs::state::Clock,
     ecs::{EntityIndex, GameId},
     gameplay_messages::AutomaticShotRequested,
@@ -8,8 +7,12 @@ use crate::{
     systems::police::Wanted,
 };
 use bevy_ecs::prelude::*;
+/// Queues automatic shots whose current trigger leases permit firing.
 pub(crate) fn request_automatic_shots(
-    mut players: Query<(&GameId, &mut Player, &Wanted)>,
+    mut players: Query<
+        (&GameId, crate::component::queries::PlayerQuery, &Wanted),
+        crate::component::queries::PlayerFilter,
+    >,
     sessions: Res<Sessions>,
     index: Res<EntityIndex>,
     clock: Res<Clock>,
@@ -55,10 +58,14 @@ pub(crate) fn request_automatic_shots(
     }
 }
 
+/// Publishes committed shot events to eligible observers.
 pub(crate) fn present_shots(
     mut shots: MessageReader<crate::gameplay_messages::ShotEmitted>,
     mut sessions: ResMut<Sessions>,
-    players: Query<&Player>,
+    players: Query<
+        crate::component::queries::PlayerQueryReadOnly,
+        crate::component::queries::PlayerFilter,
+    >,
     index: Res<EntityIndex>,
     identity: Res<crate::ecs::state::WorldIdentity>,
     clock: Res<Clock>,
@@ -96,19 +103,19 @@ pub(crate) fn present_shots(
         }
     }
 }
+/// Clears shot presentation messages after subscribers finish.
 pub(crate) fn retire_shots(mut shots: ResMut<Messages<crate::gameplay_messages::ShotEmitted>>) {
     shots.clear();
 }
 
 use crate::{
-    components::{Pedestrian, Vehicle},
     ecs::state::{Collision, WorldIdentity},
     gameplay_messages::{
         ActorEliminated, CrimeReported, NoiseEmitted, PlayerDeathRequested, ShotEmitted,
     },
     systems::{
         combat::CombatSystem,
-        police::{CrimeId, CrimeKind, Officer, OfficerShot, Unit},
+        police::{CrimeId, CrimeKind, OfficerShot, Unit},
     },
     transport::PeerKey,
 };
@@ -123,18 +130,28 @@ enum ShotTarget {
     Officer(u32),
 }
 
+/// Requests an equipment, reload, or firing action for a player.
 #[derive(Message, Clone)]
 pub(crate) struct WeaponActionRequested {
+    /// Connection incarnation associated with this item.
     pub peer: PeerKey,
+    /// Client action request to validate and execute.
     pub request: ActionRequest,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Option<Entity>,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Requests execution of an officer shot against current actor identities.
 #[derive(Message, Clone)]
 pub(crate) struct OfficerShotRequested {
+    /// Proposed officer shot captured by the decision system.
     pub shot: OfficerShot,
+    /// ECS identity of the shooter when the shot was requested.
     pub shooter: Entity,
+    /// ECS identity of the target when the shot was requested.
     pub target: Entity,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
 
@@ -142,34 +159,80 @@ pub(crate) struct OfficerShotRequested {
 /// damage before the next ray. No cached actor state crosses a shot boundary.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct Weapons<'w, 's> {
-    players: Query<'w, 's, (Entity, &'static GameId, &'static mut Player)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::PlayerQuery,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
     cars: Query<
         'w,
         's,
         (
             Entity,
             &'static GameId,
-            &'static mut Vehicle,
+            crate::component::queries::VehicleQuery,
             Option<&'static Unit>,
         ),
+        crate::component::queries::VehicleFilter,
     >,
-    peds: Query<'w, 's, (Entity, &'static GameId, &'static mut Pedestrian)>,
-    officers: Query<'w, 's, (Entity, &'static GameId, &'static mut Officer)>,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::PedestrianQuery,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::OfficerQuery,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, &'static mut Wanted>,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Current simulation tick resource.
     clock: Res<'w, Clock>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSend<'w, Collision>,
+    /// Live session state used by this system.
     sessions: ResMut<'w, Sessions>,
+    /// Unique world identity used to scope protocol messages.
     identity: Res<'w, WorldIdentity>,
+    /// Combat event ID allocator.
     events: ResMut<'w, CombatSystem>,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
+    /// Writer for authoritative player death requests.
     deaths: MessageWriter<'w, PlayerDeathRequested>,
+    /// Writer for combat elimination announcements.
     eliminations: MessageWriter<'w, ActorEliminated>,
+    /// Writer for captured crime reports.
     crimes: MessageWriter<'w, CrimeReported>,
+    /// Writer for audible gameplay incidents.
     noises: MessageWriter<'w, NoiseEmitted>,
+    /// Writer for committed shot presentation events.
     shots: MessageWriter<'w, ShotEmitted>,
 }
 impl Weapons<'_, '_> {
+    /// Finds the nearest valid shot hit across geometry and current actors.
     fn trace(
         &self,
         shooter: EntityId,
@@ -258,6 +321,7 @@ impl Weapons<'_, '_> {
         }
         (nearest, target)
     }
+    /// Applies authoritative shot damage and emits dependent gameplay events.
     fn damage(
         &mut self,
         entity: Entity,
@@ -276,7 +340,7 @@ impl Weapons<'_, '_> {
                 if car.state.health.0 == 0 {
                     self.commands
                         .entity(entity)
-                        .insert_if_new(crate::components::DisabledVehicle((
+                        .insert_if_new(crate::component::DisabledVehicle((
                             self.clock.0.saturating_add(900),
                             0,
                         )));
@@ -292,7 +356,7 @@ impl Weapons<'_, '_> {
                 if p.state.health.0 == 0 {
                     self.commands
                         .entity(entity)
-                        .insert_if_new(crate::components::Incapacitated(
+                        .insert_if_new(crate::component::Incapacitated(
                             self.clock.0.saturating_add(300),
                         ));
                 }
@@ -344,6 +408,7 @@ impl Weapons<'_, '_> {
             }
         }
     }
+    /// Reports witnessed harm caused by the current damage or shot.
     fn crime(
         &mut self,
         actor: EntityId,
@@ -382,6 +447,7 @@ impl Weapons<'_, '_> {
             });
         }
     }
+    /// Validates and commits one player weapon action.
     fn player_action(
         &mut self,
         peer: PeerKey,
@@ -528,6 +594,7 @@ impl Weapons<'_, '_> {
     }
 }
 
+/// Executes weapon actions against current player identity and control state.
 pub(crate) fn execute_actions(
     mut requests: MessageReader<WeaponActionRequested>,
     mut weapons: Weapons,
@@ -586,6 +653,7 @@ pub(crate) fn execute_actions(
         );
     }
 }
+/// Clears action requests after their results have been applied.
 pub(crate) fn retire_actions(
     mut messages: ResMut<Messages<WeaponActionRequested>>,
     mut triggers: ResMut<Messages<WeaponTriggerRequested>>,
@@ -594,6 +662,7 @@ pub(crate) fn retire_actions(
     triggers.clear();
 }
 
+/// Executes queued automatic shots only if their identity and firing conditions remain valid.
 pub(crate) fn execute_automatic(
     mut requests: MessageReader<AutomaticShotRequested>,
     mut weapons: Weapons,
@@ -627,6 +696,7 @@ pub(crate) fn execute_automatic(
     }
 }
 
+/// Validates and executes proposed officer shots against current actor state.
 pub(crate) fn execute_officer_shots(
     mut requests: MessageReader<OfficerShotRequested>,
     mut weapons: Weapons,
@@ -724,16 +794,25 @@ pub(crate) fn execute_officer_shots(
     }
 }
 
+/// Requests an update to a player's automatic-fire trigger lease.
 #[derive(Message, Clone)]
 pub(crate) struct WeaponTriggerRequested {
+    /// Connection incarnation associated with this item.
     pub peer: PeerKey,
+    /// Automatic-fire trigger intent received from the client.
     pub intent: Trigger,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Option<Entity>,
 }
+/// Applies trigger updates only to the matching live player and control epoch.
 pub(crate) fn receive_triggers(
     mut messages: MessageReader<WeaponTriggerRequested>,
-    mut players: Query<(&GameId, &mut Player)>,
+    mut players: Query<
+        (&GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
     sessions: Res<Sessions>,
     clock: Res<Clock>,
 ) {
@@ -764,17 +843,27 @@ pub(crate) fn receive_triggers(
         }
     }
 }
+/// Requests an officer weapon timer and aiming update.
 #[derive(Message, Clone)]
 pub(crate) struct OfficerWeaponTick {
+    /// Gameplay ID of the officer receiving this update.
     pub officer: EntityId,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Entity,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
+    /// Whether the actor is aiming its weapon.
     pub aiming: bool,
+    /// Vertical aiming angle in radians.
     pub pitch: Pitch,
 }
+/// Advances officer weapon timers and applies current aiming intent.
 pub(crate) fn update_officer_weapons(
     mut messages: MessageReader<OfficerWeaponTick>,
-    mut officers: Query<(&GameId, &mut Officer)>,
+    mut officers: Query<
+        (&GameId, crate::component::queries::OfficerQuery),
+        crate::component::queries::OfficerFilter,
+    >,
     clock: Res<Clock>,
 ) {
     for message in messages.read() {

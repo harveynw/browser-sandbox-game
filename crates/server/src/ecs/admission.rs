@@ -2,12 +2,18 @@
 use super::{TickOutcome, TickPhase, runtime::Scratch};
 use bevy_ecs::prelude::*;
 use std::time::Instant;
+/// Runs the ordered stages of packet admission and appearance updates.
 pub(super) struct AdmissionSchedules {
+    /// Schedule that begins admission for the current tick.
     begin: Schedule,
+    /// Schedule that processes one decoded client packet.
     packet: Schedule,
+    /// Schedule that completes the current admission batch.
     finish: Schedule,
+    /// Schedule that applies committed appearance updates.
     appearance: Schedule,
 }
+/// Builds the ordered reactions that must run after a protocol action.
 fn protocol_checkpoint() -> bevy_ecs::schedule::ScheduleConfigs<bevy_ecs::system::ScheduleSystem> {
     use crate::sessions::ingress as protocol;
     (
@@ -70,6 +76,7 @@ impl Default for AdmissionSchedules {
         }
     }
 }
+/// Processes transport input and committed profile changes in admission order.
 pub(super) fn admission(
     host: &mut bevy_ecs::world::World,
     mut schedules: Local<AdmissionSchedules>,

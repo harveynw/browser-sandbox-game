@@ -19,4 +19,4 @@ pub mod world;
 #[path = "../tests/world_cases/mod.rs"]
 mod world_cases;
 
-pub mod components;
+pub mod component;

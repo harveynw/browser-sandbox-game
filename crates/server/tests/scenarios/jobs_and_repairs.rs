@@ -1,7 +1,8 @@
 use super::*;
-use server::components::Player as PlayerComponent;
-use server::components::Vehicle as VehicleComponent;
+use server::component::PlayerSnapshot;
+use server::component::VehicleSnapshot;
 use server::systems::police::Wanted as WantedComponent;
+/// Builds a client mission action request for a scenario.
 fn job(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, name: &str) {
     vehicle_action(
         w,
@@ -14,13 +15,15 @@ fn job(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, name: &str) {
         }),
     );
 }
+/// Finds a scenario vehicle at the requested position.
 fn car_at(w: &mut World, car: u32, pos: [f32; 3]) {
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&car)
+        .get_mut_by_id::<VehicleSnapshot>(&car)
         .unwrap()
         .state
         .motor = sim_core::spawn_vehicle(pos, 0.0).unwrap();
 }
+/// Records phase entry and applies configured test failures.
 fn enter(
     w: &mut World,
     a: &mut Profiles,
@@ -43,16 +46,18 @@ fn enter(
     );
     step(w, a, t);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
+        w.entities.view::<VehicleSnapshot>()[&car].state.driver_id,
         w.sessions.peers[&p].player
     );
 }
+/// Advances the scenario by the requested number of simulation ticks.
 fn ticks(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey, count: u32) {
     for _ in 0..count {
         keep_alive(w, t, p);
         step(w, a, t);
     }
 }
+/// Creates an eligible driver and vehicle at a repair zone.
 fn repair_setup() -> (World, Profiles, FakeTransport, PeerKey, String) {
     let (mut w, mut a, mut t) = police_setup();
     let p = peer(0);
@@ -72,13 +77,14 @@ fn repair_setup() -> (World, Profiles, FakeTransport, PeerKey, String) {
     enter(&mut w, &mut a, &mut t, p, 1, 1);
     car_at(&mut w, 1, [220.0, 0.0, -180.0]);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&1)
+        .get_mut_by_id::<VehicleSnapshot>(&1)
         .unwrap()
         .state
         .health = VehicleHealth(50);
     step(&mut w, &mut a, &mut t);
     (w, a, t, p, cookie)
 }
+/// Builds and submits a repair action for the scenario player.
 fn repair(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32) {
     vehicle_action(
         w,
@@ -91,6 +97,7 @@ fn repair(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32) {
         }),
     );
 }
+/// Verifies that repair waits sixty ticks and a commit then debits exactly once.
 #[test]
 fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
     let (mut w, mut a, mut t, p, _) = repair_setup();
@@ -102,7 +109,7 @@ fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
         RepairPhase::Dwell
     );
     ticks(&mut w, &mut a, &mut t, p, 58);
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
@@ -112,12 +119,9 @@ fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
         w.sessions.peers[&p].repair_view.as_ref().unwrap().phase,
         RepairPhase::DebitPending
     );
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
     ticks(&mut w, &mut a, &mut t, p, 1);
-    assert_eq!(
-        w.entities.view::<VehicleComponent>()[&1].state.health.0,
-        100
-    );
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 100);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         100
@@ -133,6 +137,7 @@ fn repair_waits_sixty_ticks_and_a_commit_then_debits_exactly_once() {
         100
     );
 }
+/// Verifies that delayed debit after disconnect refunds and never repairs a rejoined guests car.
 #[test]
 fn delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_car() {
     let (mut w, mut a, mut t, p, cookie) = repair_setup();
@@ -149,13 +154,13 @@ fn delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_ca
     ready(&mut w, &mut a, &mut t, p);
     enter(&mut w, &mut a, &mut t, p, 2, 1);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&2)
+        .get_mut_by_id::<VehicleSnapshot>(&2)
         .unwrap()
         .state
         .health = VehicleHealth(35);
     ticks(&mut w, &mut a, &mut t, p, 45);
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
-    assert_eq!(w.entities.view::<VehicleComponent>()[&2].state.health.0, 35);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&2].state.health.0, 35);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
@@ -166,6 +171,7 @@ fn delayed_debit_after_disconnect_refunds_and_never_repairs_a_rejoined_guests_ca
     );
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::PlayerStatus(s) if s.repair.as_ref().is_some_and(|r|r.phase==RepairPhase::RefundPending))));
 }
+/// Verifies that memory worker reserves refund capacity and retries without double debit.
 #[test]
 fn memory_worker_reserves_refund_capacity_and_retries_without_double_debit() {
     let mut a = Profiles::default();
@@ -205,7 +211,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     job(&w, &mut t, p, 1, "trial_city_ring");
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     enter(&mut w, &mut a, &mut t, p, 1, 2);
@@ -213,7 +219,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     job(&w, &mut t, p, 3, "trial_city_ring");
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -222,7 +228,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     car_at(&mut w, 1, [0.0, 0.0, -256.0]);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -231,13 +237,13 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
     car_at(&mut w, 1, [-256.0, 0.0, 128.0]);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
         1
     );
-    let selected_gates = match &w.entities.values::<server::components::PlayerMission>()
+    let selected_gates = match &w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -251,7 +257,7 @@ fn trial_requires_driving_orders_gates_and_rewards_once() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -290,13 +296,13 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         step(&mut w, &mut a, &mut t);
     }
     assert!(
-        w.entities.values::<server::components::PlayerMission>()
+        w.entities.values::<server::component::PlayerMission>()
             [&w.sessions.peers[&peer(8)].player_id()]
             .is_none()
     );
     let ids: BTreeSet<_> = (0..8)
         .map(|n| {
-            w.entities.values::<server::components::PlayerMission>()
+            w.entities.values::<server::component::PlayerMission>()
                 [&w.sessions.peers[&peer(n)].player_id()]
                 .as_ref()
                 .unwrap()
@@ -307,13 +313,13 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
     assert_eq!(ids.len(), 8);
     assert_eq!(
         w.entities
-            .values::<server::components::PoolMembership>()
+            .values::<server::component::PoolMembership>()
             .values()
             .filter(|pool| **pool == server::systems::population::VehiclePool::Parked)
             .count(),
         24
     );
-    let car = w.entities.values::<server::components::PlayerMission>()
+    let car = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(0)].player_id()]
         .as_ref()
         .unwrap()
@@ -333,23 +339,23 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
     );
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.view::<VehicleComponent>()[&car]
+        w.entities.view::<VehicleSnapshot>()[&car]
             .state
             .driver_id
             .is_none()
     );
     vehicle_action(&w, &mut t, peer(0), 2, 1, Action::CancelMission(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
+    assert!(!w.entities.view::<VehicleSnapshot>().contains_key(&car));
     place(&mut w, peer(8), [48.0, 0.02, -180.0]);
     job(&w, &mut t, peer(8), 3, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.values::<server::components::PlayerMission>()
+        w.entities.values::<server::component::PlayerMission>()
             [&w.sessions.peers[&peer(8)].player_id()]
             .is_some()
     );
-    let disconnected = w.entities.values::<server::components::PlayerMission>()
+    let disconnected = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(1)].player_id()]
         .as_ref()
         .unwrap()
@@ -358,29 +364,29 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
     w.disconnect(peer(1), &mut a);
     assert!(
         !w.entities
-            .view::<VehicleComponent>()
+            .view::<VehicleSnapshot>()
             .contains_key(&disconnected)
     );
-    let destroyed = w.entities.values::<server::components::PlayerMission>()
+    let destroyed = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(2)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&destroyed)
+        .get_mut_by_id::<VehicleSnapshot>(&destroyed)
         .unwrap()
         .state
         .health = VehicleHealth(0);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&destroyed)
+        .get_mut_by_id::<VehicleSnapshot>(&destroyed)
         .unwrap()
         .state
         .disabled = true;
     step(&mut w, &mut a, &mut t);
     assert!(
         !w.entities
-            .view::<VehicleComponent>()
+            .view::<VehicleSnapshot>()
             .contains_key(&destroyed)
     );
     assert_eq!(
@@ -393,30 +399,26 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         0
     );
     let dead = w.sessions.peers[&peer(3)].player.unwrap().0;
-    let dead_car = w.entities.values::<server::components::PlayerMission>()
+    let dead_car = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(3)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&dead)
+        .get_mut_by_id::<PlayerSnapshot>(&dead)
         .unwrap()
         .state
         .health = CharacterHealth(0);
     step(&mut w, &mut a, &mut t);
-    assert!(
-        !w.entities
-            .view::<VehicleComponent>()
-            .contains_key(&dead_car)
-    );
-    let expired = w.entities.values::<server::components::PlayerMission>()
+    assert!(!w.entities.view::<VehicleSnapshot>().contains_key(&dead_car));
+    let expired = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(4)].player_id()]
         .as_ref()
         .unwrap()
         .reserved_vehicle
         .unwrap();
-    let deadline = w.entities.values::<server::components::PlayerMission>()
+    let deadline = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&peer(4)].player_id()]
         .as_ref()
         .unwrap()
@@ -426,7 +428,7 @@ fn recovery_slots_are_private_capped_and_release_on_cancel_death_timeout_disconn
         keep_alive(&w, &mut t, peer(n));
     }
     step(&mut w, &mut a, &mut t);
-    assert!(!w.entities.view::<VehicleComponent>().contains_key(&expired));
+    assert!(!w.entities.view::<VehicleSnapshot>().contains_key(&expired));
 }
 
 // Accept only the reserved recovery car and wait for a safe driver exit before completing garage delivery.
@@ -439,7 +441,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     job(&w, &mut t, p, 1, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
-    let car = w.entities.values::<server::components::PlayerMission>()
+    let car = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -449,7 +451,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     car_at(&mut w, 1, [-220.0, 0.0, 48.0]);
     ticks(&mut w, &mut a, &mut t, p, 31);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .dwell,
@@ -467,7 +469,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     car_at(&mut w, 1, [-152.0, 0.0, 176.0]);
     enter(&mut w, &mut a, &mut t, p, car, 4);
     car_at(&mut w, car, [-220.0, 0.0, 48.0]);
-    let offsets = w.entities.view::<VehicleComponent>()[&car]
+    let offsets = w.entities.view::<VehicleSnapshot>()[&car]
         .template
         .exit_offsets
         .clone();
@@ -476,7 +478,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
         join(&mut w, &mut a, &mut t, q, None);
         ready(&mut w, &mut a, &mut t, q);
         let mut pos = sim_core::anchor(
-            &w.entities.view::<VehicleComponent>()[&car].state.motor,
+            &w.entities.view::<VehicleSnapshot>()[&car].state.motor,
             *offset,
         );
         pos[1] = 0.02;
@@ -484,14 +486,14 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     }
     ticks(&mut w, &mut a, &mut t, p, 35);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
         server::systems::missions::Phase::Active
     );
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .checkpoint_index,
@@ -507,7 +509,7 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     }
     ticks(&mut w, &mut a, &mut t, p, 2);
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -519,11 +521,11 @@ fn recovery_only_accepts_its_reserved_car_and_waits_for_a_safe_garage_exit() {
     );
     let owner = w.sessions.peers[&p].player.unwrap().0;
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&owner].state.mode,
+        w.entities.view::<PlayerSnapshot>()[&owner].state.mode,
         CharacterMode::OnFoot
     );
-    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
-    let position = w.entities.view::<PlayerComponent>()[&owner]
+    assert!(!w.entities.view::<VehicleSnapshot>().contains_key(&car));
+    let position = w.entities.view::<PlayerSnapshot>()[&owner]
         .state
         .motor
         .position
@@ -591,7 +593,7 @@ fn repair_rejects_heat_and_funds_and_cancels_interrupted_dwell_without_debit() {
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
     );
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
 }
 
 // Release ownership and the reserved slot when cancelling a driven recovery, without rewarding the player.
@@ -604,7 +606,7 @@ fn cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward() {
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     job(&w, &mut t, p, 1, "recovery_docks_quay");
     step(&mut w, &mut a, &mut t);
-    let car = w.entities.values::<server::components::PlayerMission>()
+    let car = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -614,17 +616,18 @@ fn cancelling_a_driven_recovery_releases_ownership_and_slot_without_reward() {
     let epoch = w.sessions.peers[&p].epoch;
     vehicle_action(&w, &mut t, p, 3, epoch, Action::CancelMission(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(!w.entities.view::<VehicleComponent>().contains_key(&car));
+    assert!(!w.entities.view::<VehicleSnapshot>().contains_key(&car));
     assert_eq!(w.sessions.peers[&p].epoch, epoch + 1);
     assert_eq!(w.sessions.peers[&p].profile.as_ref().unwrap().credits.0, 0);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0]
+        w.entities.view::<PlayerSnapshot>()[&w.sessions.peers[&p].player.unwrap().0]
             .state
             .mode,
         CharacterMode::OnFoot
     );
 }
 
+/// Verifies that authored courier variants select private targets and commit their own rewards.
 #[test]
 fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards() {
     // Exercise every authored option deterministically, through real acceptance and payout.
@@ -648,7 +651,7 @@ fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards
         step(&mut w, &mut profiles, &mut transport);
         let mission = w
             .entities
-            .values::<server::components::PlayerMission>()
+            .values::<server::component::PlayerMission>()
             .get(&w.sessions.peers[&p].player_id())
             .unwrap()
             .as_ref()
@@ -678,7 +681,7 @@ fn authored_courier_variants_select_private_targets_and_commit_their_own_rewards
         job(&w, &mut transport, p, 1, "courier_quay_market");
         step(&mut w, &mut profiles, &mut transport);
         assert_eq!(
-            w.entities.values::<server::components::PlayerMission>()
+            w.entities.values::<server::component::PlayerMission>()
                 [&w.sessions.peers[&p].player_id()]
                 .as_ref()
                 .unwrap()

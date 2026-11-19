@@ -42,18 +42,28 @@ pub enum Command {
         event: String,
     },
 }
+/// Returns a persistence operation ID, command, and result to the server.
 pub struct Completion {
+    /// Unique ID of this item within its owning scope.
     pub id: String,
+    /// Persistence command associated with this completion.
     pub command: Command,
+    /// Result returned to the requesting caller.
     pub result: Result<ProfileView, StoreError>,
 }
+/// Runs bounded profile transactions on a dedicated SQLite thread.
 pub struct SqliteWorker {
+    /// Bounded channel used to submit persistence work.
     sender: Option<SyncSender<(String, Command)>>,
+    /// Channel that receives completed persistence operations.
     receiver: Receiver<Completion>,
+    /// Shared signal that asks the worker to stop.
     stop: Arc<AtomicBool>,
+    /// Owned persistence worker thread.
     thread: Option<JoinHandle<()>>,
 }
 impl SqliteWorker {
+    /// Opens the underlying service and prepares its state for use.
     pub fn open(path: &Path) -> Result<Self, String> {
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent)
@@ -158,6 +168,7 @@ impl SqliteWorker {
             thread: Some(thread),
         })
     }
+    /// Submits pending work without waiting for its completion.
     pub fn submit(&self, id: String, command: Command) -> Result<(), String> {
         self.sender
             .as_ref()
@@ -168,9 +179,11 @@ impl SqliteWorker {
                 TrySendError::Disconnected(_) => "persistence worker stopped".into(),
             })
     }
+    /// Collects completed work or incoming events without blocking.
     pub fn poll(&self) -> Vec<Completion> {
         self.receiver.try_iter().take(64).collect()
     }
+    /// Checks whether the service remains available for its next operation.
     pub fn healthy(&self) -> bool {
         self.thread.as_ref().is_some_and(|t| !t.is_finished())
     }
@@ -185,6 +198,7 @@ impl Drop for SqliteWorker {
         }
     }
 }
+/// Returns the current Unix time for durable event timestamps.
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -192,6 +206,7 @@ fn now() -> i64 {
         .as_millis()
         .min(i64::MAX as u128) as i64
 }
+/// Opens the underlying service and prepares its state for use.
 fn open(path: &Path) -> Result<Connection, String> {
     let mut c = Connection::open(path).map_err(|e| format!("open profiles database: {e}"))?;
     c.busy_timeout(Duration::from_millis(50))
@@ -249,10 +264,12 @@ enum DbError {
     Rejected(StoreError),
 }
 impl From<rusqlite::Error> for DbError {
+    /// Converts the underlying storage error into the server's storage error type.
     fn from(e: rusqlite::Error) -> Self {
         Self::Sql(e)
     }
 }
+/// Reads a profile record from storage.
 fn profile(c: &Connection, id: &str) -> Result<ProfileView, DbError> {
     Ok(c.query_row(
         "SELECT profile_id,display_name,credits,completed_jobs,tshirt_colour FROM profiles WHERE profile_id=?1",
@@ -268,6 +285,7 @@ fn profile(c: &Connection, id: &str) -> Result<ProfileView, DbError> {
         },
     )?)
 }
+/// Executes a profile storage command in the SQLite connection.
 fn execute(c: &mut Connection, cmd: &Command) -> Result<ProfileView, DbError> {
     let tx = c.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let view = match cmd {
@@ -320,6 +338,7 @@ fn execute(c: &mut Connection, cmd: &Command) -> Result<ProfileView, DbError> {
     tx.commit()?;
     Ok(view)
 }
+/// Applies an economic ledger event atomically with its profile update.
 fn economic(
     c: &Connection,
     id: &str,

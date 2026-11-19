@@ -1,8 +1,11 @@
 //! Shared damage rules invoked by ordered weapon and impact systems.
-use crate::components::*;
 use crate::systems::population::PedestrianPhase;
 use protocol::*;
-pub(crate) fn pedestrian_damage(ped: &mut Pedestrian, amount: u8) {
+/// Applies damage and stops a pedestrian when its health reaches zero.
+pub(crate) fn pedestrian_damage(
+    ped: &mut crate::component::queries::PedestrianQueryItem<'_, '_>,
+    amount: u8,
+) {
     ped.state.health.0 = ped.state.health.0.saturating_sub(u16::from(amount));
     if ped.state.health.0 == 0 {
         ped.phase = PedestrianPhase::Incapacitated;
@@ -10,8 +13,9 @@ pub(crate) fn pedestrian_damage(ped: &mut Pedestrian, amount: u8) {
         ped.state.motor.velocity = Vec3([Scalar(0.0); 3]);
     }
 }
+/// Applies eligible vehicle damage while protecting vehicles occupied by another player.
 pub(crate) fn vehicle_damage(
-    car: &mut Vehicle,
+    car: &mut crate::component::queries::VehicleQueryItem<'_, '_>,
     amount: u16,
     attacker: Option<protocol::EntityId>,
 ) -> bool {

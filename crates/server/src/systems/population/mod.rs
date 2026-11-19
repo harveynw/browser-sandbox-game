@@ -2,7 +2,9 @@
 pub(crate) mod native;
 pub(crate) mod pedestrians;
 pub(crate) mod traffic;
-use crate::components::Vehicle;
+use crate::component::VehicleSnapshot;
+#[cfg(test)]
+use crate::component::tests::ActorWorldExt as _;
 use content::{EdgeKind, RoadGraph, WorldManifest};
 use protocol::*;
 use sim_core::{CollisionQueries, CollisionWorld, QueryFilter};
@@ -37,28 +39,43 @@ pub enum VehiclePool {
     Parked,
     Traffic,
 }
+/// Describes a player's position and facing for population visibility decisions.
 #[derive(Clone, Copy)]
 pub struct Observer {
+    /// World position in metres.
     pub position: [f32; 3],
+    /// Horizontal facing angle in radians.
     pub yaw: f32,
 }
 
-use crate::components::Pedestrian;
+use crate::component::PedestrianSnapshot;
+/// Counts population changes and navigation work.
 #[derive(Default, Debug)]
 pub struct PopulationMetrics {
+    /// Total number of ambient actors spawned.
     pub spawned: u64,
+    /// Total number of ambient actors retired.
     pub despawned: u64,
+    /// Total number of route searches performed.
     pub path_jobs: u64,
+    /// Largest number of route searches performed in one tick.
     pub max_path_jobs_per_tick: usize,
+    /// Total number of replacement routes requested.
     pub replans: u64,
+    /// Total number of spawn attempts rejected by placement checks.
     pub blocked_spawns: u64,
 }
+/// Indexes authored graph positions and edges for route searches.
 pub(crate) struct Navigation {
+    /// World positions indexed by authored navigation node ID.
     pub(crate) points: BTreeMap<u32, [f32; 3]>,
+    /// Outgoing graph edges with their costs and movement kinds.
     edges: BTreeMap<u32, Vec<(u32, f32, EdgeKind)>>,
+    /// Authored graph edges available as population spawn candidates.
     pub(crate) candidates: Vec<(u32, u32, [f32; 3], f32)>,
 }
 impl Navigation {
+    /// Indexes graph nodes and permitted edges for walking or driving routes.
     pub(crate) fn new(graph: &RoadGraph, walking: bool) -> Self {
         let points: BTreeMap<_, _> = graph
             .nodes
@@ -94,6 +111,7 @@ impl Navigation {
             candidates,
         }
     }
+    /// Finds the closest authored navigation node to a position.
     pub(crate) fn nearest(&self, p: [f32; 3]) -> Option<u32> {
         self.points
             .keys()
@@ -105,10 +123,12 @@ impl Navigation {
             })
             .copied()
     }
+    /// Finds a route between authored navigation nodes.
     pub(crate) fn path(&self, from: u32, goal: u32) -> VecDeque<u32> {
         self.path_avoiding(from, goal, None)
     }
 
+    /// Finds a route while excluding a temporarily blocked node.
     pub(crate) fn path_avoiding(
         &self,
         from: u32,
@@ -149,11 +169,14 @@ impl Navigation {
         VecDeque::new()
     }
 }
+/// Tracks temporary vehicle reservations for intersection cells.
 #[derive(Default)]
 pub struct Intersections {
+    /// Intersection cells mapped to their vehicle owner and expiry tick.
     reservations: BTreeMap<(i32, i32), (u32, u32)>,
 }
 impl Intersections {
+    /// Reserves an intersection cell unless another vehicle holds its unexpired reservation.
     pub fn request(&mut self, key: (i32, i32), id: u32, tick: u32) -> bool {
         self.reservations.retain(|_, (_, expiry)| *expiry > tick);
         match self.reservations.get(&key) {
@@ -165,23 +188,35 @@ impl Intersections {
             }
         }
     }
+    /// Releases reservations owned by the specified actor.
     fn release(&mut self, id: u32) {
         self.reservations.retain(|_, (owner, _)| *owner != id);
     }
 }
+/// Manages seeded ambient populations, navigation, and intersection access.
 #[derive(bevy_ecs::prelude::Resource)]
 pub struct PopulationSystem {
+    /// Measurements collected for server diagnostics.
     pub metrics: PopulationMetrics,
+    /// Temporary intersection access reservations.
     pub intersections: Intersections,
+    /// Navigation graph used by vehicles.
     road: Navigation,
+    /// Navigation graph used by actors on foot.
     sidewalk: Navigation,
+    /// Actor IDs waiting for navigation work.
     queue: VecDeque<u32>,
+    /// Seeded random generator state for repeatable population choices.
     rng: u64,
+    /// Cursor used to rotate vehicle population choices.
     car_cursor: usize,
+    /// Cursor used to rotate pedestrian population choices.
     pedestrian_cursor: usize,
+    /// Movement-axis scale used by pedestrian inputs.
     walk_axis: f32,
 }
 impl PopulationSystem {
+    /// Creates deterministic population state and tags the initial parked vehicles.
     #[cfg(test)]
     pub fn new(
         manifest: &WorldManifest,
@@ -193,10 +228,11 @@ impl PopulationSystem {
         let parked: Vec<_> = parked.collect();
         let population = Self::from_content(manifest, config, parked.len(), seed)?;
         for id in parked {
-            vehicles.insert_value::<crate::components::PoolMembership>(id, VehiclePool::Parked);
+            vehicles.insert_value::<crate::component::PoolMembership>(id, VehiclePool::Parked);
         }
         Ok(population)
     }
+    /// Creates seeded population state from the authored world content.
     pub(crate) fn from_content(
         manifest: &WorldManifest,
         config: &content::SimConfig,
@@ -225,6 +261,7 @@ impl PopulationSystem {
             walk_axis: 1.4 / config.character.walk_speed as f32,
         })
     }
+    /// Advances the seeded generator and returns its next random value.
     fn random(&mut self) -> usize {
         self.rng ^= self.rng << 13;
         self.rng ^= self.rng >> 7;
@@ -242,8 +279,8 @@ impl PopulationSystem {
         collision: &mut CollisionWorld,
         next_id: &mut u32,
     ) -> Result<(), String> {
-        let mut state =
-            bevy_ecs::system::SystemState::<native::DirectorActors>::new(vehicles.ecs_mut());
+        let mut live = vehicles.live();
+        let mut state = bevy_ecs::system::SystemState::<native::DirectorActors>::new(&mut live);
         let result = native::direct_actors(
             self,
             tick,
@@ -251,13 +288,12 @@ impl PopulationSystem {
             manifest,
             collision,
             next_id,
-            &mut state
-                .get_mut(vehicles.ecs_mut())
-                .expect("native actor queries"),
+            &mut state.get_mut(&mut live).expect("native actor queries"),
         );
-        state.apply(vehicles.ecs_mut());
+        state.apply(&mut live);
         result
     }
+    /// Releases AI route and intersection state when vehicle ownership changes.
     #[cfg(test)]
     pub fn release_ai(&mut self, id: u32, vehicles: &mut crate::ecs::EntityStore) {
         if let Some(b) = vehicles.get_mut_by_id::<Traffic>(&id) {
@@ -265,6 +301,7 @@ impl PopulationSystem {
         }
         self.intersections.release(id);
     }
+    /// Checks whether an ambient vehicle can be taken by a player.
     #[cfg(test)]
     pub fn can_enter(&self, id: u32, vehicles: &crate::ecs::EntityStore) -> bool {
         vehicles
@@ -272,6 +309,7 @@ impl PopulationSystem {
             .get(&id)
             .is_none_or(|b| b.phase == TrafficPhase::Available)
     }
+    /// Builds the vehicle input selected by the actor's AI state.
     #[cfg(test)]
     pub fn vehicle_input(
         &self,
@@ -284,6 +322,7 @@ impl PopulationSystem {
             crate::systems::population::input::motor_input(&traffic, tick, speed)
         })
     }
+    /// Runs traffic driving decisions for an owned scenario fixture.
     #[cfg(test)]
     pub fn decide(
         &mut self,
@@ -293,36 +332,32 @@ impl PopulationSystem {
         manifest: &WorldManifest,
         collision: &mut CollisionWorld,
     ) -> Result<(), String> {
-        let mut routes =
-            bevy_ecs::system::SystemState::<traffic::RouteActors>::new(vehicles.ecs_mut());
+        let mut live = vehicles.live();
+        let mut routes = bevy_ecs::system::SystemState::<traffic::RouteActors>::new(&mut live);
         traffic::plan_actors(
             self,
             tick,
-            &mut routes.get_mut(vehicles.ecs_mut()).expect("route queries"),
+            &mut routes.get_mut(&mut live).expect("route queries"),
         );
-        let mut driving =
-            bevy_ecs::system::SystemState::<traffic::DrivingActors>::new(vehicles.ecs_mut());
+        let mut driving = bevy_ecs::system::SystemState::<traffic::DrivingActors>::new(&mut live);
         traffic::drive_actors(
             self,
             tick,
             observers,
             manifest,
             collision,
-            &mut driving
-                .get_mut(vehicles.ecs_mut())
-                .expect("traffic queries"),
+            &mut driving.get_mut(&mut live).expect("traffic queries"),
         )?;
         let mut pedestrians =
-            bevy_ecs::system::SystemState::<pedestrians::PedestrianActors>::new(vehicles.ecs_mut());
+            bevy_ecs::system::SystemState::<pedestrians::PedestrianActors>::new(&mut live);
         pedestrians::decide_actors(
             self,
             tick,
-            &mut pedestrians
-                .get_mut(vehicles.ecs_mut())
-                .expect("pedestrian queries"),
+            &mut pedestrians.get_mut(&mut live).expect("pedestrian queries"),
         );
         Ok(())
     }
+    /// Runs pedestrian motor updates for an owned scenario fixture.
     #[cfg(test)]
     pub fn step_pedestrians(
         &mut self,
@@ -331,13 +366,29 @@ impl PopulationSystem {
         config: &SimConfig,
         vehicles: &mut crate::ecs::EntityStore,
     ) -> Result<(), String> {
-        for ped in vehicles.values_mut::<Pedestrian>() {
-            crate::systems::movement::pedestrians::step_motor(&mut *ped, tick, collision, config)?;
+        let mut live = vehicles.live();
+        let mut query = live.query::<crate::component::queries::PedestrianQuery>();
+        for mut ped in query.iter_mut(&mut live) {
+            crate::systems::movement::pedestrians::step_motor(
+                &mut ped.state.motor,
+                &ped.state.health,
+                &ped.data.input,
+                tick,
+                collision,
+                config,
+            )?;
         }
         Ok(())
     }
-    fn react_to_noise(&self, ped: &mut Pedestrian, position: [f32; 3], tick: u32) {
-        let p = ped.state.motor.position.0.map(|v| v.0);
+    /// Applies a noise incident to nearby eligible pedestrians.
+    fn react_to_noise(
+        &self,
+        ped: &mut crate::component::PedestrianData,
+        motor: &protocol::CharacterMotor,
+        position: [f32; 3],
+        tick: u32,
+    ) {
+        let p = motor.position.0.map(|v| v.0);
         if distance(p, position) > 20.0 || ped.phase == PedestrianPhase::Incapacitated {
             return;
         }
@@ -358,6 +409,7 @@ impl PopulationSystem {
             std::mem::swap(&mut ped.from, &mut ped.to);
         }
     }
+    /// Starts a pedestrian's flight response away from a threat.
     #[cfg(test)]
     pub fn frighten(
         &mut self,
@@ -365,29 +417,37 @@ impl PopulationSystem {
         tick: u32,
         vehicles: &mut crate::ecs::EntityStore,
     ) {
-        for ped in vehicles.values_mut::<Pedestrian>() {
-            self.react_to_noise(ped, position, tick);
+        let mut live = vehicles.live();
+        let mut query = live.query::<crate::component::queries::PedestrianQuery>();
+        for mut ped in query.iter_mut(&mut live) {
+            self.react_to_noise(&mut ped.data, &ped.state.motor, position, tick);
         }
     }
 }
+/// Allocates the next gameplay entity ID with overflow protection.
 fn allocate(next: &mut u32) -> Result<u32, String> {
     let id = *next;
     *next = next.checked_add(1).ok_or("entity IDs exhausted")?;
     Ok(id)
 }
+/// Returns horizontal distance between two world positions in metres.
 fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
     (a[0] - b[0]).hypot(a[2] - b[2])
 }
+/// Returns the horizontal angle that faces from one position to another.
 fn yaw_to(a: [f32; 3], b: [f32; 3]) -> f32 {
     (-(b[0] - a[0])).atan2(-(b[2] - a[2]))
 }
+/// Normalises an angle to the signed half-turn range.
 fn wrap(yaw: f32) -> f32 {
     (yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
+/// Checks whether a position lies within the allowed population spawn region.
 fn spawn_region(p: [f32; 3], observers: &[Observer]) -> bool {
     observers.iter().any(|o| distance(p, o.position) <= 160.0)
         && observers.iter().all(|o| distance(p, o.position) >= 40.0)
 }
+/// Checks whether a position is outside the observers' visible spawn area.
 pub(crate) fn hidden(p: [f32; 3], observers: &[Observer], collision: &CollisionWorld) -> bool {
     observers.iter().all(|o| {
         let a = [o.position[0], o.position[1] + 1.7, o.position[2]];
@@ -402,6 +462,7 @@ pub(crate) fn hidden(p: [f32; 3], observers: &[Observer], collision: &CollisionW
         })
     })
 }
+/// Checks whether an actor has remained distant long enough to recycle.
 fn aged_far(tick: u32, p: [f32; 3], observers: &[Observer], since: &mut Option<u32>) -> bool {
     if observers.iter().any(|o| distance(p, o.position) <= 220.0) {
         *since = None;
@@ -416,6 +477,7 @@ mod tests {
     use super::*;
     use crate::content_loader::WorldContent;
     use std::path::Path;
+    /// Loads the published world content used by this test.
     fn content() -> WorldContent {
         WorldContent::load_index(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
@@ -423,6 +485,7 @@ mod tests {
         )
         .unwrap()
     }
+    /// Creates a seeded population system for the test content.
     fn population(content: &WorldContent) -> PopulationSystem {
         PopulationSystem::new(
             &content.manifest,
@@ -433,6 +496,7 @@ mod tests {
         )
         .unwrap()
     }
+    /// Verifies that route schedule bounds work without running driving or pedestrian decisions.
     #[test]
     fn route_schedule_bounds_work_without_running_driving_or_pedestrian_decisions() {
         use bevy_ecs::prelude::*;
@@ -441,14 +505,14 @@ mod tests {
         let population = population(&core.content);
         let ids: Vec<_> = core
             .entities
-            .view::<Vehicle>()
+            .view::<VehicleSnapshot>()
             .keys()
             .take(6)
             .copied()
             .collect();
         assert_eq!(ids.len(), 6);
         for &id in &ids {
-            let car = core.entities.get::<Vehicle>(EntityId(id)).unwrap();
+            let car = core.entities.get::<VehicleSnapshot>(EntityId(id)).unwrap();
             let input = sim_core::neutral_input(0, car.state.motor.yaw);
             let position = car.state.motor.position.0.map(|v| v.0);
             core.entities.insert(
@@ -488,6 +552,7 @@ mod tests {
             );
         }
     }
+    /// Verifies that pedestrian schedule keeps five hz cadence and incapacitated RNG consumption.
     #[test]
     fn pedestrian_schedule_keeps_five_hz_cadence_and_incapacitated_rng_consumption() {
         use bevy_ecs::prelude::*;
@@ -511,7 +576,7 @@ mod tests {
         let entity = world
             .spawn((
                 crate::ecs::GameId(EntityId(1)),
-                Pedestrian {
+                PedestrianSnapshot {
                     id: EntityId(1),
                     state: CharacterState {
                         equipment: None,
@@ -530,7 +595,8 @@ mod tests {
                     progress_position: position,
                     flee_until: 0,
                     threat: [0.0; 3],
-                },
+                }
+                .into_bundle(),
             ))
             .id();
         let mut schedule = Schedule::default();
@@ -540,16 +606,26 @@ mod tests {
             .tick = 5;
         schedule.run(&mut world);
         assert_eq!(world.resource::<PopulationSystem>().rng, initial_rng);
-        assert_eq!(world.get::<Pedestrian>(entity).unwrap().input.tick, 0);
+        assert_eq!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(entity)
+                .unwrap()
+                .input
+                .tick,
+            0
+        );
         world
             .resource_mut::<crate::systems::planning::Planning>()
             .tick = 6;
         schedule.run(&mut world);
         assert_eq!(world.resource::<PopulationSystem>().rng, expected_rng);
-        let ped = world.get::<Pedestrian>(entity).unwrap();
+        let ped = world
+            .actor::<crate::component::queries::PedestrianQueryReadOnly>(entity)
+            .unwrap();
         assert_eq!(ped.phase, PedestrianPhase::Incapacitated);
         assert_eq!(ped.input, sim_core::neutral_input(6, ped.state.motor.yaw));
     }
+    /// Verifies that noise reader uses incident tick skips incapacitated and does not replay.
     #[test]
     fn noise_reader_uses_incident_tick_skips_incapacitated_and_does_not_replay() {
         use crate::gameplay_messages::NoiseEmitted;
@@ -564,7 +640,7 @@ mod tests {
             .unwrap();
         let to = edges[0].0;
         let position = population.sidewalk.points[&from];
-        let ped = |id, phase| Pedestrian {
+        let ped = |id, phase| PedestrianSnapshot {
             id: EntityId(id),
             state: CharacterState {
                 equipment: None,
@@ -590,36 +666,61 @@ mod tests {
         let walking = world
             .spawn((
                 crate::ecs::GameId(EntityId(1)),
-                ped(1, PedestrianPhase::Walking),
+                ped(1, PedestrianPhase::Walking).into_bundle(),
             ))
             .id();
         let down = world
             .spawn((
                 crate::ecs::GameId(EntityId(2)),
-                ped(2, PedestrianPhase::Incapacitated),
+                ped(2, PedestrianPhase::Incapacitated).into_bundle(),
             ))
             .id();
         world.write_message(NoiseEmitted { position, tick: 42 });
         let mut schedule = Schedule::default();
         schedule.add_systems(hear_noise);
         schedule.run(&mut world);
-        let state = world.get::<Pedestrian>(walking).unwrap();
+        let state = world
+            .actor::<crate::component::queries::PedestrianQueryReadOnly>(walking)
+            .unwrap();
         assert_eq!(state.flee_until, 192);
         assert_eq!(state.threat, position);
         assert_eq!(state.wait_until, 0);
-        assert_eq!(world.get::<Pedestrian>(down).unwrap().flee_until, 0);
-        world.get_mut::<Pedestrian>(walking).unwrap().flee_until = 0;
+        assert_eq!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(down)
+                .unwrap()
+                .flee_until,
+            0
+        );
+        world
+            .actor_mut::<crate::component::queries::PedestrianQuery>(walking)
+            .unwrap()
+            .flee_until = 0;
         schedule.run(&mut world);
-        assert_eq!(world.get::<Pedestrian>(walking).unwrap().flee_until, 0);
+        assert_eq!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(walking)
+                .unwrap()
+                .flee_until,
+            0
+        );
         world.write_message(NoiseEmitted { position, tick: 43 });
         schedule.run(&mut world);
-        assert_eq!(world.get::<Pedestrian>(walking).unwrap().flee_until, 193);
+        assert_eq!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(walking)
+                .unwrap()
+                .flee_until,
+            193
+        );
     }
+    /// Builds the collision world used by population tests.
     fn collision(content: &WorldContent) -> (SimConfig, CollisionWorld) {
         let config = SimConfig::from_content(&content.config).unwrap();
         let collision = CollisionWorld::from_content(&content.collision, &config).unwrap();
         (config, collision)
     }
+    /// Advances this state using the current tick and validated observations.
     fn advance(
         pop: &mut PopulationSystem,
         cars: &mut crate::ecs::EntityStore,
@@ -635,7 +736,7 @@ mod tests {
         collision
             .set_vehicle_proxies(
                 &cars
-                    .view::<Vehicle>()
+                    .view::<VehicleSnapshot>()
                     .values()
                     .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
@@ -643,12 +744,17 @@ mod tests {
             .unwrap();
         pop.decide(tick, cars, observers, &content.manifest, collision)
             .unwrap();
-        for id in cars.view::<Vehicle>().keys().copied().collect::<Vec<_>>() {
-            let car = cars.view::<Vehicle>().get(&id).unwrap();
+        for id in cars
+            .view::<VehicleSnapshot>()
+            .keys()
+            .copied()
+            .collect::<Vec<_>>()
+        {
+            let car = cars.view::<VehicleSnapshot>().get(&id).unwrap();
             let input = pop
                 .vehicle_input(id, tick, car.state.motor.speed.0, cars)
                 .unwrap_or_else(|| sim_core::neutral_input(tick, car.state.motor.yaw));
-            let car = cars.get_mut_by_id::<Vehicle>(&id).unwrap();
+            let car = cars.get_mut_by_id::<VehicleSnapshot>(&id).unwrap();
             collision.exclude_vehicle(Some(id));
             car.state.motor = sim_core::step_vehicle(
                 &car.state.motor,
@@ -675,7 +781,7 @@ mod tests {
             collision
                 .set_vehicle_proxies(
                     &cars
-                        .view::<Vehicle>()
+                        .view::<VehicleSnapshot>()
                         .values()
                         .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
@@ -685,6 +791,7 @@ mod tests {
         collision.exclude_vehicle(None);
         pop.step_pedestrians(tick, collision, config, cars).unwrap();
     }
+    /// Verifies that traffic parks in an authored free slot and becomes available.
     #[test]
     fn traffic_parks_in_an_authored_free_slot_and_becomes_available() {
         let mut c = content();
@@ -707,14 +814,16 @@ mod tests {
             &mut next,
         )
         .unwrap();
-        let id = *cars.view::<Vehicle>().keys().next().unwrap();
-        cars.retain::<Vehicle>(|k, _| *k == id);
+        let id = *cars.view::<VehicleSnapshot>().keys().next().unwrap();
+        cars.retain::<VehicleSnapshot>(|k, _| *k == id);
         cars.retain::<Traffic>(|k, _| *k == id);
-        cars.retain_value::<crate::components::PoolMembership>(|k, _| *k == id);
-        cars.clear::<Pedestrian>();
+        cars.retain_value::<crate::component::PoolMembership>(|k, _| *k == id);
+        cars.clear::<PedestrianSnapshot>();
         let slot = c.manifest.parking[0].position.map(|v| v as f32);
-        cars.get_mut_by_id::<Vehicle>(&id).unwrap().state.motor =
-            sim_core::spawn_vehicle([slot[0], 0.0, slot[2] + 12.0], 0.0).unwrap();
+        cars.get_mut_by_id::<VehicleSnapshot>(&id)
+            .unwrap()
+            .state
+            .motor = sim_core::spawn_vehicle([slot[0], 0.0, slot[2] + 12.0], 0.0).unwrap();
         let brain = cars.get_mut_by_id::<Traffic>(&id).unwrap();
         brain.born = 0;
         brain.progress_at = 900;
@@ -722,7 +831,7 @@ mod tests {
             collision
                 .set_vehicle_proxies(
                     &cars
-                        .view::<Vehicle>()
+                        .view::<VehicleSnapshot>()
                         .values()
                         .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
@@ -730,12 +839,12 @@ mod tests {
                 .unwrap();
             pop.decide(tick, &mut cars, &[], &c.manifest, &mut collision)
                 .unwrap();
-            let car = cars.view::<Vehicle>().get(&id).unwrap();
+            let car = cars.view::<VehicleSnapshot>().get(&id).unwrap();
             let input = pop
                 .vehicle_input(id, tick, car.state.motor.speed.0, &cars)
                 .unwrap_or_else(|| sim_core::neutral_input(tick, car.state.motor.yaw));
             let available = pop.can_enter(id, &cars);
-            let car = cars.get_mut_by_id::<Vehicle>(&id).unwrap();
+            let car = cars.get_mut_by_id::<VehicleSnapshot>(&id).unwrap();
             collision.exclude_vehicle(Some(id));
             car.state.motor = sim_core::step_vehicle(
                 &car.state.motor,
@@ -754,7 +863,7 @@ mod tests {
                 assert!(distance(car.state.motor.position.0.map(|v| v.0), slot) < 2.0);
                 assert!(car.state.motor.speed.0.abs() < 0.3);
                 assert_eq!(
-                    cars.values::<crate::components::PoolMembership>()[&id],
+                    cars.values::<crate::component::PoolMembership>()[&id],
                     VehiclePool::Traffic
                 );
                 return;
@@ -762,10 +871,11 @@ mod tests {
         }
         panic!(
             "failed to park: {:?}, phase {:?}",
-            cars.view::<Vehicle>()[&id].state.motor,
+            cars.view::<VehicleSnapshot>()[&id].state.motor,
             cars.view::<Traffic>()[&id].phase
         );
     }
+    /// Verifies that same seed and observers produce identical population and motion.
     #[test]
     fn same_seed_and_observers_produce_identical_population_and_motion() {
         let c = content();
@@ -804,29 +914,30 @@ mod tests {
         assert_eq!(a_id, b_id);
         assert_eq!(
             a_cars
-                .view::<Vehicle>()
+                .view::<VehicleSnapshot>()
                 .iter()
                 .map(|(id, v)| (*id, v.state.clone()))
                 .collect::<Vec<_>>(),
             b_cars
-                .view::<Vehicle>()
+                .view::<VehicleSnapshot>()
                 .iter()
                 .map(|(id, v)| (*id, v.state.clone()))
                 .collect::<Vec<_>>()
         );
         assert_eq!(
             a_cars
-                .view::<Pedestrian>()
+                .view::<PedestrianSnapshot>()
                 .iter()
                 .map(|(id, p)| (*id, p.state.clone()))
                 .collect::<Vec<_>>(),
             b_cars
-                .view::<Pedestrian>()
+                .view::<PedestrianSnapshot>()
                 .iter()
                 .map(|(id, p)| (*id, p.state.clone()))
                 .collect::<Vec<_>>()
         );
     }
+    /// Verifies that intersections first request wins stable ties expire and release.
     #[test]
     fn intersections_first_request_wins_stable_ties_expire_and_release() {
         let mut r = Intersections::default();
@@ -838,6 +949,7 @@ mod tests {
         r.release(8);
         assert!(r.request((1, 2), 7, 127));
     }
+    /// Verifies that parked budget includes eight reserved and tags survive possession.
     #[test]
     fn parked_budget_includes_eight_reserved_and_tags_survive_possession() {
         let c = content();
@@ -898,22 +1010,26 @@ mod tests {
             )
             .unwrap();
         }
-        assert!(!cars.view::<Vehicle>().is_empty());
-        let id = *cars.view::<Vehicle>().keys().next().unwrap();
+        assert!(!cars.view::<VehicleSnapshot>().is_empty());
+        let id = *cars.view::<VehicleSnapshot>().keys().next().unwrap();
         assert!(!p.can_enter(id, &cars));
         cars.get_mut_by_id::<Traffic>(&id).unwrap().phase = TrafficPhase::Available;
         assert!(p.can_enter(id, &cars));
-        cars.get_mut_by_id::<Vehicle>(&id).unwrap().state.driver_id = Some(EntityId(1000));
-        let tag = cars.values::<crate::components::PoolMembership>()[&id];
+        cars.get_mut_by_id::<VehicleSnapshot>(&id)
+            .unwrap()
+            .state
+            .driver_id = Some(EntityId(1000));
+        let tag = cars.values::<crate::component::PoolMembership>()[&id];
         p.direct(1500, &[], &mut cars, &c.manifest, &mut collision, &mut next)
             .unwrap();
         p.direct(3000, &[], &mut cars, &c.manifest, &mut collision, &mut next)
             .unwrap();
-        assert!(cars.view::<Vehicle>().contains_key(&id));
-        assert_eq!(cars.values::<crate::components::PoolMembership>()[&id], tag);
+        assert!(cars.view::<VehicleSnapshot>().contains_key(&id));
+        assert_eq!(cars.values::<crate::component::PoolMembership>()[&id], tag);
         assert_eq!(cars.view::<Traffic>().len(), 1);
-        assert!(cars.view::<Pedestrian>().is_empty());
+        assert!(cars.view::<PedestrianSnapshot>().is_empty());
     }
+    /// Verifies that seeded population traversal is bounded hidden collision safe and recycles.
     #[test]
     fn seeded_population_traversal_is_bounded_hidden_collision_safe_and_recycles() {
         let c = content();
@@ -946,23 +1062,23 @@ mod tests {
                 &observers,
                 &mut next,
             );
-            max_cars = max_cars.max(cars.view::<Vehicle>().len());
-            max_peds = max_peds.max(cars.view::<Pedestrian>().len());
-            assert!(cars.view::<Vehicle>().len() <= TRAFFIC_CAP);
-            assert!(cars.view::<Pedestrian>().len() <= PEDESTRIAN_CAP);
+            max_cars = max_cars.max(cars.view::<VehicleSnapshot>().len());
+            max_peds = max_peds.max(cars.view::<PedestrianSnapshot>().len());
+            assert!(cars.view::<VehicleSnapshot>().len() <= TRAFFIC_CAP);
+            assert!(cars.view::<PedestrianSnapshot>().len() <= PEDESTRIAN_CAP);
             assert_eq!(
-                cars.view::<Vehicle>().len(),
-                cars.values::<crate::components::PoolMembership>()
+                cars.view::<VehicleSnapshot>().len(),
+                cars.values::<crate::component::PoolMembership>()
                     .values()
                     .filter(|p| **p == VehiclePool::Traffic)
                     .count()
             );
             for (id, p) in cars
-                .view::<Vehicle>()
+                .view::<VehicleSnapshot>()
                 .iter()
                 .map(|(&id, c)| (id, c.state.motor.position.0.map(|v| v.0)))
                 .chain(
-                    cars.view::<Pedestrian>()
+                    cars.view::<PedestrianSnapshot>()
                         .iter()
                         .map(|(&id, p)| (id, p.state.motor.position.0.map(|v| v.0))),
                 )
@@ -975,11 +1091,13 @@ mod tests {
                 if distance(p, initial[&id]) > 5.0 {
                     moved.insert(id);
                 }
-                if cars.view::<Vehicle>().contains_key(&id) && distance(p, initial[&id]) > 20.0 {
+                if cars.view::<VehicleSnapshot>().contains_key(&id)
+                    && distance(p, initial[&id]) > 20.0
+                {
                     moved_cars.insert(id);
                 }
             }
-            for ped in cars.view::<Pedestrian>().values() {
+            for ped in cars.view::<PedestrianSnapshot>().values() {
                 let p = ped.state.motor.position.0.map(|v| v.0);
                 assert!(
                     !collision
@@ -1013,13 +1131,11 @@ mod tests {
             pop.direct(tick, &[], &mut cars, &c.manifest, &mut collision, &mut next)
                 .unwrap();
         }
-        assert!(cars.view::<Vehicle>().is_empty());
-        assert!(cars.view::<Pedestrian>().is_empty());
-        assert!(
-            cars.values::<crate::components::PoolMembership>()
-                .is_empty()
-        );
+        assert!(cars.view::<VehicleSnapshot>().is_empty());
+        assert!(cars.view::<PedestrianSnapshot>().is_empty());
+        assert!(cars.values::<crate::component::PoolMembership>().is_empty());
     }
+    /// Verifies that sensor brakes and unreachable graph stops without moving through static geometry.
     #[test]
     fn sensor_brakes_and_unreachable_graph_stops_without_moving_through_static_geometry() {
         let c = content();
@@ -1040,15 +1156,15 @@ mod tests {
             &mut next,
         )
         .unwrap();
-        let id = *cars.view::<Vehicle>().keys().next().unwrap();
-        let car = &cars.view::<Vehicle>()[&id];
+        let id = *cars.view::<VehicleSnapshot>().keys().next().unwrap();
+        let car = &cars.view::<VehicleSnapshot>()[&id];
         let mut obstacle = sim_core::anchor(&car.state.motor, [0.0, 0.0, -8.0]);
         obstacle[1] = 0.0;
         let other = 9999;
         let template = car.template.clone();
         cars.insert(
             other,
-            Vehicle {
+            VehicleSnapshot {
                 id: EntityId(other),
                 state: VehicleState {
                     motor: sim_core::spawn_vehicle(obstacle, car.state.motor.yaw.0).unwrap(),
@@ -1063,7 +1179,7 @@ mod tests {
         collision
             .set_vehicle_proxies(
                 &cars
-                    .view::<Vehicle>()
+                    .view::<VehicleSnapshot>()
                     .values()
                     .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
@@ -1080,6 +1196,7 @@ mod tests {
         assert_eq!(cars.view::<Traffic>()[&id].phase, TrafficPhase::Stopped);
         assert_eq!(p.vehicle_input(id, 54, 0.0, &cars).unwrap().buttons.0, 4);
     }
+    /// Verifies that pedestrians use authored edges wait for crossings and flee on graph.
     #[test]
     fn pedestrians_use_authored_edges_wait_for_crossings_and_flee_on_graph() {
         let c = content();
@@ -1100,7 +1217,7 @@ mod tests {
             &mut next,
         )
         .unwrap();
-        let id = *cars.view::<Pedestrian>().keys().next().unwrap();
+        let id = *cars.view::<PedestrianSnapshot>().keys().next().unwrap();
         let (from, to) = p
             .sidewalk
             .edges
@@ -1113,7 +1230,7 @@ mod tests {
             .unwrap();
         let start = p.sidewalk.points[&from];
         let target = p.sidewalk.points[&to];
-        let ped = cars.get_mut_by_id::<Pedestrian>(&id).unwrap();
+        let ped = cars.get_mut_by_id::<PedestrianSnapshot>(&id).unwrap();
         ped.from = from;
         ped.to = to;
         ped.state.motor =
@@ -1124,10 +1241,10 @@ mod tests {
             0.0,
             (start[2] + target[2]) / 2.0,
         ];
-        cars.clear::<Vehicle>();
+        cars.clear::<VehicleSnapshot>();
         cars.insert(
             9999,
-            Vehicle {
+            VehicleSnapshot {
                 id: EntityId(9999),
                 state: VehicleState {
                     motor: sim_core::spawn_vehicle(car_position, 0.0).unwrap(),
@@ -1143,18 +1260,18 @@ mod tests {
         p.decide(36, &mut cars, &[], &c.manifest, &mut collision)
             .unwrap();
         assert_eq!(
-            cars.view::<Pedestrian>()[&id].phase,
+            cars.view::<PedestrianSnapshot>()[&id].phase,
             PedestrianPhase::Waiting
         );
-        assert_eq!(cars.view::<Pedestrian>()[&id].input.move_z.0, 0);
-        cars.clear::<Vehicle>();
+        assert_eq!(cars.view::<PedestrianSnapshot>()[&id].input.move_z.0, 0);
+        cars.clear::<VehicleSnapshot>();
         p.decide(42, &mut cars, &[], &c.manifest, &mut collision)
             .unwrap();
         assert_eq!(
-            cars.view::<Pedestrian>()[&id].phase,
+            cars.view::<PedestrianSnapshot>()[&id].phase,
             PedestrianPhase::Walking
         );
-        let position = cars.view::<Pedestrian>()[&id]
+        let position = cars.view::<PedestrianSnapshot>()[&id]
             .state
             .motor
             .position
@@ -1164,16 +1281,16 @@ mod tests {
         p.decide(48, &mut cars, &[], &c.manifest, &mut collision)
             .unwrap();
         assert_eq!(
-            cars.view::<Pedestrian>()[&id].phase,
+            cars.view::<PedestrianSnapshot>()[&id].phase,
             PedestrianPhase::Fleeing
         );
         p.decide(198, &mut cars, &[], &c.manifest, &mut collision)
             .unwrap();
         assert_eq!(
-            cars.view::<Pedestrian>()[&id].phase,
+            cars.view::<PedestrianSnapshot>()[&id].phase,
             PedestrianPhase::Walking
         );
-        let ped = &cars.view::<Pedestrian>()[&id];
+        let ped = &cars.view::<PedestrianSnapshot>()[&id];
         assert!(
             p.sidewalk.edges[&ped.from]
                 .iter()
@@ -1182,10 +1299,17 @@ mod tests {
     }
 }
 
+/// Applies current noise incidents once to nearby active pedestrians.
 pub(crate) fn hear_noise(
     mut messages: bevy_ecs::prelude::MessageReader<crate::gameplay_messages::NoiseEmitted>,
     population: bevy_ecs::prelude::Res<PopulationSystem>,
-    mut pedestrians: bevy_ecs::prelude::Query<(&crate::ecs::GameId, &mut Pedestrian)>,
+    mut pedestrians: bevy_ecs::prelude::Query<
+        (
+            &crate::ecs::GameId,
+            crate::component::queries::PedestrianQuery,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
 ) {
     if messages.is_empty() {
         return;
@@ -1194,7 +1318,12 @@ pub(crate) fn hear_noise(
     actors.sort_by_key(|(id, _)| id.0.0);
     for message in messages.read() {
         for (_, ped) in &mut actors {
-            population.react_to_noise(ped, message.position, message.tick);
+            population.react_to_noise(
+                &mut ped.data,
+                &ped.state.motor,
+                message.position,
+                message.tick,
+            );
         }
     }
 }
@@ -1205,7 +1334,7 @@ pub(crate) fn release_restored_vehicles(
     mut population: bevy_ecs::prelude::ResMut<PopulationSystem>,
     mut vehicles: bevy_ecs::prelude::Query<
         (&crate::ecs::GameId, Option<&mut Traffic>),
-        bevy_ecs::prelude::With<Vehicle>,
+        bevy_ecs::prelude::With<crate::component::VehicleData>,
     >,
     clock: bevy_ecs::prelude::Res<crate::ecs::state::Clock>,
 ) {
@@ -1227,4 +1356,4 @@ pub(crate) fn release_restored_vehicles(
 }
 
 pub(crate) mod input;
-pub use crate::components::Traffic;
+pub use crate::component::Traffic;

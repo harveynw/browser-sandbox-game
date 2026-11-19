@@ -1,5 +1,6 @@
 //! Wanted-state transitions and police-unit control operations.
 use super::*;
+/// Creates empty pursuit state for a player with no active crimes.
 pub(crate) fn clear_wanted() -> Wanted {
     Wanted {
         heat: 0,
@@ -21,6 +22,7 @@ pub(crate) fn clear_wanted() -> Wanted {
     }
 }
 
+/// Applies new crime evidence while enforcing deduplication and heat cooldowns.
 pub(crate) fn observe(wanted: &mut Wanted, event: CrimeId, tick: u32, report: CrimeReport) {
     if wanted.seen.contains(&event) {
         return;
@@ -70,6 +72,7 @@ pub(crate) fn observe(wanted: &mut Wanted, event: CrimeId, tick: u32, report: Cr
         wanted.pursuit = Pursuit::Pursuing;
     }
 }
+/// Updates pursuit, search expiry, and continuous arrest progress.
 pub(crate) fn advance(
     wanted: &mut Wanted,
     tick: u32,
@@ -126,6 +129,7 @@ pub(crate) fn advance(
     wanted.arrest_ticks >= 90
 }
 
+/// Clears a police unit's target and route recovery state.
 pub(crate) fn release_target(unit: &mut Unit) {
     unit.target = None;
     unit.route.clear();
@@ -136,6 +140,7 @@ pub(crate) fn release_target(unit: &mut Unit) {
     unit.next_plan = 0;
 }
 
+/// Combines AI steering with speed control for the current tick.
 pub(crate) fn motor_input(unit: &Unit, tick: u32, speed: f32) -> InputFrame {
     let mut input = unit.input.clone();
     input.tick = tick;

@@ -30,21 +30,30 @@ enum Signal {
     Candidate(RTCIceCandidateInit),
     Channel(Arc<dyn DataChannel>),
 }
-struct Handler(mpsc::Sender<Signal>);
+/// Forwards WebRTC connection events to the test client.
+struct Handler(
+    /// Queue used to forward connection events to the test client.
+    mpsc::Sender<Signal>,
+);
 #[async_trait::async_trait]
 impl PeerConnectionEventHandler for Handler {
+    /// Forwards a generated ICE candidate to the test client's signalling queue.
     async fn on_ice_candidate(&self, e: RTCPeerConnectionIceEvent) {
         if let Ok(c) = e.candidate.to_json() {
             let _ = self.0.try_send(Signal::Candidate(c));
         }
     }
+    /// Forwards a new WebRTC data channel to the test client.
     async fn on_data_channel(&self, c: Arc<dyn DataChannel>) {
         let _ = self.0.try_send(Signal::Channel(c));
     }
 }
 /// Independent streams make the loss profile reproducible without coupling
 /// its direction to the SCTP DATA/SACK packet cadence.
-struct DatagramLoss([u32; 2]);
+struct DatagramLoss(
+    /// Separate random generator states for forward and reverse packet loss.
+    [u32; 2],
+);
 impl Default for DatagramLoss {
     fn default() -> Self {
         Self([0x19c0_ff01, 0x19c0_ff02])
@@ -62,6 +71,7 @@ impl DatagramLoss {
         (*state as usize).is_multiple_of(one_in)
     }
 }
+/// Verifies that independent loss is repeatable and not coupled to reverse traffic.
 #[test]
 fn independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic() {
     let mut a = DatagramLoss::default();
@@ -80,29 +90,44 @@ fn independent_loss_is_repeatable_and_not_coupled_to_reverse_traffic() {
     assert!((150..250).contains(&reverse));
 }
 
+/// Stores the client and server addresses joined by the test relay.
 #[derive(Default)]
 struct Route {
+    /// Address of the client side of the test relay.
     client: Option<SocketAddr>,
+    /// Live network server, absent in socket-free tests.
     server: Option<SocketAddr>,
 }
+/// Counts packets, bytes, and impairments observed by the test relay.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RelayStats {
     // Index 0 is client -> server, index 1 is server -> client.
     received: [usize; 2],
+    /// Packet counts dropped by relay direction.
     dropped: [usize; 2],
+    /// Packet counts forwarded by relay direction.
     forwarded: [usize; 2],
+    /// Number of packets from an unrecognised relay address.
     unknown: usize,
+    /// UDP payload bytes received by relay direction.
     received_bytes: [usize; 2],
+    /// UDP payload bytes forwarded by relay direction.
     forwarded_bytes: [usize; 2],
+    /// Number of packets deliberately delivered out of order.
     reordered: usize,
+    /// Number of packets deliberately delivered more than once.
     duplicated: usize,
+    /// Number of packets dropped because the impairment queue was full.
     overflow: usize,
+    /// Largest number of datagrams waiting in the impairment queue.
     peak_queue: usize,
 }
 impl RelayStats {
+    /// Returns collected measurements as a JSON report.
     pub fn report(&self) -> serde_json::Value {
         serde_json::json!({"received_packets":self.received,"dropped_packets":self.dropped,"forwarded_packets":self.forwarded,"received_udp_payload_bytes":self.received_bytes,"forwarded_udp_payload_bytes":self.forwarded_bytes,"reordered":self.reordered,"duplicated":self.duplicated,"overflow":self.overflow,"peak_queue":self.peak_queue})
     }
+    /// Returns relay counter changes since the supplied earlier snapshot.
     pub fn since(&self, before: Self) -> Self {
         Self {
             received: std::array::from_fn(|i| self.received[i] - before.received[i]),
@@ -122,20 +147,33 @@ impl RelayStats {
         }
     }
 }
+/// Forwards test datagrams with controlled loss, delay, and reordering.
 pub struct Relay {
+    /// Shared packet and byte counters for the test relay.
     pub stats: Arc<Mutex<RelayStats>>,
+    /// Local socket address exposed by the relay.
     address: SocketAddr,
+    /// Navigation nodes remaining on the actor's route.
     route: Arc<Mutex<Route>>,
+    /// Shared signal that asks the worker to stop.
     stop: Arc<AtomicBool>,
+    /// Whether the relay applies the target network impairment profile.
     pub target_profile: Arc<AtomicBool>,
+    /// Denominator of the configured random packet-loss probability.
     pub loss_one_in: Arc<AtomicUsize>,
+    /// Whether the relay applies periodic packet loss.
     pub periodic_loss: Arc<AtomicBool>,
+    /// Whether an obstacle currently prevents forward movement.
     pub blocked: Arc<AtomicBool>,
+    /// Packet counts dropped by relay direction.
     pub dropped: Arc<AtomicUsize>,
+    /// Packet counts forwarded by relay direction.
     pub forwarded: Arc<AtomicUsize>,
+    /// Background worker owned by this handle.
     worker: Option<thread::JoinHandle<()>>,
 }
 impl Relay {
+    /// Starts a local UDP relay with configurable network impairments.
     pub fn new() -> Result<Self> {
         let socket = UdpSocket::bind("127.0.0.1:0")?;
         socket.set_read_timeout(Some(Duration::from_millis(10)))?;
@@ -291,6 +329,7 @@ impl Relay {
             candidate.to_owned()
         }
     }
+    /// Rewrites SDP candidate addresses to pass through the test relay.
     fn sdp(&self, sdp: &str, server: bool) -> String {
         sdp.split_inclusive('\n')
             .map(|line| {
@@ -312,16 +351,25 @@ impl Drop for Relay {
     }
 }
 
+/// Buffers bounded input and output for one connection incarnation.
 pub struct Peer {
+    /// WebSocket used for signalling and reliable gameplay messages.
     socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+    /// Whether the WebRTC probe succeeded.
     rtc: Arc<dyn PeerConnection>,
+    /// WebRTC events waiting for the test client to handle them.
     signals: mpsc::Receiver<Signal>,
+    /// Unreliable WebRTC data channel, once established.
     channel: Option<Arc<dyn DataChannel>>,
+    /// Test relay used to measure or impair network delivery.
     pub relay: Relay,
+    /// Whether the WebRTC data channel has opened.
     pub open: bool,
+    /// Gameplay packets received before the test data channel opened.
     pending: VecDeque<(bool, Vec<u8>)>,
 }
 impl Peer {
+    /// Opens signalling and negotiates a test WebRTC data channel through the relay.
     pub async fn connect(address: SocketAddr) -> Result<Self> {
         let (socket, _) = connect_async(format!("ws://{address}")).await?;
         let (tx, signals) = mpsc::channel(16);
@@ -356,6 +404,7 @@ impl Peer {
         assert!(!p.channel.as_ref().unwrap().ordered().await?);
         Ok(p)
     }
+    /// Queues or submits a message using the required delivery channel.
     pub async fn send(&mut self, reliable: bool, bytes: Vec<u8>) -> Result {
         if reliable {
             self.socket.send(Message::Binary(bytes.into())).await?;
@@ -368,6 +417,7 @@ impl Peer {
         }
         Ok(())
     }
+    /// Returns the next gameplay packet from either transport within the test deadline.
     pub async fn receive_any(&mut self) -> Result<(bool, Vec<u8>)> {
         if let Some(packet) = self.pending.pop_front() {
             return Ok(packet);
@@ -381,6 +431,7 @@ impl Peer {
         })
         .await?
     }
+    /// Validates incoming transport data and queues bounded decoded messages.
     pub async fn receive(&mut self, reliable: bool) -> Result<Vec<u8>> {
         timeout(DEADLINE, async {
             loop {
@@ -393,6 +444,7 @@ impl Peer {
         })
         .await?
     }
+    /// Collects completed work or incoming events without blocking.
     async fn poll(&mut self) -> Result<Option<(bool, Vec<u8>)>> {
         let channel = self.channel.clone();
         tokio::select! {
@@ -407,6 +459,7 @@ impl Peer {
         }
         Ok(None)
     }
+    /// Returns the data channel's currently buffered byte count.
     pub async fn outstanding(&self) -> Result<usize> {
         Ok(self
             .channel
@@ -415,6 +468,7 @@ impl Peer {
             .outstanding_bytes()
             .await?)
     }
+    /// Rejects sends when the test data channel exceeds its buffer limit.
     pub async fn check_backpressure(&mut self, packet: &[u8]) -> Result {
         self.relay.blocked.store(true, Ordering::Relaxed);
         let c = self.channel.as_ref().ok_or("no RTC channel")?;
@@ -439,6 +493,7 @@ impl Peer {
         self.relay.blocked.store(false, Ordering::Relaxed);
         Ok(())
     }
+    /// Closes the test client's WebRTC and signalling connections.
     pub async fn close(mut self) -> Result {
         let ws = self.socket.close(None).await;
         let rtc = self.rtc.close().await;

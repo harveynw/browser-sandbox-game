@@ -8,13 +8,37 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Borrows ambient actors and commands needed to spawn or retire population.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DirectorActors<'w, 's> {
-    cars: Query<'w, 's, (Entity, &'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries traffic decisions used by this system.
     brains: Query<'w, 's, (Entity, &'static GameId, &'static mut Traffic)>,
-    peds: Query<'w, 's, (Entity, &'static GameId, &'static mut Pedestrian)>,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::PedestrianQuery,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
+/// Spawns and retires ambient actors within population and visibility limits.
 pub(crate) fn direct_actors(
     population: &mut PopulationSystem,
     tick: u32,
@@ -31,7 +55,7 @@ pub(crate) fn direct_actors(
     let mut cars: BTreeMap<_, _> = actors
         .cars
         .iter()
-        .map(|(e, id, c)| (id.0.0, (e, c.clone())))
+        .map(|(e, id, c)| (id.0.0, (e, c.to_snapshot())))
         .collect();
     let mut count = actors.brains.iter().count();
     let mut brains: Vec<_> = actors.brains.iter_mut().collect();
@@ -49,7 +73,7 @@ pub(crate) fn direct_actors(
         let stuck =
             tick.saturating_sub(brain.progress_at) >= 450 && brain.phase != TrafficPhase::Available;
         if (far || stuck) && hidden(p, observers, collision) {
-            crate::systems::planning::despawn(&mut actors.commands, id.0.0, entity);
+            crate::component::spawn::despawn(&mut actors.commands, id.0.0, entity);
             cars.remove(&id.0.0);
             count -= 1;
             population.intersections.release(id.0.0);
@@ -66,7 +90,7 @@ pub(crate) fn direct_actors(
             (far || tick.saturating_sub(ped.progress_at) >= 450) && hidden(p, observers, collision)
         };
         if remove {
-            crate::systems::planning::despawn(&mut actors.commands, id.0.0, entity);
+            crate::component::spawn::despawn(&mut actors.commands, id.0.0, entity);
             population.metrics.despawned += 1;
         } else {
             positions.insert(id.0.0, p);
@@ -102,7 +126,7 @@ pub(crate) fn direct_actors(
             continue;
         }
         let id = allocate(next_id)?;
-        let car = Vehicle {
+        let car = VehicleSnapshot {
             id: EntityId(id),
             state: VehicleState {
                 motor: sim_core::spawn_vehicle(p, yaw)?,
@@ -125,13 +149,13 @@ pub(crate) fn direct_actors(
             parking: None,
             born: tick,
         };
-        crate::systems::planning::spawn(
+        crate::component::spawn::spawn(
             &mut actors.commands,
             id,
             (
-                car.clone(),
+                car.clone().into_bundle(),
                 brain,
-                crate::components::PoolMembership(VehiclePool::Traffic),
+                crate::component::PoolMembership(VehiclePool::Traffic),
             ),
         );
         cars.insert(id, (Entity::PLACEHOLDER, car));
@@ -163,7 +187,7 @@ pub(crate) fn direct_actors(
             continue;
         }
         let id = allocate(next_id)?;
-        let ped = Pedestrian {
+        let ped = PedestrianSnapshot {
             id: EntityId(id),
             state: CharacterState {
                 equipment: None,
@@ -183,12 +207,13 @@ pub(crate) fn direct_actors(
             flee_until: 0,
             threat: p,
         };
-        crate::systems::planning::spawn(&mut actors.commands, id, ped);
+        crate::component::spawn::spawn(&mut actors.commands, id, ped.into_bundle());
         positions.insert(id, p);
         population.metrics.spawned += 1;
     }
     Ok(())
 }
+/// Runs ambient population maintenance for the current observers.
 pub(crate) fn direct(
     mut population: ResMut<PopulationSystem>,
     mut actors: DirectorActors,

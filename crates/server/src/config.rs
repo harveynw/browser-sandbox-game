@@ -1,23 +1,32 @@
 //! Persistence and optional public playtest configuration.
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+/// Selects profile storage and public network settings.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Profile storage settings.
     pub persistence: Persistence,
+    /// Public hosting settings.
     #[serde(default)]
     pub network: NetworkConfig,
 }
+/// Defines the public origin and advertised WebRTC address.
 #[derive(Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NetworkConfig {
+    /// Allowed public HTTPS origin, if public hosting is enabled.
     pub public_origin: Option<String>,
+    /// Concrete host address advertised to WebRTC clients.
     pub webrtc_host: Option<std::net::IpAddr>,
 }
+/// Selects the profile storage mode and database path.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Persistence {
+    /// Selected profile storage mode.
     pub mode: Mode,
+    /// Path to the profile database, if SQLite is selected.
     pub path: Option<PathBuf>,
 }
 #[derive(Deserialize)]
@@ -27,6 +36,7 @@ pub enum Mode {
     Memory,
 }
 impl Config {
+    /// Reads local TOML settings and validates storage and public-hosting requirements.
     pub fn load(path: &Path) -> Result<Self, String> {
         let text = std::fs::read_to_string(path).map_err(|e| format!("read local config: {e}"))?;
         let config: Self =
@@ -55,6 +65,7 @@ impl Config {
         }
         Ok(config)
     }
+    /// Opens the profile store selected by this configuration.
     pub fn profiles(&self, repository: &Path) -> Result<crate::admission::Profiles, String> {
         match self.persistence.mode {
             Mode::Memory => Ok(crate::admission::Profiles::default()),

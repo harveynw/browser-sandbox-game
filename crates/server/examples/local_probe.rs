@@ -12,11 +12,16 @@ use tokio::{
     time::{Instant, timeout},
 };
 
+/// Carries a probe's HTTP status, decoded body, and guest cookie.
 struct Http {
+    /// HTTP status code returned by the probe request.
     code: u16,
+    /// Decoded JSON response body.
     body: Value,
+    /// Guest cookie returned by the server, if present.
     cookie: Option<String>,
 }
+/// Sends a local HTTP request and decodes its status, JSON body, and cookie.
 async fn http(port: u16, path: &str, body: Option<Value>, cookie: Option<&str>) -> Result<Http> {
     timeout(Duration::from_secs(3),async {
         let mut stream=TcpStream::connect(("127.0.0.1",port)).await?;
@@ -33,6 +38,7 @@ async fn http(port: u16, path: &str, body: Option<Value>, cookie: Option<&str>) 
         Ok(Http{code,cookie,body:serde_json::from_slice(&payload)?})
     }).await?
 }
+/// Decodes an HTTP chunked body and rejects truncated chunks.
 fn unchunk(mut bytes: &[u8]) -> Result<Vec<u8>> {
     let mut result = Vec::new();
     loop {
@@ -58,6 +64,7 @@ fn unchunk(mut bytes: &[u8]) -> Result<Vec<u8>> {
         bytes = &bytes[size + 2..];
     }
 }
+/// Retains a guest cookie returned by the control endpoint.
 fn save_cookie(path: &Path, cookie: &str) -> Result {
     use std::io::Write;
     #[cfg(unix)]
@@ -73,6 +80,7 @@ fn save_cookie(path: &Path, cookie: &str) -> Result {
     file.write_all(cookie.as_bytes())?;
     Ok(())
 }
+/// Queues or submits a message using the required delivery channel.
 async fn send(
     peer: &mut Peer,
     world: &Option<OpaqueId>,
@@ -91,6 +99,7 @@ async fn send(
     )
     .await
 }
+/// Runs the module's main operation and returns its outcome.
 async fn run(port: u16, cookie_path: &Path) -> Result {
     let mut cookie = std::fs::read_to_string(cookie_path).ok();
     loop {
@@ -250,6 +259,7 @@ async fn run(port: u16, cookie_path: &Path) -> Result {
     );
     Ok(())
 }
+/// Starts the server or probe and reports any terminal error.
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result {
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -262,6 +272,7 @@ async fn main() -> Result {
     }
     timeout(Duration::from_secs(15), run(port, Path::new(&args[1]))).await?
 }
+/// Verifies that proxy chunks are decoded without accepting truncated bodies.
 #[test]
 fn proxy_chunks_are_decoded_without_accepting_truncated_bodies() {
     assert_eq!(unchunk(b"2\r\n{}\r\n0\r\n\r\n").unwrap(), b"{}");

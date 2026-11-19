@@ -1,6 +1,6 @@
 //! Native police assignment, routing, perception and arrest systems.
 use super::*;
-use crate::systems::planning::Pending;
+use crate::component::spawn::Pending;
 use crate::systems::population::Observer;
 use crate::{
     ecs::state::{Clock, Collision, Content},
@@ -9,14 +9,47 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Borrows actors and commands needed to maintain the police roster.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RosterActors<'w, 's> {
-    cars: Query<'w, 's, (Entity, &'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries police units used by this system.
     units: Query<'w, 's, (&'static GameId, &'static mut Unit)>,
-    officers: Query<'w, 's, (&'static GameId, &'static Officer)>,
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent, &'static Wanted)>,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::OfficerQueryReadOnly,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+            &'static Wanted,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
+/// Maintains patrol population and assigns police roles across active suspects.
 pub(crate) fn roster_actors(
     police: &mut PoliceSystem,
     tick: u32,
@@ -31,7 +64,7 @@ pub(crate) fn roster_actors(
     let mut cars: BTreeMap<_, _> = actors
         .cars
         .iter()
-        .map(|(_, id, c)| (id.0.0, c.clone()))
+        .map(|(_, id, c)| (id.0.0, c.to_snapshot()))
         .collect();
     let mut units: BTreeMap<_, _> = actors
         .units
@@ -105,7 +138,7 @@ pub(crate) fn roster_actors(
     let unit_cars: BTreeMap<_, _> = cars.iter().map(|(&id, v)| (id, v.clone())).collect();
     let unit_officers: Vec<_> = officers
         .values()
-        .map(|o| (o.unit, o.mounted, o.state.clone()))
+        .map(|o| (o.unit, o.mounted, o.state.to_protocol()))
         .collect();
     for id in units.keys().copied().collect::<Vec<_>>() {
         let u = units.get_mut(&id).expect("police unit");
@@ -191,7 +224,7 @@ pub(crate) fn roster_actors(
             *next_id = id.checked_add(1).ok_or("police entity IDs exhausted")?;
             cars.insert(
                 id,
-                Vehicle {
+                VehicleSnapshot {
                     id: EntityId(id),
                     template: template.clone().into(),
                     idle_ticks: 0,
@@ -300,20 +333,21 @@ pub(crate) fn roster_actors(
     }
     for id in removed {
         if let Some(&entity) = identities.get(&id) {
-            crate::systems::planning::despawn(&mut actors.commands, id, entity);
+            crate::component::spawn::despawn(&mut actors.commands, id, entity);
         }
     }
     for (id, unit) in units {
         if let Pending::Spawn(unit) = unit {
-            crate::systems::planning::spawn(
+            crate::component::spawn::spawn(
                 &mut actors.commands,
                 id,
-                (cars.remove(&id).expect("spawn car"), unit),
+                (cars.remove(&id).expect("spawn car").into_bundle(), unit),
             );
         }
     }
     Ok(())
 }
+/// Runs police roster maintenance against the live ECS actor queries.
 pub(crate) fn roster(
     mut police: ResMut<PoliceSystem>,
     mut actors: RosterActors,
@@ -338,19 +372,29 @@ pub(crate) fn roster(
     }
 }
 
+/// Requests an arrest after the pursuit conditions remain valid.
 #[derive(Message, Clone, Copy)]
 pub(crate) struct ArrestRequested {
+    /// Connection incarnation associated with this item.
     pub peer: crate::transport::PeerKey,
+    /// Stable gameplay ID of the player.
     pub player: EntityId,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Entity,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Reports that an arrest has changed the player's state.
 #[derive(Message, Clone, Copy)]
 pub(crate) struct ArrestStarted {
+    /// Stable gameplay ID of the player.
     pub player: EntityId,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Entity,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Applies a validated arrest and safely releases vehicle control.
 pub(crate) fn arrest(
     mut requests: MessageReader<ArrestRequested>,
     mut actors: crate::systems::impact_consequences::RecoveryActors,
@@ -409,7 +453,7 @@ pub(crate) fn arrest(
             let near = car.state.motor.position.0.map(|v| v.0);
             actors.collision.0.exclude_vehicle(Some(car_id.0));
             position = crate::systems::vehicle::safe_exit_with(
-                actors.cars.get(car_entity).unwrap().1,
+                &actors.cars.get(car_entity).unwrap().1,
                 &actors.collision.0,
                 |p| actors.clear(p, message.player),
             );
@@ -436,7 +480,7 @@ pub(crate) fn arrest(
             let (_, mut player) = actors.players.get_mut(message.entity).unwrap();
             player.state.mode = CharacterMode::Arrested;
             player.state.vehicle_id = None;
-            player.state.motor = motor;
+            player.state.motor.0 = motor;
             crate::systems::weapons::state::cancel(&mut player.weapon);
             player.lifecycle.protected_until = None;
             player.lifecycle.respawn = Some(message.tick.saturating_add(150));
@@ -493,9 +537,10 @@ pub(crate) fn arrest(
         }
     }
 }
+/// Fails missions after their player enters the arrest state.
 pub(crate) fn fail_arrested_missions(
     mut messages: MessageReader<ArrestStarted>,
-    mut missions: Query<(&GameId, &mut crate::components::PlayerMission)>,
+    mut missions: Query<(&GameId, &mut crate::component::PlayerMission)>,
     clock: Res<Clock>,
 ) {
     for message in messages.read() {

@@ -14,6 +14,7 @@ const RELIABLE_BYTES: usize = 512 * 1024;
 const CONTROLS: usize = 128;
 const ACTIONS: usize = 32;
 
+/// Identifies one connection incarnation so reused IDs cannot receive stale operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PeerKey {
     /// Numeric connection ID assigned by the net crate; it can be reused.
@@ -50,6 +51,7 @@ enum UnreliableStream {
     // Other unreliable messages share a latest-only slot.
     Cosmetic,
 }
+/// Selects the independent unreliable stream for an outgoing protocol message.
 fn stream(message: &protocol::ServerMessage) -> UnreliableStream {
     match message {
         protocol::ServerMessage::OwnerState(_) => UnreliableStream::Owner,
@@ -58,6 +60,7 @@ fn stream(message: &protocol::ServerMessage) -> UnreliableStream {
         _ => UnreliableStream::Cosmetic,
     }
 }
+/// Buffers bounded input and output for one connection incarnation.
 #[derive(Default)]
 struct Peer {
     // Incarnation paired with the map's numeric connection ID.
@@ -66,6 +69,7 @@ struct Peer {
     ingress: VecDeque<ClientEnvelope>,
     // Ordered encoded messages awaiting reliable delivery and their total byte count.
     reliable: VecDeque<Vec<u8>>,
+    /// Total bytes held in the reliable output queue.
     reliable_bytes: usize,
     // Latest pending snapshot records, coalesced per entity and visibility.
     snapshots: SnapshotBuffer,
@@ -96,6 +100,7 @@ pub struct Network {
     closed_reasons: BTreeMap<&'static str, u64>,
 }
 impl Network {
+    /// Injects a transport event into the socket-free test boundary.
     #[cfg(test)]
     pub(crate) fn test_event(&mut self, event: TransportEvent) {
         match event {
@@ -127,6 +132,7 @@ impl Network {
         }
     }
 
+    /// Fills a test peer's reliable queue to exercise backpressure.
     #[cfg(test)]
     pub(crate) fn test_fill_reliable(&mut self, key: PeerKey) {
         let peer = self.peer(key).expect("live peer");
@@ -143,6 +149,7 @@ impl Network {
         }
     }
 
+    /// Drains test output using the same limits as live networking.
     #[cfg(test)]
     pub(crate) fn test_flush(
         &mut self,
@@ -179,6 +186,7 @@ impl Network {
         (sent, closed)
     }
 
+    /// Opens the underlying service and prepares its state for use.
     fn open(&mut self, id: u32) -> bool {
         if self.peers.contains_key(&id)
             || self.peers.len() >= MAX_PEERS
@@ -202,6 +210,7 @@ impl Network {
             .push_back(TransportEvent::Opened(PeerKey { id, generation }));
         true
     }
+    /// Removes the requested component while preserving the actor's other components.
     fn remove(&mut self, key: PeerKey, reason: &'static str) -> bool {
         if self.peer(key).is_none() {
             return false;
@@ -218,11 +227,13 @@ impl Network {
         }
         true
     }
+    /// Looks up or creates the connection state used by this operation.
     fn peer(&mut self, key: PeerKey) -> Option<&mut Peer> {
         self.peers
             .get_mut(&key.id)
             .filter(|p| p.generation == key.generation)
     }
+    /// Validates incoming transport data and queues bounded decoded messages.
     fn receive(&mut self, id: u32, bytes: &[u8]) {
         let Some(peer) = self.peers.get_mut(&id) else {
             return;
@@ -259,9 +270,11 @@ impl Network {
 }
 
 impl Network {
+    /// Starts the background service or live tick driver.
     pub fn start(address: &str) -> std::io::Result<Self> {
         Self::start_with_host(address, None)
     }
+    /// Starts networking with the configured advertised WebRTC address.
     pub fn start_with_host(address: &str, host: Option<std::net::IpAddr>) -> std::io::Result<Self> {
         // Detect ordinary bind errors synchronously; the net crate still has a bind race.
         let listener = std::net::TcpListener::bind(address)?;
@@ -373,6 +386,7 @@ impl Network {
         }
     }
 
+    /// Submits pending work without waiting for its completion.
     fn submit(&mut self, sends: Vec<(u32, Delivery, Vec<u8>)>, kills: Vec<u32>) {
         // The dependency uses blocking_send; a stalled actor can stall the game loop.
         if sends.is_empty() && kills.is_empty() {
@@ -406,6 +420,7 @@ impl Network {
         !self.failed
     }
 
+    /// Removes the next bounded batch of pending work.
     pub fn drain(&mut self, max: usize) -> Vec<TransportEvent> {
         let q = self;
         let mut out = Vec::new();
@@ -440,6 +455,7 @@ impl Network {
         }
         out
     }
+    /// Queues or submits a message using the required delivery channel.
     pub fn send(
         &mut self,
         key: PeerKey,
@@ -496,6 +512,7 @@ impl Network {
             }
         }
     }
+    /// Requests peer cleanup and records its reason.
     pub fn disconnect(&mut self, key: PeerKey, reason: &'static str) {
         // Admission stops immediately; flush issues the eventual kill. Duplicate requests are harmless.
         if let Some(p) = self.peer(key) {
@@ -523,6 +540,7 @@ impl Default for Network {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Creates a socket-free network boundary for transport tests.
     fn boundary() -> (Network, PeerKey) {
         let mut q = Network::default();
         assert!(q.open(0));
@@ -532,6 +550,7 @@ mod tests {
         };
         (q, key)
     }
+    /// Creates a scoped ping reply for transport queue tests.
     fn pong(nonce: u32) -> ServerEnvelope {
         crate::world::test_envelope(
             "diagnostic",
@@ -617,6 +636,7 @@ mod tests {
         assert!(q.peer(old).is_none());
         assert_eq!(q.lifecycle.len(), 3);
     }
+    /// Verifies that admits 64 peers and rejects the next until a slot is freed.
     #[test]
     fn admits_64_peers_and_rejects_the_next_until_a_slot_is_freed() {
         let mut q = Network::default();

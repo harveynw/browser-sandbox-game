@@ -1,13 +1,17 @@
 //! Native actor lifecycle systems. Removal and identity bookkeeping commit together.
 pub(crate) mod players;
+#[cfg(test)]
+use crate::component::PedestrianSnapshot;
+#[cfg(test)]
+use crate::component::tests::ActorWorldExt as _;
 use crate::{
-    components::Incapacitated,
-    components::Pedestrian,
+    component::Incapacitated,
     ecs::state::Clock,
     ecs::{EntityIndex, GameId},
 };
 use bevy_ecs::prelude::*;
 
+/// Removes an actor only if its current identity matches the indexed entity.
 pub(crate) fn despawn_indexed(world: &mut World, entity: Entity, id: protocol::EntityId) {
     // A deferred command must never delete a replacement with the same game ID.
     if !world
@@ -23,8 +27,9 @@ pub(crate) fn despawn_indexed(world: &mut World, entity: Entity, id: protocol::E
     }
 }
 
+/// Removes incapacitated pedestrians when their cleanup deadline expires.
 pub(crate) fn despawn_expired_pedestrians(
-    pedestrians: Query<(Entity, &GameId, &Incapacitated), With<Pedestrian>>,
+    pedestrians: Query<(Entity, &GameId, &Incapacitated), With<crate::component::PedestrianData>>,
     clock: Res<Clock>,
     mut commands: Commands,
 ) {
@@ -39,9 +44,17 @@ pub(crate) fn despawn_expired_pedestrians(
     }
 }
 
-type Orphans<'w, 's> =
-    Query<'w, 's, (Entity, &'static GameId), (With<Incapacitated>, Without<Pedestrian>)>;
+type Orphans<'w, 's> = Query<
+    'w,
+    's,
+    (Entity, &'static GameId),
+    (
+        With<Incapacitated>,
+        Without<crate::component::PedestrianData>,
+    ),
+>;
 
+/// Removes stale incapacitation markers and empty actor shells.
 pub(crate) fn remove_orphaned_incapacitation(orphans: Orphans<'_, '_>, mut commands: Commands) {
     for (entity, id) in &orphans {
         let id = id.0;
@@ -61,12 +74,28 @@ pub(crate) fn remove_orphaned_incapacitation(orphans: Orphans<'_, '_>, mut comma
     }
 }
 
+/// Borrows geometry and nearby actors to find safe vehicle restoration positions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RestorationSpace<'w, 's> {
-    players: Query<'w, 's, &'static crate::components::Player>,
-    pedestrians: Query<'w, 's, &'static Pedestrian>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        crate::component::queries::PlayerQueryReadOnly,
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    pedestrians: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Collision queries used to validate movement and placement.
     collision: NonSendMut<'w, crate::ecs::state::Collision>,
+    /// Validated world content used by this operation.
     content: Res<'w, crate::ecs::state::Content>,
+    /// Current simulation tick resource.
     clock: Res<'w, Clock>,
 }
 type RestorableVehicles<'w, 's> = Query<
@@ -75,13 +104,15 @@ type RestorableVehicles<'w, 's> = Query<
     (
         Entity,
         &'static GameId,
-        &'static mut crate::components::DisabledVehicle,
-        Option<&'static mut crate::components::Vehicle>,
-        Option<&'static crate::components::VehicleHome>,
+        &'static mut crate::component::DisabledVehicle,
+        Option<crate::component::queries::VehicleQuery>,
+        Option<&'static crate::component::VehicleHome>,
         Has<crate::systems::police::Unit>,
     ),
+    crate::component::queries::VehicleFilter,
 >;
 
+/// Restores disabled vehicles when their deadline and placement checks permit it.
 pub(crate) fn restore_vehicles(
     mut vehicles: RestorableVehicles,
     mut space: RestorationSpace,
@@ -108,7 +139,7 @@ pub(crate) fn restore_vehicles(
                 }
                 world
                     .entity_mut(entity)
-                    .remove::<crate::components::DisabledVehicle>();
+                    .remove::<crate::component::DisabledVehicle>();
                 if world.entity(entity).archetype().components().len() == 1 {
                     despawn_indexed(world, entity, id);
                 }
@@ -161,13 +192,13 @@ pub(crate) fn restore_vehicles(
                     return;
                 }
             };
-            car.state.motor = motor;
-            car.state.health = protocol::VehicleHealth(template.health);
+            car.state.motor.0 = motor;
+            car.state.health.0 = template.health;
             car.state.disabled = false;
             car.idle_ticks = 30;
             commands
                 .entity(entity)
-                .remove::<crate::components::DisabledVehicle>();
+                .remove::<crate::component::DisabledVehicle>();
             restored.write(crate::gameplay_messages::VehicleRestored {
                 vehicle: id.0,
                 entity,
@@ -183,8 +214,9 @@ pub(crate) fn restore_vehicles(
 mod tests {
     use super::*;
     use protocol::*;
-    fn pedestrian(id: u32) -> Pedestrian {
-        Pedestrian {
+    /// Creates a pedestrian actor for lifecycle tests.
+    fn pedestrian(id: u32) -> PedestrianSnapshot {
+        PedestrianSnapshot {
             id: EntityId(id),
             state: CharacterState {
                 equipment: None,
@@ -205,8 +237,10 @@ mod tests {
             threat: [0.0; 3],
         }
     }
+    /// Detects remaining actor components before removing an empty entity.
     #[derive(Component)]
     struct AttachedState;
+    /// Verifies that expiry removes actor and index before the next system.
     #[test]
     fn expiry_removes_actor_and_index_before_the_next_system() {
         let mut world = World::new();
@@ -215,7 +249,7 @@ mod tests {
         let entity = world
             .spawn((
                 GameId(EntityId(7)),
-                pedestrian(7),
+                pedestrian(7).into_bundle(),
                 Incapacitated(300),
                 AttachedState,
             ))
@@ -225,7 +259,12 @@ mod tests {
         schedule.add_systems(
             (
                 despawn_expired_pedestrians,
-                |clock: Res<Clock>, index: Res<EntityIndex>, peds: Query<&Pedestrian>| {
+                |clock: Res<Clock>,
+                 index: Res<EntityIndex>,
+                 peds: Query<
+                    crate::component::queries::PedestrianQueryReadOnly,
+                    crate::component::queries::PedestrianFilter,
+                >| {
                     if clock.0 >= 300 {
                         assert!(peds.is_empty());
                         assert!(!index.0.contains_key(&7));
@@ -235,7 +274,11 @@ mod tests {
                 .chain(),
         );
         schedule.run(&mut world);
-        assert!(world.get::<Pedestrian>(entity).is_some());
+        assert!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(entity)
+                .is_some()
+        );
         world.resource_mut::<Clock>().0 = 300;
         schedule.run(&mut world);
         assert!(world.get_entity(entity).is_err());
@@ -248,22 +291,32 @@ mod tests {
         );
         schedule.run(&mut world);
     }
+    /// Verifies that stale deferred deletion preserves replacement identity.
     #[test]
     fn stale_deferred_deletion_preserves_replacement_identity() {
         let mut world = World::new();
         world.init_resource::<EntityIndex>();
-        let old = world.spawn((GameId(EntityId(7)), pedestrian(7))).id();
+        let old = world
+            .spawn((GameId(EntityId(7)), pedestrian(7).into_bundle()))
+            .id();
         world.resource_mut::<EntityIndex>().0.insert(7, old);
         let mut queue = bevy_ecs::world::CommandQueue::default();
         Commands::new(&mut queue, &world)
             .queue(move |world: &mut World| despawn_indexed(world, old, EntityId(7)));
         world.despawn(old);
-        let replacement = world.spawn((GameId(EntityId(7)), pedestrian(7))).id();
+        let replacement = world
+            .spawn((GameId(EntityId(7)), pedestrian(7).into_bundle()))
+            .id();
         world.resource_mut::<EntityIndex>().0.insert(7, replacement);
         queue.apply(&mut world);
-        assert!(world.get::<Pedestrian>(replacement).is_some());
+        assert!(
+            world
+                .actor::<crate::component::queries::PedestrianQueryReadOnly>(replacement)
+                .is_some()
+        );
         assert_eq!(world.resource::<EntityIndex>().0[&7], replacement);
     }
+    /// Verifies that orphan cleanup removes empty shells but preserves other components.
     #[test]
     fn orphan_cleanup_removes_empty_shells_but_preserves_other_components() {
         let mut world = World::new();

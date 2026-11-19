@@ -2,51 +2,120 @@
 //! view below borrows components for one call; it is never retained as a resource.
 use super::*;
 use crate::{
-    components::{PlayerMission, SecuredVehicle},
+    component::{PlayerMission, SecuredVehicle},
     ecs::state::{Clock, WorldIdentity},
     ecs::{GameId, TickOutcome},
 };
 use bevy_ecs::{prelude::*, system::SystemParam};
 use std::result::Result;
+/// Borrows players and vehicles for owner-state replication.
 #[derive(SystemParam)]
 pub(crate) struct OwnerActors<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent)>,
-    cars: Query<'w, 's, (&'static GameId, &'static VehicleComponent)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
 }
+/// Borrows actors needed to build public entity state.
 #[derive(SystemParam)]
 pub(crate) struct PublicActors<'w, 's> {
+    /// Player and vehicle queries used for owner updates.
     owners: OwnerActors<'w, 's>,
+    /// Queries police units used by this system.
     units: Query<'w, 's, &'static GameId, With<PoliceUnitComponent>>,
-    officers: Query<'w, 's, (&'static GameId, &'static OfficerComponent)>,
-    peds: Query<'w, 's, (&'static GameId, &'static PedestrianComponent)>,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::OfficerQueryReadOnly,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PedestrianQueryReadOnly,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries secured vehicles used by this system.
     secured: Query<'w, 's, &'static GameId, With<SecuredVehicle>>,
 }
+/// Borrows player, pursuit, and mission state for private status updates.
 #[derive(SystemParam)]
 pub(crate) struct StatusActors<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, (&'static GameId, &'static WantedComponent)>,
+    /// Queries player missions used by this system.
     missions: Query<'w, 's, (&'static GameId, &'static PlayerMission)>,
 }
+/// Groups actor queries used by replication.
 #[derive(SystemParam)]
 pub(crate) struct Actors<'w, 's> {
+    /// Actor queries used to produce public replication state.
     public: PublicActors<'w, 's>,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, (&'static GameId, &'static WantedComponent)>,
+    /// Queries player missions used by this system.
     missions: Query<'w, 's, (&'static GameId, &'static PlayerMission)>,
 }
+/// Collects borrowed actor state in gameplay-ID order for replication.
 #[derive(Default)]
 pub(crate) struct View<'a> {
+    /// Simulation tick recorded for this item.
     tick: u32,
+    /// World instance ID used to scope replicated messages.
     id: &'a str,
-    players: BTreeMap<u32, &'a PlayerComponent>,
-    cars: BTreeMap<u32, &'a VehicleComponent>,
+    /// Player state indexed by stable gameplay ID.
+    players: BTreeMap<u32, crate::component::queries::PlayerQueryReadOnlyItem<'a, 'a>>,
+    /// Vehicle state available to this operation.
+    cars: BTreeMap<u32, crate::component::queries::VehicleQueryReadOnlyItem<'a, 'a>>,
+    /// Police unit state indexed by stable gameplay ID.
     units: BTreeMap<u32, ()>,
-    officers: BTreeMap<u32, &'a OfficerComponent>,
-    peds: BTreeMap<u32, &'a PedestrianComponent>,
+    /// Police officer state available to this operation.
+    officers: BTreeMap<u32, crate::component::queries::OfficerQueryReadOnlyItem<'a, 'a>>,
+    /// Pedestrian state available to this operation.
+    peds: BTreeMap<u32, crate::component::queries::PedestrianQueryReadOnlyItem<'a, 'a>>,
+    /// Police pursuit state available to this operation.
     wanted: BTreeMap<u32, &'a WantedComponent>,
+    /// Mission state available to this operation.
     missions: BTreeMap<u32, &'a PlayerMission>,
+    /// Vehicles whose theft can be witnessed as a crime.
     secured: BTreeMap<u32, ()>,
 }
 impl OwnerActors<'_, '_> {
+    /// Builds a borrowed view of the state exposed to its caller.
     pub(super) fn view<'a>(&'a self, tick: u32, id: &'a str) -> View<'a> {
         View {
             tick,
@@ -58,6 +127,7 @@ impl OwnerActors<'_, '_> {
     }
 }
 impl PublicActors<'_, '_> {
+    /// Builds a borrowed view of the state exposed to its caller.
     pub(super) fn view<'a>(&'a self, tick: u32, id: &'a str) -> View<'a> {
         View {
             units: self.units.iter().map(|id| (id.0.0, ())).collect(),
@@ -69,6 +139,7 @@ impl PublicActors<'_, '_> {
     }
 }
 impl StatusActors<'_, '_> {
+    /// Builds a borrowed view of the state exposed to its caller.
     pub(super) fn view<'a>(&'a self, tick: u32, id: &'a str) -> View<'a> {
         View {
             tick,
@@ -81,7 +152,11 @@ impl StatusActors<'_, '_> {
     }
 }
 impl Actors<'_, '_> {
-    pub(crate) fn player(&self, id: Option<EntityId>) -> Option<&PlayerComponent> {
+    /// Looks up a player through its stable gameplay ID.
+    pub(crate) fn player(
+        &self,
+        id: Option<EntityId>,
+    ) -> Option<crate::component::queries::PlayerQueryReadOnlyItem<'_, '_>> {
         let id = id?;
         self.public
             .owners
@@ -90,6 +165,7 @@ impl Actors<'_, '_> {
             .find(|(actual, _)| actual.0 == id)
             .map(|(_, p)| p)
     }
+    /// Builds a borrowed view of the state exposed to its caller.
     pub(crate) fn view<'a>(&'a self, tick: u32, id: &'a str) -> View<'a> {
         View {
             wanted: self.wanted.iter().map(|(id, v)| (id.0.0, v)).collect(),
@@ -100,8 +176,10 @@ impl Actors<'_, '_> {
 }
 pub(super) type PeerPackets = BTreeMap<PeerKey, Vec<(Delivery, ServerEnvelope)>>;
 
+/// Projects borrowed world state into protocol entity records.
 pub(crate) struct Projection;
 impl Projection {
+    /// Queues or submits a message using the required delivery channel.
     fn send(
         peer: PeerKey,
         sid: Option<&str>,
@@ -112,6 +190,7 @@ impl Projection {
     ) {
         Replication::queue(peer, sid, delivery, message, world.id, sessions);
     }
+    /// Queues a protocol message for ordered reliable delivery.
     fn reliable(
         peer: PeerKey,
         sid: Option<&str>,
@@ -121,6 +200,7 @@ impl Projection {
     ) {
         Self::send(peer, sid, Delivery::Reliable, message, world, sessions);
     }
+    /// Builds or queues the authoritative state of the entity controlled by a session.
     pub(crate) fn owner(session: &Session, world: &View) -> Result<OwnerState, String> {
         let id = session.player.ok_or("missing owner")?;
         let player = world.players.get(&id.0).ok_or("missing player")?;
@@ -133,13 +213,14 @@ impl Projection {
             state: player
                 .state
                 .vehicle_id
-                .map(|car| EntityState::Vehicle(world.cars[&car.0].state.clone()))
+                .map(|car| EntityState::Vehicle(world.cars[&car.0].state.to_protocol()))
                 .unwrap_or_else(|| {
-                    EntityState::Character(crate::replication::projection::public_state(player))
+                    EntityState::Character(crate::component::snapshots::public_state(player))
                 }),
-            player_state: crate::replication::projection::public_state(player),
+            player_state: crate::component::snapshots::public_state(player),
         })
     }
+    /// Builds public entity records for replication.
     pub(crate) fn entities(world: &View) -> BTreeMap<u32, (EntityDescriptor, EntityState)> {
         world
             .players
@@ -155,7 +236,7 @@ impl Projection {
                             template_id: TemplateId("player_greybox".into()),
                             display_name: Some(p.display_name.clone()),
                         },
-                        EntityState::Character(crate::replication::projection::public_state(p)),
+                        EntityState::Character(crate::component::snapshots::public_state(p)),
                     ),
                 )
             })
@@ -180,7 +261,7 @@ impl Projection {
                                 None
                             },
                         },
-                        EntityState::Vehicle(v.state.clone()),
+                        EntityState::Vehicle(v.state.to_protocol()),
                     ),
                 )
             }))
@@ -200,7 +281,7 @@ impl Projection {
                                     display_name: None,
                                     tshirt_colour: Some(TshirtColour(0x263f68)),
                                 },
-                                EntityState::Character(officer.state.clone()),
+                                EntityState::Character(officer.state.to_protocol()),
                             ),
                         )
                     }),
@@ -216,12 +297,13 @@ impl Projection {
                             template_id: TemplateId("pedestrian_greybox".into()),
                             display_name: None,
                         },
-                        EntityState::Character(p.state.clone()),
+                        EntityState::Character(p.state.to_protocol()),
                     ),
                 )
             }))
             .collect()
     }
+    /// Selects the entity currently controlled by a player.
     pub(crate) fn controlled(s: &Session, world: &View) -> u32 {
         let player = s.player.expect("authenticated player");
         world.players[&player.0]
@@ -267,11 +349,12 @@ impl Projection {
         }
         Ok(())
     }
+    /// Builds or queues private gameplay status for a session.
     pub(crate) fn status(tick: u32, s: &Session, world: &View) -> Result<PlayerStatus, String> {
         let p = s.profile.as_ref().ok_or("profile missing")?;
         Ok(PlayerStatus {
             equipped_weapon: world.players[&s.player_id()].weapon.equipped,
-            inventory: crate::replication::projection::views(&world.players[&s.player_id()].weapon),
+            inventory: crate::component::snapshots::views(&world.players[&s.player_id()].weapon),
             equip_end_tick: world.players[&s.player_id()].weapon.equip_end,
             revision: Revision(s.status_revision),
             server_tick: tick,
@@ -307,6 +390,7 @@ impl Projection {
             protected_until_tick: world.players[&s.player_id()].lifecycle.protected_until,
         })
     }
+    /// Builds the full entity baseline required before a session can play.
     pub(crate) fn baseline(
         peer: PeerKey,
         s: &mut Session,
@@ -371,6 +455,7 @@ impl Projection {
         );
         Ok(())
     }
+    /// Publishes visibility changes before movement snapshots are sent.
     pub(crate) fn sync_visible(world: &View, sessions: &mut Sessions) -> Result<(), String> {
         let entities = Projection::entities(world);
         let spatial = SpatialIndex::new(entities.iter().map(|(&id, (_, state))| {
@@ -437,6 +522,7 @@ impl Projection {
         }
         Ok(())
     }
+    /// Builds the map positions of all online players.
     pub(super) fn player_map(world: &View, sessions: &mut Sessions) {
         let players: Vec<_> = sessions
             .peers
@@ -480,6 +566,7 @@ impl Projection {
             );
         }
     }
+    /// Builds authoritative owner updates for the current publication.
     pub(super) fn owner_states(world: &View, sessions: &mut Sessions) -> Result<(), String> {
         let updates: Result<Vec<_>, String> = sessions
             .peers
@@ -499,6 +586,7 @@ impl Projection {
         }
         Ok(())
     }
+    /// Builds movement snapshots for the current visible entities.
     pub(super) fn snapshots(world: &View, sessions: &Sessions) -> Result<PeerPackets, String> {
         let mut batches = PeerPackets::new();
         let entities = Projection::entities(world);
@@ -571,14 +659,14 @@ impl Projection {
 // Scenario diagnostics use the same query projection as the scheduled publisher.
 #[cfg(test)]
 pub(crate) fn with_view<R>(world: &mut crate::world::World, f: impl FnOnce(&View) -> R) -> R {
+    let mut live = world.entities.live();
     let tick = world.tick;
     let id = world.id.clone();
-    let mut state = bevy_ecs::system::SystemState::<Actors>::new(world.entities.ecs_mut());
-    let actors = state
-        .get_mut(world.entities.ecs_mut())
-        .expect("replication queries");
+    let mut state = bevy_ecs::system::SystemState::<Actors>::new(&mut live);
+    let actors = state.get_mut(&mut live).expect("replication queries");
     f(&actors.view(tick, &id))
 }
+/// Publishes visibility changes before movement snapshots are sent.
 pub(crate) fn sync_visible(
     actors: PublicActors,
     clock: Res<Clock>,

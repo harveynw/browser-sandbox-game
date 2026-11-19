@@ -1,6 +1,7 @@
 //! Traffic input generation from component data.
 use super::*;
 
+/// Combines AI steering with speed control for the current tick.
 pub(crate) fn motor_input(traffic: &Traffic, tick: u32, speed: f32) -> Option<InputFrame> {
     if traffic.phase == TrafficPhase::Available {
         return None;

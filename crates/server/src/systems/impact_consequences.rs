@@ -1,6 +1,5 @@
 //! Native consumers for impact presentation, occupant recovery, and crash missions.
 use crate::{
-    components::{Pedestrian, Player, Vehicle},
     ecs::state::{Clock, Collision, Content, WorldIdentity},
     ecs::{EntityIndex, GameId},
     gameplay_messages::{
@@ -13,15 +12,20 @@ use crate::{
 use bevy_ecs::prelude::*;
 use protocol::*;
 use sim_core::{CollisionQueries, QueryFilter};
+/// Returns horizontal distance between two world positions in metres.
 fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
     (a[0] - b[0]).hypot(a[2] - b[2])
 }
 
+/// Publishes impact effects to eligible observing sessions.
 pub(crate) fn present_impacts(
     mut messages: MessageReader<ImpactApplied>,
     mut combat: ResMut<CombatSystem>,
     mut sessions: ResMut<Sessions>,
-    players: Query<&Player>,
+    players: Query<
+        crate::component::queries::PlayerQueryReadOnly,
+        crate::component::queries::PlayerFilter,
+    >,
     index: Res<EntityIndex>,
     identity: Res<WorldIdentity>,
     clock: Res<Clock>,
@@ -64,10 +68,17 @@ pub(crate) fn present_impacts(
     }
 }
 
+/// Requests safe recovery for players inside disabled vehicles.
 pub(crate) fn find_disabled_occupants(
     sessions: Res<Sessions>,
-    players: Query<&Player>,
-    cars: Query<&Vehicle>,
+    players: Query<
+        crate::component::queries::PlayerQueryReadOnly,
+        crate::component::queries::PlayerFilter,
+    >,
+    cars: Query<
+        crate::component::queries::VehicleQueryReadOnly,
+        crate::component::queries::VehicleFilter,
+    >,
     index: Res<EntityIndex>,
     clock: Res<Clock>,
     mut messages: MessageWriter<DisabledVehicleOccupant>,
@@ -101,17 +112,41 @@ pub(crate) fn find_disabled_occupants(
         }
     }
 }
+/// Borrows actors and services needed to release occupants from disabled vehicles.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RecoveryActors<'w, 's> {
-    pub(crate) players: Query<'w, 's, (&'static GameId, &'static mut Player)>,
-    pub(crate) cars: Query<'w, 's, (&'static GameId, &'static mut Vehicle)>,
-    pub(crate) peds: Query<'w, 's, &'static Pedestrian>,
+    /// Queries players used by this system.
+    pub(crate) players: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
+    pub(crate) cars: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::VehicleQuery),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    pub(crate) peds: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Collision queries used to validate movement and placement.
     pub(crate) collision: NonSendMut<'w, Collision>,
+    /// Validated world content used by this operation.
     pub(crate) content: Res<'w, Content>,
+    /// Live session state used by this system.
     pub(crate) sessions: ResMut<'w, Sessions>,
+    /// Current simulation tick resource.
     pub(crate) clock: Res<'w, Clock>,
 }
 impl RecoveryActors<'_, '_> {
+    /// Clears transient state after its current processing batch.
     pub(crate) fn clear(&self, position: [f32; 3], except: EntityId) -> bool {
         !self
             .collision
@@ -128,6 +163,7 @@ impl RecoveryActors<'_, '_> {
                     || distance(position, p.state.motor.position.0.map(|v| v.0)) > 1.0
             })
     }
+    /// Finds a clear fallback position when ordinary vehicle exits are blocked.
     pub(crate) fn fallback(&self, near: [f32; 3], except: EntityId) -> Option<[f32; 3]> {
         let mut candidates = Vec::new();
         for spawn in &self.content.0.manifest.spawns {
@@ -157,6 +193,7 @@ impl RecoveryActors<'_, '_> {
         })
     }
 }
+/// Safely releases disabled vehicle occupants and updates their control state.
 pub(crate) fn recover_occupants(
     mut messages: MessageReader<DisabledVehicleOccupant>,
     mut actors: RecoveryActors,
@@ -188,7 +225,7 @@ pub(crate) fn recover_occupants(
         let near = car.state.motor.position.0.map(|v| v.0);
         actors.collision.0.exclude_vehicle(Some(message.car.0));
         let exit = crate::systems::vehicle::safe_exit_with(
-            actors.cars.get(message.car_entity).unwrap().1,
+            &actors.cars.get(message.car_entity).unwrap().1,
             &actors.collision.0,
             |p| actors.clear(p, message.player),
         );
@@ -197,7 +234,7 @@ pub(crate) fn recover_occupants(
         let (_, mut player) = actors.players.get_mut(message.player_entity).unwrap();
         let session = actors.sessions.peers.get_mut(&message.peer).unwrap();
         if player.state.health.0 > 0 {
-            player.state.health = CharacterHealth(0);
+            player.state.health.0 = 0;
             crate::systems::weapons::state::cancel(&mut player.weapon);
             player.lifecycle.respawn = Some(message.tick.saturating_add(150));
             player.lifecycle.protected_until = None;
@@ -207,10 +244,10 @@ pub(crate) fn recover_occupants(
             let (_, mut car) = actors.cars.get_mut(message.car_entity).unwrap();
             car.state.driver_id = None;
             car.state.disabled = true;
-            player.state.health = CharacterHealth(0);
+            player.state.health.0 = 0;
             player.state.mode = CharacterMode::Downed;
             player.state.vehicle_id = None;
-            player.state.motor = sim_core::spawn_character(exit, 0.0).expect("safe exit");
+            player.state.motor.0 = sim_core::spawn_character(exit, 0.0).expect("safe exit");
             crate::systems::weapons::state::cancel(&mut player.weapon);
             player
                 .lifecycle
@@ -233,9 +270,10 @@ pub(crate) fn recover_occupants(
         }
     }
 }
+/// Fails missions for players ejected by a crash.
 pub(crate) fn fail_crash_missions(
     mut messages: MessageReader<CrashEjected>,
-    mut missions: Query<(&GameId, &mut crate::components::PlayerMission)>,
+    mut missions: Query<(&GameId, &mut crate::component::PlayerMission)>,
     clock: Res<Clock>,
 ) {
     for message in messages.read() {

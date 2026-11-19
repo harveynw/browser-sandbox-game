@@ -1,35 +1,57 @@
 //! Native message consumer for control epochs and reliable replica refreshes.
 use super::Replication;
 use crate::{
-    components::SecuredVehicle,
-    components::{Pedestrian, Player, Vehicle},
+    component::SecuredVehicle,
     ecs::state::{Clock, WorldIdentity},
     ecs::{EntityIndex, GameId, TickOutcome},
     gameplay_messages::ControlTransitionRequested,
     sessions::Sessions,
-    systems::police::{Officer, Unit},
+    systems::police::Unit,
 };
 use bevy_ecs::prelude::*;
 use protocol::*;
 use std::{collections::BTreeMap, result::Result};
 
+/// Borrows actors needed to publish changes in player control.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct Replicas<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static mut Player)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
     vehicles: Query<
         'w,
         's,
         (
-            &'static Vehicle,
+            crate::component::queries::VehicleQueryReadOnly,
             Option<&'static Unit>,
             Option<&'static SecuredVehicle>,
         ),
+        crate::component::queries::VehicleFilter,
     >,
-    pedestrians: Query<'w, 's, &'static Pedestrian>,
-    officers: Query<'w, 's, &'static Officer>,
+    /// Queries pedestrians used by this system.
+    pedestrians: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        crate::component::queries::OfficerQueryReadOnly,
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
 }
 impl Replicas<'_, '_> {
+    /// Builds a snapshot from the current authoritative state.
     fn snapshot(&self, id: u32) -> Result<(EntityDescriptor, EntityState), String> {
         let entity = *self.index.0.get(&id).ok_or("missing changed entity")?;
         if let Ok((_, player)) = self.players.get(entity) {
@@ -41,7 +63,7 @@ impl Replicas<'_, '_> {
                     template_id: TemplateId("player_greybox".into()),
                     display_name: Some(player.display_name.clone()),
                 },
-                EntityState::Character(crate::replication::projection::public_state(player)),
+                EntityState::Character(crate::component::snapshots::public_state(&player)),
             ));
         }
         if let Ok((vehicle, police, secured)) = self.vehicles.get(entity) {
@@ -63,7 +85,7 @@ impl Replicas<'_, '_> {
                         None
                     },
                 },
-                EntityState::Vehicle(vehicle.state.clone()),
+                EntityState::Vehicle(vehicle.state.to_protocol()),
             ));
         }
         if let Ok(officer) = self.officers.get(entity)
@@ -77,7 +99,7 @@ impl Replicas<'_, '_> {
                     display_name: None,
                     tshirt_colour: Some(TshirtColour(0x263f68)),
                 },
-                EntityState::Character(officer.state.clone()),
+                EntityState::Character(officer.state.to_protocol()),
             ));
         }
         if let Ok(pedestrian) = self.pedestrians.get(entity) {
@@ -89,13 +111,14 @@ impl Replicas<'_, '_> {
                     template_id: TemplateId("pedestrian_greybox".into()),
                     display_name: None,
                 },
-                EntityState::Character(pedestrian.state.clone()),
+                EntityState::Character(pedestrian.state.to_protocol()),
             ));
         }
         Err("changed entity has no public replica".into())
     }
 }
 
+/// Publishes authoritative ownership changes to affected peers.
 pub(crate) fn apply_control_transitions(
     mut messages: MessageReader<ControlTransitionRequested>,
     mut replicas: Replicas,
@@ -128,7 +151,7 @@ pub(crate) fn apply_control_transitions(
                 .get(message.player_entity)
                 .map_err(|_| "missing player")?
                 .1;
-            let player_state = crate::replication::projection::public_state(player);
+            let player_state = crate::component::snapshots::public_state(&player);
             let controlled_entity_id = player.state.vehicle_id.unwrap_or(message.player);
             let state = if controlled_entity_id == message.player {
                 EntityState::Character(player_state.clone())

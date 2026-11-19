@@ -1,5 +1,6 @@
 //! Shutdown schedule wiring; bounded draining is owned by the shutdown service.
 use bevy_ecs::prelude::*;
+/// Builds shutdown schedules for player retirement and transaction draining.
 pub(crate) fn schedules() -> (Schedule, Schedule) {
     let mut retire = Schedule::default();
     retire.add_systems(

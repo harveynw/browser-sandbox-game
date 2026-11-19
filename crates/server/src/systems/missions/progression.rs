@@ -1,5 +1,6 @@
 //! Ordered mission objectives, recovery retirement and reward requests.
 use super::*;
+/// Advances each admitted player's mission in stable peer order.
 pub(crate) fn progress(
     mut actors: JobActors,
     mut sessions: ResMut<Sessions>,
@@ -47,6 +48,7 @@ pub(crate) fn progress(
     }
 }
 
+/// Updates mission progress from authoritative player and vehicle motion.
 fn advance_objective(
     actors: &JobActors,
     s: &Session,
@@ -59,7 +61,7 @@ fn advance_objective(
     let car = player.state.vehicle_id.map(|id| id.0);
     let motor = car
         .map(|id| sim_core::presentation_motor(&actors.car(id).state.motor))
-        .unwrap_or_else(|| player.state.motor.clone());
+        .unwrap_or_else(|| player.state.motor.0.clone());
     let alive = player.state.health.0 > 0
         && matches!(
             player.state.mode,
@@ -133,6 +135,7 @@ fn finish_recovery(
     }
     Ok(())
 }
+/// Queues a reward request for the current mission and player identity.
 fn request_reward(
     actors: &JobActors,
     peer: crate::transport::PeerKey,
@@ -157,6 +160,7 @@ fn request_reward(
     }
     Ok(())
 }
+/// Releases a failed mission's reserved vehicle when a safe exit is available.
 fn retire_failed(
     actors: &mut JobActors,
     peer: crate::transport::PeerKey,

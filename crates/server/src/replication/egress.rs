@@ -10,14 +10,19 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 
+/// Records how many messages were sent and whether delivery failed.
 #[derive(Resource, Default)]
 pub(crate) struct Drain {
+    /// Number of messages successfully submitted during this drain.
     sent: usize,
+    /// Whether a peer failed while draining output.
     failed: bool,
 }
+/// Reports whether this output drain encountered a delivery failure.
 pub(crate) fn failed(drain: Res<Drain>) -> bool {
     drain.failed
 }
+/// Queues or submits a message using the required delivery channel.
 pub(crate) fn send(
     mut network: NonSendMut<Network>,
     io: NonSend<TickIo>,
@@ -98,8 +103,13 @@ pub(crate) fn send(
         }
     }
 }
+/// Wraps the schedule that drains staged network output.
 #[derive(Default)]
-pub(crate) struct FlushSchedule(Option<Schedule>);
+pub(crate) struct FlushSchedule(
+    /// Egress schedule temporarily taken while it runs.
+    Option<Schedule>,
+);
+/// Drains pending output while respecting per-peer limits.
 pub(crate) fn flush(host: &mut bevy_ecs::world::World, mut local: Local<FlushSchedule>) {
     let entered = host.resource_scope(|host, mut scratch: Mut<Scratch>| {
         scratch.enter(TickPhase::Flush, &mut host.resource_mut::<TickOutcome>())

@@ -17,32 +17,56 @@ pub enum Objective {
         garage: [f32; 3],
     },
 }
+/// Describes motion used to advance gameplay decisions.
 pub struct Motion {
+    /// Whether the actor and required vehicles remain usable.
     pub alive: bool,
+    /// Number of sessions currently playing.
     pub playing: bool,
+    /// World position in metres.
     pub position: [f32; 3],
+    /// Movement speed in metres per second.
     pub speed: f32,
+    /// Gameplay ID of the vehicle currently driven, if any.
     pub vehicle: Option<u32>,
+    /// World position recorded before the current movement step.
     pub previous: Option<[f32; 3]>,
 }
+/// Tracks a private mission's objective, progress, deadline, and reward.
 pub struct Mission {
+    /// Rules that define how this mission progresses.
     pub objective: Objective,
+    /// Index of the next mission checkpoint.
     pub checkpoint_index: u16,
+    /// Gameplay ID of the vehicle reserved for this recovery mission.
     pub reserved_vehicle: Option<u32>,
+    /// Unique mission instance ID used to deduplicate rewards.
     pub id: String,
+    /// Authored mission template ID.
     pub template: String,
+    /// Selected authored mission variant, if present.
     pub variant_index: Option<u16>,
+    /// Simulation tick when the active mission fails.
     pub deadline: u32,
+    /// Current objective position in world metres.
     pub target: [f32; 3],
+    /// Distance within which the mission target counts as reached.
     pub radius: f32,
+    /// Maximum speed allowed while dwelling at the target.
     pub max_speed: f32,
+    /// Consecutive ticks required at the mission target.
     pub required_dwell: u32,
+    /// Credits awarded after the mission completes.
     pub reward: u32,
+    /// Consecutive eligible ticks spent at the current target.
     pub dwell: u32,
+    /// Current stage of this item's lifecycle.
     pub phase: Phase,
+    /// Tick when completed or failed mission status can be removed.
     pub clear_at: Option<u32>,
 }
 impl Mission {
+    /// Builds a borrowed view of the state exposed to its caller.
     pub fn view(&self) -> MissionView {
         MissionView {
             instance_id: OpaqueId(self.id.clone()),
@@ -60,11 +84,13 @@ impl Mission {
                 .then_some(Vec3(self.target.map(Scalar))),
         }
     }
+    /// Marks the mission failed and schedules its private status for removal.
     pub fn fail(&mut self, tick: u32) {
         self.phase = Phase::Failed;
         self.dwell = 0;
         self.clear_at = Some(tick.saturating_add(150));
     }
+    /// Advances mission progress from authoritative motion and checks failure deadlines.
     pub fn advance(&mut self, tick: u32, motion: Motion) {
         let Motion {
             alive,
@@ -148,6 +174,7 @@ pub fn swept_gate(from: [f32; 3], to: [f32; 3], center: [f32; 3], radius: f32) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Creates a time-trial mission with a distinct return checkpoint.
     fn trial() -> Mission {
         Mission {
             id: "trial".into(),
@@ -170,6 +197,7 @@ mod tests {
             reserved_vehicle: None,
         }
     }
+    /// Creates a driving observation between two positions for mission tests.
     fn motion(from: [f32; 3], to: [f32; 3]) -> Motion {
         Motion {
             alive: true,
@@ -180,6 +208,7 @@ mod tests {
             previous: Some(from),
         }
     }
+    /// Verifies that swept trial consumes one ordered gate per tick and distinct return finish.
     #[test]
     fn swept_trial_consumes_one_ordered_gate_per_tick_and_distinct_return_finish() {
         let mut m = trial();
@@ -195,6 +224,7 @@ mod tests {
         m.advance(101, motion([0.0; 3], [0.0; 3]));
         assert_eq!(m.phase, Phase::RewardPending);
     }
+    /// Verifies that swept gates reject near misses on foot and same tick failure or timeout.
     #[test]
     fn swept_gates_reject_near_misses_on_foot_and_same_tick_failure_or_timeout() {
         assert!(swept_gate(

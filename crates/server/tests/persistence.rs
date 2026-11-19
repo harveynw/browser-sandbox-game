@@ -8,8 +8,13 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-struct Database(PathBuf);
+/// Owns a temporary database path used by persistence tests.
+struct Database(
+    /// Temporary SQLite database path removed when the test ends.
+    PathBuf,
+);
 impl Database {
+    /// Creates an isolated temporary directory for the test database.
     fn new() -> Self {
         let dir =
             std::env::temp_dir().join(server::admission::random_id("pm-persistence-", 16).unwrap());
@@ -22,6 +27,7 @@ impl Drop for Database {
         let _ = std::fs::remove_dir_all(self.0.parent().unwrap());
     }
 }
+/// Runs the module's main operation and returns its outcome.
 fn run(w: &SqliteWorker, id: &str, command: Command) -> Result<ProfileView, StoreError> {
     w.submit(id.into(), command).unwrap();
     let until = Instant::now() + Duration::from_secs(3);
@@ -34,6 +40,7 @@ fn run(w: &SqliteWorker, id: &str, command: Command) -> Result<ProfileView, Stor
         thread::sleep(Duration::from_millis(1));
     }
 }
+/// Loads and validates the requested configuration or stored profile.
 fn load(w: &SqliteWorker, hash: &str) -> ProfileView {
     run(
         w,
@@ -45,6 +52,7 @@ fn load(w: &SqliteWorker, hash: &str) -> ProfileView {
     )
     .unwrap()
 }
+/// Submits a profile economic event and waits for its storage result.
 fn event(
     w: &SqliteWorker,
     p: &ProfileView,
@@ -63,6 +71,7 @@ fn event(
         },
     )
 }
+/// Verifies that migrations hash only cookie and committed rewards survive reopen once.
 #[test]
 fn migrations_hash_only_cookie_and_committed_rewards_survive_reopen_once() {
     let db = Database::new();
@@ -123,6 +132,7 @@ fn migrations_hash_only_cookie_and_committed_rewards_survive_reopen_once() {
         2
     );
 }
+/// Verifies that insufficient funds and conflicting or unbacked events rollback atomically.
 #[test]
 fn insufficient_funds_and_conflicting_or_unbacked_events_rollback_atomically() {
     let db = Database::new();
@@ -159,6 +169,7 @@ fn insufficient_funds_and_conflicting_or_unbacked_events_rollback_atomically() {
         0
     );
 }
+/// Verifies that interrupted repairs refund once on restart but acknowledged repairs stay paid.
 #[test]
 fn interrupted_repairs_refund_once_on_restart_but_acknowledged_repairs_stay_paid() {
     let db = Database::new();
@@ -214,6 +225,7 @@ fn interrupted_repairs_refund_once_on_restart_but_acknowledged_repairs_stay_paid
         );
     }
 }
+/// Verifies that schema mismatch and invalid database fail startup explicitly.
 #[test]
 fn schema_mismatch_and_invalid_database_fail_startup_explicitly() {
     let db = Database::new();
@@ -224,6 +236,7 @@ fn schema_mismatch_and_invalid_database_fail_startup_explicitly() {
     std::fs::write(&db.0, b"not a SQLite database").unwrap();
     assert!(SqliteWorker::open(&db.0).is_err());
 }
+/// Waits for a committed guest profile from the asynchronous storage facade.
 fn prepare(a: &mut Profiles, cookie: Option<&str>) -> (ProfileView, String) {
     let (mut p, secret) = a.prepare_session(cookie).unwrap();
     let cookie = secret.or_else(|| cookie.map(str::to_owned)).unwrap();
@@ -237,6 +250,7 @@ fn prepare(a: &mut Profiles, cookie: Option<&str>) -> (ProfileView, String) {
     }
     panic!("profile load timeout")
 }
+/// Verifies that facade does not publish uncommitted rewards and retries locked database with same id.
 #[test]
 fn facade_does_not_publish_uncommitted_rewards_and_retries_locked_database_with_same_id() {
     let db = Database::new();
@@ -275,6 +289,7 @@ fn facade_does_not_publish_uncommitted_rewards_and_retries_locked_database_with_
     let mut a = Profiles::sqlite(&db.0).unwrap();
     assert_eq!(prepare(&mut a, Some(&cookie)).0.completed_jobs, 1);
 }
+/// Verifies that bounded submission rejects excess work without blocking.
 #[test]
 fn bounded_submission_rejects_excess_work_without_blocking() {
     let db = Database::new();
@@ -301,6 +316,7 @@ fn bounded_submission_rejects_excess_work_without_blocking() {
     c.execute_batch("ROLLBACK").unwrap();
 }
 
+/// Verifies that only one worker can own a database and recovery does not run in a second server.
 #[test]
 fn only_one_worker_can_own_a_database_and_recovery_does_not_run_in_a_second_server() {
     let db = Database::new();
@@ -326,6 +342,7 @@ fn only_one_worker_can_own_a_database_and_recovery_does_not_run_in_a_second_serv
     );
 }
 
+/// Verifies that durable HTTP admission returns pending cookie then only committed profile.
 #[test]
 fn durable_http_admission_returns_pending_cookie_then_only_committed_profile() {
     use server::{content_loader::WorldContent, control::Control, world};
@@ -374,6 +391,7 @@ fn durable_http_admission_returns_pending_cookie_then_only_committed_profile() {
         thread::sleep(Duration::from_millis(1));
     }
 }
+/// Verifies that local config selects SQLite or disposable memory and rejects bad modes or paths.
 #[test]
 fn local_config_selects_sqlite_or_disposable_memory_and_rejects_bad_modes_or_paths() {
     use server::config::Config;

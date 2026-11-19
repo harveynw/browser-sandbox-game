@@ -1,75 +1,125 @@
 //! Native mission progression, recovery lifecycle and durable reward messages.
 use super::*;
 use crate::{
-    components::{PlayerMission, RecoveryReservation},
+    component::{PlayerMission, RecoveryReservation},
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId, TickOutcome},
     gameplay_messages::ControlTransitionRequested,
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Requests a durable reward for a specific player and mission instance.
 #[derive(Message, Clone)]
 pub(crate) struct RewardRequested {
+    /// Connection incarnation associated with this item.
     pub peer: crate::transport::PeerKey,
+    /// Stable gameplay ID of the player.
     pub player: EntityId,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Entity,
+    /// Session ID captured to reject results from an earlier connection.
     pub session: String,
+    /// Profile ID that must receive the mission reward.
     pub profile: String,
+    /// Mission instance ID associated with the requested reward.
     pub mission: String,
+    /// Credits requested for the completed mission.
     pub amount: u32,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Reports a committed reward with the updated profile.
 #[derive(Message, Clone)]
 pub(crate) struct RewardCommitted {
+    /// Original reward request whose transaction committed.
     pub request: RewardRequested,
+    /// Committed guest profile.
     pub profile: ProfileView,
 }
+/// Reports that a reserved recovery vehicle has been retired.
 #[derive(Message, Clone, Copy)]
 pub(crate) struct RecoveryRetired {
+    /// Stable gameplay ID of the vehicle.
     pub car: EntityId,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Entity,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Borrows actors and services needed to advance or retire missions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct JobActors<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static mut PlayerComponent)>,
-    cars: Query<'w, 's, (&'static GameId, &'static mut VehicleComponent)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::VehicleQuery),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries player missions used by this system.
     missions: Query<'w, 's, &'static mut PlayerMission>,
+    /// Queries recovery reservations used by this system.
     reservations: Query<'w, 's, &'static RecoveryReservation>,
-    peds: Query<'w, 's, &'static PedestrianComponent>,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSendMut<'w, Collision>,
+    /// Writer for control-change publication requests.
     controls: MessageWriter<'w, ControlTransitionRequested>,
+    /// Writer for recovery vehicle retirement messages.
     retired: MessageWriter<'w, RecoveryRetired>,
 }
 impl JobActors<'_, '_> {
-    fn player(&self, id: u32) -> &PlayerComponent {
+    /// Looks up a player through its stable gameplay ID.
+    fn player(&self, id: u32) -> crate::component::queries::PlayerQueryReadOnlyItem<'_, '_> {
         self.players
             .get(self.index.0[&id])
             .expect("mission player")
             .1
     }
-    fn car(&self, id: u32) -> &VehicleComponent {
+    /// Looks up an indexed vehicle required by the current mission.
+    fn car(&self, id: u32) -> crate::component::queries::VehicleQueryReadOnlyItem<'_, '_> {
         self.car_opt(id).expect("mission car")
     }
-    fn car_opt(&self, id: u32) -> Option<&VehicleComponent> {
+    /// Looks up a vehicle that may already have been retired.
+    fn car_opt(
+        &self,
+        id: u32,
+    ) -> Option<crate::component::queries::VehicleQueryReadOnlyItem<'_, '_>> {
         self.index
             .0
             .get(&id)
             .and_then(|e| self.cars.get(*e).ok())
             .map(|(_, c)| c)
     }
+    /// Returns mutable mission state for the indexed player.
     fn mission_mut(&mut self, id: u32) -> Mut<'_, PlayerMission> {
         self.missions
             .get_mut(self.index.0[&id])
             .expect("mission component")
     }
+    /// Checks whether a vehicle still has a recovery reservation.
     fn reserved(&self, id: u32) -> bool {
         self.index
             .0
             .get(&id)
             .is_some_and(|e| self.reservations.get(*e).is_ok())
     }
+    /// Clears transient state after its current processing batch.
     fn clear(&self, p: [f32; 3], owner: u32) -> bool {
         !self
             .collision
@@ -85,6 +135,7 @@ impl JobActors<'_, '_> {
                 a.state.health.0 == 0 || distance(p, a.state.motor.position.0.map(|v| v.0)) > 1.0
             })
     }
+    /// Clears completed requests or retires state after its consumers finish.
     fn retire(
         &mut self,
         peer: crate::transport::PeerKey,
@@ -106,7 +157,7 @@ impl JobActors<'_, '_> {
             );
             self.collision.0.exclude_vehicle(Some(car));
             let exit =
-                crate::systems::vehicle::safe_exit_with(self.car(car), &self.collision.0, |p| {
+                crate::systems::vehicle::safe_exit_with(&self.car(car), &self.collision.0, |p| {
                     self.clear(p, id.0)
                 });
             self.collision.0.exclude_vehicle(None);
@@ -123,7 +174,7 @@ impl JobActors<'_, '_> {
             let (_, mut p) = self.players.get_mut(self.index.0[&id.0]).unwrap();
             p.state.vehicle_id = None;
             p.state.mode = CharacterMode::OnFoot;
-            p.state.motor = sim_core::spawn_character(exit, yaw)?;
+            p.state.motor.0 = sim_core::spawn_character(exit, yaw)?;
             crate::systems::weapons::state::cancel(&mut p.weapon);
             s.status_dirty = true;
             self.controls.write(ControlTransitionRequested {
@@ -146,6 +197,7 @@ impl JobActors<'_, '_> {
 mod progression;
 pub(crate) use progression::progress;
 
+/// Submits mission rewards and emits only committed profile results.
 pub(crate) fn persist_rewards(
     mut requests: MessageReader<RewardRequested>,
     mut io: NonSendMut<crate::ecs::runtime::TickIo>,
@@ -170,6 +222,7 @@ pub(crate) fn persist_rewards(
         }
     }
 }
+/// Applies committed rewards only to the matching live mission and player.
 pub(crate) fn apply_rewards(
     mut messages: MessageReader<RewardCommitted>,
     mut missions: Query<(&GameId, &mut PlayerMission)>,
@@ -204,6 +257,7 @@ pub(crate) fn apply_rewards(
         }
     }
 }
+/// Removes retired recovery vehicles after their dependent consumers finish.
 pub(crate) fn remove_retired(
     mut messages: MessageReader<RecoveryRetired>,
     actors: Query<&GameId, With<RecoveryReservation>>,
@@ -212,12 +266,16 @@ pub(crate) fn remove_retired(
 ) {
     for m in messages.read() {
         if m.tick == clock.0 && actors.get(m.entity).is_ok_and(|id| id.0 == m.car) {
-            crate::systems::planning::despawn(&mut commands, m.car.0, m.entity);
+            crate::component::spawn::despawn(&mut commands, m.car.0, m.entity);
         }
     }
 }
+/// Refreshes collision proxies before mission placement checks.
 pub(crate) fn refresh_proxies(
-    cars: Query<(&GameId, &VehicleComponent)>,
+    cars: Query<
+        (&GameId, crate::component::queries::VehicleQueryReadOnly),
+        crate::component::queries::VehicleFilter,
+    >,
     mut collision: NonSendMut<Collision>,
     mut outcome: ResMut<TickOutcome>,
 ) {
@@ -232,16 +290,46 @@ pub(crate) fn refresh_proxies(
     }
 }
 
+/// Borrows actors and commands needed to accept a mission.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct AcceptanceActors<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static mut PlayerComponent)>,
-    cars: Query<'w, 's, (&'static GameId, &'static VehicleComponent)>,
-    peds: Query<'w, 's, (&'static GameId, &'static PedestrianComponent)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PedestrianQueryReadOnly,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries player missions used by this system.
     missions: Query<'w, 's, &'static mut PlayerMission>,
+    /// Queries recovery reservations used by this system.
     reservations: Query<'w, 's, (&'static GameId, &'static RecoveryReservation)>,
-    pools: Query<'w, 's, (&'static GameId, &'static crate::components::PoolMembership)>,
+    /// Queries vehicle pool memberships used by this system.
+    pools: Query<'w, 's, (&'static GameId, &'static crate::component::PoolMembership)>,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
+/// Validates mission eligibility and allocates the selected private objective.
 fn accept(
     s: &mut Session,
     template_id: &str,
@@ -447,7 +535,7 @@ fn accept(
             m.reserved_vehicle = Some(car);
             m.target = slot.position.map(|v| v as f32);
             m.objective = Objective::Recovery { garage };
-            let vehicle = VehicleComponent {
+            let vehicle = VehicleSnapshot {
                 id: EntityId(car),
                 state: VehicleState {
                     motor,
@@ -459,21 +547,21 @@ fn accept(
                 idle_ticks: 30,
             };
             let bundle = (
-                vehicle,
-                crate::components::PoolMembership(crate::systems::population::VehiclePool::Parked),
-                crate::components::RecoveryReservation(Reservation {
+                vehicle.into_bundle(),
+                crate::component::PoolMembership(crate::systems::population::VehiclePool::Parked),
+                crate::component::RecoveryReservation(Reservation {
                     slot: slot.id,
                     owner: id.0,
                 }),
             );
             if slot.secured {
-                crate::systems::planning::spawn(
+                crate::component::spawn::spawn(
                     &mut actors.commands,
                     car,
-                    (bundle, crate::components::SecuredVehicle),
+                    (bundle, crate::component::SecuredVehicle),
                 );
             } else {
-                crate::systems::planning::spawn(&mut actors.commands, car, bundle);
+                crate::component::spawn::spawn(&mut actors.commands, car, bundle);
             }
         }
     }
@@ -489,24 +577,39 @@ fn accept(
     ActionCode::Ok
 }
 
+/// Requests a mission action from a client.
 #[derive(Message, Clone)]
 pub(crate) struct JobActionRequested {
+    /// Connection incarnation associated with this item.
     pub peer: crate::transport::PeerKey,
+    /// Client action request to validate and execute.
     pub request: ActionRequest,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Option<Entity>,
 }
+/// Borrows session, content, and identity services needed to process mission actions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct JobServices<'w> {
+    /// Live session state used by this system.
     sessions: ResMut<'w, Sessions>,
+    /// Pending repair transaction state.
     repairs: ResMut<'w, RepairSystem>,
+    /// Current simulation tick resource.
     clock: Res<'w, Clock>,
+    /// Validated world content used by this operation.
     content: Res<'w, Content>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSend<'w, Collision>,
+    /// Allocator for new mission vehicle gameplay IDs.
     next: ResMut<'w, crate::ecs::state::EntityAllocator>,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Unique world identity used to scope protocol messages.
     identity: Res<'w, crate::ecs::state::WorldIdentity>,
 }
+/// Processes mission actions and caches their results for duplicate requests.
 pub(crate) fn actions(
     mut messages: MessageReader<JobActionRequested>,
     mut services: JobServices,
@@ -647,17 +750,22 @@ pub(crate) fn actions(
         services.sessions.peers.insert(message.peer, s);
     }
 }
+/// Clears action requests after their results have been applied.
 pub(crate) fn retire_actions(mut messages: ResMut<Messages<JobActionRequested>>) {
     messages.clear();
 }
 
+/// Publishes changed private mission status to affected sessions.
 pub(crate) fn publish_status(
-    players: Query<(
-        &GameId,
-        &PlayerComponent,
-        &crate::systems::police::Wanted,
-        &PlayerMission,
-    )>,
+    players: Query<
+        (
+            &GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+            &crate::systems::police::Wanted,
+            &PlayerMission,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
     index: Res<EntityIndex>,
     clock: Res<Clock>,
     identity: Res<crate::ecs::state::WorldIdentity>,
@@ -699,7 +807,7 @@ pub(crate) fn publish_status(
             s.id.clone(),
             PlayerStatus {
                 equipped_weapon: p.weapon.equipped,
-                inventory: crate::replication::projection::views(&p.weapon),
+                inventory: crate::component::snapshots::views(&p.weapon),
                 equip_end_tick: p.weapon.equip_end,
                 revision: Revision(next),
                 server_tick: clock.0,

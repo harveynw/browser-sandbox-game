@@ -4,18 +4,43 @@ use crate::content_loader::WorldContent;
 use crate::{ecs::EntityStore, sessions::Sessions, systems::Systems, world::World as Core};
 use bevy_ecs::prelude::*;
 
+/// Stores the current simulation tick.
 #[derive(Resource)]
-pub struct Clock(pub u32);
+pub struct Clock(
+    /// Current simulation tick.
+    pub u32,
+);
+/// Stores the unique ID of this world instance.
 #[derive(Resource)]
-pub struct WorldIdentity(pub String);
+pub struct WorldIdentity(
+    /// Unique world instance ID.
+    pub String,
+);
+/// Stores the next available gameplay entity ID.
 #[derive(Resource)]
-pub struct EntityAllocator(pub u32);
+pub struct EntityAllocator(
+    /// Next unused stable gameplay entity ID.
+    pub u32,
+);
+/// Shares validated content with ECS systems.
 #[derive(Resource)]
-pub struct Content(pub WorldContent);
+pub struct Content(
+    /// Validated published world content.
+    pub WorldContent,
+);
+/// Shares runtime simulation settings with ECS systems.
 #[derive(Resource)]
-pub struct SimulationConfig(pub sim_core::SimConfig);
-pub struct Collision(pub sim_core::CollisionWorld);
+pub struct SimulationConfig(
+    /// Validated runtime simulation settings.
+    pub sim_core::SimConfig,
+);
+/// Owns collision queries on the server thread.
+pub struct Collision(
+    /// Collision world used by server-thread queries.
+    pub sim_core::CollisionWorld,
+);
 
+/// Moves owned fixture state into its ECS resources.
 #[cfg(test)]
 pub(crate) fn install(core: Core) -> World {
     let Core {
@@ -30,6 +55,7 @@ pub(crate) fn install(core: Core) -> World {
         timings,
     } = core;
     let mut world = entities.into_world();
+    crate::component::tests::install_fixture_actors(&mut world);
     world.insert_resource(Clock(tick));
     world.insert_resource(WorldIdentity(id));
     world.insert_resource(EntityAllocator(next_entity));
@@ -41,6 +67,7 @@ pub(crate) fn install(core: Core) -> World {
     world
 }
 
+/// Installs each gameplay system's state as an ECS resource.
 #[cfg(test)]
 pub(crate) fn install_systems(world: &mut World, systems: Systems) {
     let Systems {
@@ -60,6 +87,7 @@ pub(crate) fn install_systems(world: &mut World, systems: Systems) {
     world.insert_resource(population);
     world.insert_resource(repairs);
 }
+/// Removes gameplay resources and returns their owned fixture state.
 #[cfg(test)]
 fn take_systems(world: &mut World) -> Systems {
     Systems {
@@ -81,6 +109,7 @@ pub(crate) fn unpack(mut world: World) -> (Core, Sessions, Systems) {
     let systems = take_systems(&mut world);
     (unpack_core(world), sessions, systems)
 }
+/// Extracts owned world metadata while preserving its actor storage.
 #[cfg(test)]
 pub(crate) fn unpack_core(mut world: World) -> Core {
     let Clock(tick) = world.remove_resource().unwrap();
@@ -91,6 +120,7 @@ pub(crate) fn unpack_core(mut world: World) -> Core {
     let Collision(collision) = world.remove_non_send().unwrap();
     let metrics = world.remove_resource().unwrap();
     let timings = world.remove_resource().unwrap();
+    crate::component::tests::unpack_fixture_actors(&mut world);
     Core {
         entities: EntityStore::from_world(world),
         tick,

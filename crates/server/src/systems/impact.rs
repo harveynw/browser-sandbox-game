@@ -1,6 +1,9 @@
 //! Native impact calculation and health systems; control/replication consequences follow.
+#[cfg(test)]
+use crate::component::PedestrianSnapshot;
+#[cfg(test)]
+use crate::component::tests::ActorWorldExt as _;
 use crate::{
-    components::{Pedestrian, Vehicle},
     ecs::runtime::Scratch,
     ecs::state::Clock,
     ecs::{GameId, TickOutcome},
@@ -11,12 +14,16 @@ use std::collections::BTreeMap;
 
 /// Persistent collision-pair suppression, not a queue of work for another system.
 #[derive(Resource, Default)]
-pub(crate) struct ImpactCooldowns(BTreeMap<(u32, u32, bool), u32>);
+pub(crate) struct ImpactCooldowns(
+    /// Actor pairs and contact kinds mapped to their next eligible damage tick.
+    BTreeMap<(u32, u32, bool), u32>,
+);
 
+/// Converts vehicle contacts into damage requests while enforcing pair cooldowns.
 pub(crate) fn calculate_vehicle_damage(
     mut impacts: MessageReader<VehicleImpact>,
     mut damage: MessageWriter<VehicleContactDamage>,
-    vehicles: Query<&GameId, With<Vehicle>>,
+    vehicles: Query<&GameId, With<crate::component::VehicleData>>,
     scratch: Res<Scratch>,
     mut clock: ResMut<Clock>,
     mut cooldowns: ResMut<ImpactCooldowns>,
@@ -61,9 +68,24 @@ pub(crate) fn calculate_vehicle_damage(
     }
 }
 
+/// Finds swept vehicle impacts on pedestrians and queues damage requests.
 pub(crate) fn calculate_pedestrian_damage(
-    vehicles: Query<(Entity, &GameId, &Vehicle)>,
-    pedestrians: Query<(Entity, &GameId, &Pedestrian)>,
+    vehicles: Query<
+        (
+            Entity,
+            &GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    pedestrians: Query<
+        (
+            Entity,
+            &GameId,
+            crate::component::queries::PedestrianQueryReadOnly,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
     scratch: Res<Scratch>,
     clock: Res<Clock>,
     mut cooldowns: ResMut<ImpactCooldowns>,
@@ -125,25 +147,45 @@ pub(crate) fn calculate_pedestrian_damage(
     }
 }
 
+/// Borrows actors and collision state needed to apply impact damage.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DamageActors<'w, 's> {
+    /// Queries vehicles used by this system.
     cars: Query<
         'w,
         's,
         (
             &'static GameId,
-            &'static mut Vehicle,
+            crate::component::queries::VehicleQuery,
             Option<&'static crate::systems::police::Unit>,
         ),
+        crate::component::queries::VehicleFilter,
     >,
-    pedestrians: Query<'w, 's, (&'static GameId, &'static mut Pedestrian)>,
-    players: Query<'w, 's, &'static crate::components::Player>,
+    /// Queries pedestrians used by this system.
+    pedestrians: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PedestrianQuery),
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        crate::component::queries::PlayerQueryReadOnly,
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, crate::ecs::EntityIndex>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSend<'w, crate::ecs::state::Collision>,
+    /// Current simulation tick resource.
     clock: Res<'w, Clock>,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
 impl DamageActors<'_, '_> {
+    /// Reports witnessed harm caused by the current damage or shot.
     fn crime(
         &self,
         actor: protocol::EntityId,
@@ -188,6 +230,7 @@ impl DamageActors<'_, '_> {
             report,
         })
     }
+    /// Applies vehicle damage while preserving protection for another player's occupied vehicle.
     fn damage_car(
         &mut self,
         entity: Entity,
@@ -201,7 +244,7 @@ impl DamageActors<'_, '_> {
         if car.state.health.0 == 0 {
             self.commands
                 .entity(entity)
-                .insert_if_new(crate::components::DisabledVehicle((
+                .insert_if_new(crate::component::DisabledVehicle((
                     self.clock.0.saturating_add(900),
                     0,
                 )));
@@ -210,6 +253,7 @@ impl DamageActors<'_, '_> {
     }
 }
 
+/// Applies queued vehicle damage and sets the first cleanup deadline.
 pub(crate) fn apply_vehicle_damage(
     mut messages: MessageReader<VehicleContactDamage>,
     mut actors: DamageActors,
@@ -276,6 +320,7 @@ pub(crate) fn apply_vehicle_damage(
     }
 }
 
+/// Applies queued pedestrian damage and marks incapacitated actors for cleanup.
 pub(crate) fn apply_pedestrian_damage(
     mut messages: MessageReader<PedestrianImpactDamage>,
     mut actors: DamageActors,
@@ -307,7 +352,7 @@ pub(crate) fn apply_pedestrian_damage(
             actors
                 .commands
                 .entity(impact.pedestrian_entity)
-                .insert_if_new(crate::components::Incapacitated(
+                .insert_if_new(crate::component::Incapacitated(
                     impact.tick.saturating_add(300),
                 ));
         }
@@ -338,11 +383,12 @@ pub(crate) fn apply_pedestrian_damage(
 mod health_tests {
     use super::*;
     use crate::{
-        components::{DisabledVehicle, Incapacitated},
+        component::{DisabledVehicle, Incapacitated},
         gameplay_messages::ImpactApplied,
     };
     use protocol::*;
 
+    /// Creates the ECS actors and resources needed by this focused test.
     fn fixture() -> (World, Entity, EntityId) {
         let content = crate::content_loader::WorldContent::load(
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -354,24 +400,46 @@ mod health_tests {
         let (entity, id) = world
             .query::<(Entity, &GameId)>()
             .iter(&world)
-            .find(|(e, _)| world.get::<Vehicle>(*e).is_some())
+            .find(|(e, _)| {
+                world
+                    .actor::<crate::component::queries::VehicleQueryReadOnly>(*e)
+                    .is_some()
+            })
             .map(|(e, id)| (e, id.0))
             .unwrap();
         (world, entity, id)
     }
 
+    /// Verifies that native vehicle health preserves occupant protection and first cleanup deadline.
     #[test]
     fn native_vehicle_health_preserves_occupant_protection_and_first_cleanup_deadline() {
         let (mut world, entity, id) = fixture();
         let other = world
-            .query::<(Entity, &GameId, &Vehicle)>()
+            .query::<(
+                Entity,
+                &GameId,
+                crate::component::queries::VehicleQueryReadOnly,
+            )>()
             .iter(&world)
             .find(|(e, _, _)| *e != entity)
             .map(|(e, id, _)| (e, id.0))
             .unwrap();
-        world.get_mut::<Vehicle>(entity).unwrap().state.driver_id = Some(EntityId(100));
-        world.get_mut::<Vehicle>(other.0).unwrap().state.driver_id = Some(EntityId(101));
-        let health = world.get::<Vehicle>(entity).unwrap().state.health.0;
+        world
+            .actor_mut::<crate::component::queries::VehicleQuery>(entity)
+            .unwrap()
+            .state
+            .driver_id = Some(EntityId(100));
+        world
+            .actor_mut::<crate::component::queries::VehicleQuery>(other.0)
+            .unwrap()
+            .state
+            .driver_id = Some(EntityId(101));
+        let health = world
+            .actor::<crate::component::queries::VehicleQueryReadOnly>(entity)
+            .unwrap()
+            .state
+            .health
+            .0;
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_vehicle_damage);
         let mut hit = VehicleContactDamage {
@@ -387,14 +455,24 @@ mod health_tests {
         };
         world.write_message(hit.clone());
         schedule.run(&mut world);
-        assert_eq!(world.get::<Vehicle>(entity).unwrap().state.health.0, health);
+        assert_eq!(
+            world
+                .actor::<crate::component::queries::VehicleQueryReadOnly>(entity)
+                .unwrap()
+                .state
+                .health
+                .0,
+            health
+        );
         assert!(world.resource::<Messages<ImpactApplied>>().is_empty());
         // A static fatal crash still stops an occupied car; control cleanup is later.
         hit.contact.vehicle = false;
         hit.damage = u16::MAX;
         world.write_message(hit.clone());
         schedule.run(&mut world);
-        let car = world.get::<Vehicle>(entity).unwrap();
+        let car = world
+            .actor::<crate::component::queries::VehicleQueryReadOnly>(entity)
+            .unwrap();
         assert_eq!(car.state.health.0, 0);
         assert!(!car.state.disabled);
         assert_eq!(car.state.motor.speed.0, 0.0);
@@ -408,7 +486,11 @@ mod health_tests {
         schedule.run(&mut world);
         assert_eq!(world.get::<DisabledVehicle>(entity).unwrap().0, (900, 0));
         // Unoccupied destroyed cars are immediately disabled, before pedestrian sweeps.
-        world.get_mut::<Vehicle>(other.0).unwrap().state.driver_id = None;
+        world
+            .actor_mut::<crate::component::queries::VehicleQuery>(other.0)
+            .unwrap()
+            .state
+            .driver_id = None;
         world.write_message(VehicleContactDamage {
             vehicle: other.1,
             entity: other.0,
@@ -421,14 +503,21 @@ mod health_tests {
             damage: u16::MAX,
         });
         schedule.run(&mut world);
-        assert!(world.get::<Vehicle>(other.0).unwrap().state.disabled);
+        assert!(
+            world
+                .actor::<crate::component::queries::VehicleQueryReadOnly>(other.0)
+                .unwrap()
+                .state
+                .disabled
+        );
     }
 
+    /// Verifies that native pedestrian health sets lifecycle without extending deadline.
     #[test]
     fn native_pedestrian_health_sets_lifecycle_without_extending_deadline() {
         let (mut world, car_entity, car) = fixture();
         let id = EntityId(20000);
-        let pedestrian = Pedestrian {
+        let pedestrian = PedestrianSnapshot {
             id,
             state: CharacterState {
                 equipment: None,
@@ -448,7 +537,7 @@ mod health_tests {
             flee_until: 0,
             threat: [0.0; 3],
         };
-        let entity = world.spawn((GameId(id), pedestrian)).id();
+        let entity = world.spawn((GameId(id), pedestrian.into_bundle())).id();
         let mut schedule = Schedule::default();
         schedule.add_systems(apply_pedestrian_damage);
         let mut hit = PedestrianImpactDamage {
@@ -461,7 +550,9 @@ mod health_tests {
         };
         world.write_message(hit.clone());
         schedule.run(&mut world);
-        let ped = world.get::<Pedestrian>(entity).unwrap();
+        let ped = world
+            .actor::<crate::component::queries::PedestrianQueryReadOnly>(entity)
+            .unwrap();
         assert_eq!(ped.state.health.0, 0);
         assert_eq!(ped.state.mode, CharacterMode::Downed);
         assert_eq!(ped.state.motor.velocity, Vec3([Scalar(0.0); 3]));
@@ -485,6 +576,7 @@ mod tests {
     use crate::{content_loader::WorldContent, systems::movement::MovementFrame};
     use std::path::Path;
 
+    /// Verifies that calculation needs no managers preserves health and enforces pair expiry.
     #[test]
     fn calculation_needs_no_managers_preserves_health_and_enforces_pair_expiry() {
         let content = WorldContent::load(
@@ -504,7 +596,11 @@ mod tests {
             previous_peds: BTreeMap::new(),
         });
         let cars: Vec<_> = world
-            .query::<(Entity, &GameId, &Vehicle)>()
+            .query::<(
+                Entity,
+                &GameId,
+                crate::component::queries::VehicleQueryReadOnly,
+            )>()
             .iter(&world)
             .map(|(e, id, v)| (e, id.0, v.state.health.0))
             .take(2)
@@ -537,7 +633,12 @@ mod tests {
         assert_eq!(output[0].damage, 20);
         for (entity, _, health) in &cars {
             assert_eq!(
-                world.get::<Vehicle>(*entity).unwrap().state.health.0,
+                world
+                    .actor::<crate::component::queries::VehicleQueryReadOnly>(*entity)
+                    .unwrap()
+                    .state
+                    .health
+                    .0,
                 *health
             );
         }
@@ -557,9 +658,12 @@ mod tests {
         // Same game ID on a new generational entity must not accept an old report.
         crate::gameplay_messages::clear(&mut world);
         world.resource_mut::<Scratch>().frame.as_mut().unwrap().next = 31;
-        let car = world.get::<Vehicle>(cars[0].0).unwrap().clone();
+        let car = world
+            .actor::<crate::component::queries::VehicleQueryReadOnly>(cars[0].0)
+            .unwrap()
+            .to_snapshot();
         world.despawn(cars[0].0);
-        world.spawn((GameId(cars[0].1), car));
+        world.spawn((GameId(cars[0].1), car.into_bundle()));
         world.write_message(report(0, 31, 30.0));
         schedule.run(&mut world);
         assert!(

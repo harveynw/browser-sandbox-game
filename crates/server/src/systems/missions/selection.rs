@@ -1,5 +1,6 @@
 //! Instance-scoped selection: random mission IDs supply entropy, never tick/frame order.
 //! Stable ranks let recovery consider every safe, unreserved slot before choosing.
+/// Computes a stable selection rank from mission and session identity.
 pub(super) fn rank(instance: &str, option: &str) -> u64 {
     instance
         .bytes()
@@ -9,6 +10,7 @@ pub(super) fn rank(instance: &str, option: &str) -> u64 {
             (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
         })
 }
+/// Selects a bounded authored mission variant deterministically.
 pub(super) fn variant(instance: &str, count: usize) -> Option<u16> {
     (0..count)
         .min_by_key(|index| rank(instance, &index.to_string()))
@@ -17,6 +19,7 @@ pub(super) fn variant(instance: &str, count: usize) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Verifies that selections are stable bounded and vary between contracts.
     #[test]
     fn selections_are_stable_bounded_and_vary_between_contracts() {
         assert_eq!(variant("mission-a", 0), None);

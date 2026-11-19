@@ -1,6 +1,7 @@
 use super::*;
-use server::components::Player as PlayerComponent;
-use server::components::Vehicle as VehicleComponent;
+use server::component::PlayerSnapshot;
+use server::component::VehicleSnapshot;
+/// Verifies that recycled generations ignore old data close and outputs across twelve rejoins.
 #[test]
 fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins() {
     let (mut w, mut a, mut t) = setup();
@@ -27,9 +28,9 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
             });
             step(&mut w, &mut a, &mut t);
             assert_eq!(w.sessions.peers[&p].player, Some(player));
-            assert_eq!(w.entities.view::<PlayerComponent>().len(), 1);
+            assert_eq!(w.entities.view::<PlayerSnapshot>().len(), 1);
         }
-        let origin = w.entities.view::<PlayerComponent>()[&player.0]
+        let origin = w.entities.view::<PlayerSnapshot>()[&player.0]
             .state
             .motor
             .clone();
@@ -50,7 +51,7 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
         }
         for axis in 0..3 {
             assert!(
-                (w.entities.view::<PlayerComponent>()[&player.0]
+                (w.entities.view::<PlayerSnapshot>()[&player.0]
                     .state
                     .motor
                     .position
@@ -65,11 +66,11 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
         assert!(w.sessions.peers[&p].inputs.is_empty());
         send(&w, &mut t, p, ClientMessage::Leave(Empty {}));
         step(&mut w, &mut a, &mut t);
-        assert!(w.entities.view::<PlayerComponent>().is_empty());
+        assert!(w.entities.view::<PlayerSnapshot>().is_empty());
         assert!(w.sessions.peers.is_empty());
         assert!(
             w.entities
-                .view::<VehicleComponent>()
+                .view::<VehicleSnapshot>()
                 .values()
                 .all(|v| v.state.driver_id.is_none())
         );
@@ -79,6 +80,7 @@ fn recycled_generations_ignore_old_data_close_and_outputs_across_twelve_rejoins(
     }
 }
 
+/// Verifies that reliable budget failure retires actor and hides it before flush finishes.
 #[test]
 fn reliable_budget_failure_retires_actor_and_hides_it_before_flush_finishes() {
     let (mut w, mut profiles, mut t) = setup();
@@ -107,7 +109,7 @@ fn reliable_budget_failure_retires_actor_and_hides_it_before_flush_finishes() {
     }
     step(&mut w, &mut profiles, &mut t);
     assert!(!w.sessions.peers.contains_key(&failed));
-    assert!(w.entities.get::<PlayerComponent>(player).is_none());
+    assert!(w.entities.get::<PlayerSnapshot>(player).is_none());
     assert!(!w.sessions.peers[&observer].visible.contains_key(&player.0));
     assert!(t.closed.contains(&failed));
     assert!(

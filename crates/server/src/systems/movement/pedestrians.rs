@@ -1,20 +1,22 @@
 //! Pedestrian motor stepping invoked by movement systems and fixtures.
-use crate::components::*;
+use crate::component::*;
 
 /// Advance this actor only; navigation decisions are made before movement.
 pub(crate) fn step_motor(
-    ped: &mut Pedestrian,
+    movement: &mut CharacterMovement,
+    health: &Health,
+    input: &protocol::InputFrame,
     tick: u32,
     collision: &sim_core::CollisionWorld,
     config: &sim_core::SimConfig,
 ) -> std::result::Result<(), String> {
-    if ped.state.health.0 == 0 {
+    if health.0 == 0 {
         return Ok(());
     }
-    let mut input = ped.input.clone();
+    let mut input = input.clone();
     input.tick = tick;
     let result = sim_core::step_character(
-        &ped.state.motor,
+        &movement.0,
         &input,
         &sim_core::StepContext {
             tick,
@@ -22,6 +24,6 @@ pub(crate) fn step_motor(
             config,
         },
     )?;
-    ped.state.motor = result.motor;
+    movement.0 = result.motor;
     Ok(())
 }

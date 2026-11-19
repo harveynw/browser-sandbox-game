@@ -10,6 +10,7 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::time::{Duration, Instant};
+/// Queues a disconnect request for every session during shutdown.
 pub(crate) fn request_all(
     sessions: Res<Sessions>,
     clock: Res<Clock>,
@@ -23,6 +24,7 @@ pub(crate) fn request_all(
         });
     }
 }
+/// Retires players and drains pending repair and profile work within bounded shutdown deadlines.
 pub(crate) fn run(world: &mut World, profiles: &mut Profiles) -> bool {
     crate::gameplay_messages::clear(world);
     let _ = world.resource_mut::<TickOutcome>().finish();

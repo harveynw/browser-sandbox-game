@@ -5,8 +5,12 @@ use std::collections::BTreeMap;
 #[cfg(test)]
 use std::{marker::PhantomData, ops::Index};
 
+/// Maps stable gameplay IDs to their current ECS entities.
 #[derive(Resource, Default)]
-pub(crate) struct EntityIndex(pub(crate) BTreeMap<u32, Entity>);
+pub(crate) struct EntityIndex(
+    /// Current ECS entity indexed by stable gameplay ID.
+    pub(crate) BTreeMap<u32, Entity>,
+);
 
 #[cfg(test)]
 mod fixture;
@@ -30,7 +34,7 @@ pub(crate) mod shutdown;
 pub(crate) mod checkpoints;
 pub(crate) mod messages;
 
-pub use crate::components::GameId;
+pub use crate::component::GameId;
 
 #[cfg(test)]
 pub(crate) mod values;

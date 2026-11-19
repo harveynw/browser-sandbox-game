@@ -1,6 +1,7 @@
 use protocol::DisplayName;
 use server::{admission::Profiles, content_loader::WorldContent, control::Control, world};
 use std::path::Path;
+/// Verifies that tickets are one use expiring bounded and require the cookie secret.
 #[test]
 fn tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret() {
     let mut a = Profiles::default();
@@ -34,6 +35,7 @@ fn tickets_are_one_use_expiring_bounded_and_require_the_cookie_secret() {
     assert!(a.report_probe(Some(&cookie), "session-new", 10));
     assert_eq!(a.probe_until_ms, 5010);
 }
+/// Verifies that localhost origin cookie json and expiring readiness gates are explicit.
 #[test]
 fn localhost_origin_cookie_json_and_expiring_readiness_gates_are_explicit() {
     let content = WorldContent::load(
@@ -181,6 +183,7 @@ fn localhost_origin_cookie_json_and_expiring_readiness_gates_are_explicit() {
     );
 }
 
+/// Verifies that appearance requires guest cookie origin and valid rgb without touching other profiles.
 #[test]
 fn appearance_requires_guest_cookie_origin_and_valid_rgb_without_touching_other_profiles() {
     let content = WorldContent::load(

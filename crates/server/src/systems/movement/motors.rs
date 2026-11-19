@@ -1,6 +1,9 @@
 //! Native ECS motor systems. They require neither the legacy adapter nor subsystem managers.
+#[cfg(test)]
+use crate::component::tests::ActorWorldExt as _;
+#[cfg(test)]
+use crate::component::{PedestrianSnapshot, VehicleSnapshot};
 use crate::{
-    components::{Pedestrian, Vehicle},
     ecs::runtime::Scratch,
     ecs::state::{Collision, SimulationConfig},
     ecs::{GameId, TickOutcome, TickPhase},
@@ -12,13 +15,26 @@ use bevy_ecs::prelude::*;
 use sim_core::{CollisionQueries, StepContext};
 use std::time::Instant;
 
+/// Records entry into the movement phase and starts its work timer.
 pub(crate) fn begin_movement(mut scratch: ResMut<Scratch>, mut outcome: ResMut<TickOutcome>) {
     if scratch.enter(TickPhase::Movement, &mut outcome) {
         scratch.movement_started = Some(Instant::now());
     }
 }
+/// Advances pedestrian motors and records simulation failures.
 pub(crate) fn move_pedestrians(
-    mut pedestrians: Query<(&GameId, &mut Pedestrian)>,
+    mut pedestrians: Query<
+        (
+            &GameId,
+            &mut crate::component::CharacterMovement,
+            &crate::component::Health,
+            &crate::component::PedestrianData,
+        ),
+        (
+            With<crate::component::PedestrianData>,
+            crate::component::queries::PedestrianFilter,
+        ),
+    >,
     collision: NonSend<Collision>,
     config: Res<SimulationConfig>,
     mut scratch: ResMut<Scratch>,
@@ -27,10 +43,12 @@ pub(crate) fn move_pedestrians(
     let result = (|| -> Result<(), String> {
         let tick = scratch.frame()?.next;
         let mut actors: Vec<_> = pedestrians.iter_mut().collect();
-        actors.sort_by_key(|(id, _)| id.0.0);
-        for (_, mut ped) in actors {
+        actors.sort_by_key(|(id, _, _, _)| id.0.0);
+        for (_, mut movement, health, ped) in actors {
             crate::systems::movement::pedestrians::step_motor(
-                &mut ped,
+                &mut movement,
+                health,
+                &ped.input,
                 tick,
                 &collision.0,
                 &config.0,
@@ -49,12 +67,14 @@ type VehicleMotorQuery<'w, 's> = Query<
     (
         Entity,
         &'static GameId,
-        &'static mut Vehicle,
+        crate::component::queries::VehicleQuery,
         Option<&'static Unit>,
         Option<&'static Traffic>,
     ),
+    crate::component::queries::VehicleFilter,
 >;
 
+/// Advances vehicle motors and emits authoritative impact events.
 pub(crate) fn move_vehicles(
     mut impacts: MessageWriter<VehicleImpact>,
     mut vehicles: VehicleMotorQuery<'_, '_>,
@@ -118,7 +138,7 @@ pub(crate) fn move_vehicles(
                             delta_speed: result.impact_delta_speed,
                             contacts: result.contacts,
                         });
-                        car.state.motor = result.motor;
+                        car.state.motor.0 = result.motor;
                         car.idle_ticks = if car.state.motor.speed.0.abs() < 0.1 {
                             car.idle_ticks.saturating_add(1)
                         } else {
@@ -154,8 +174,14 @@ pub(crate) fn move_vehicles(
 
 /// Player motors follow vehicle commits; owners retain deterministic game-ID order.
 pub(crate) fn move_players(
-    mut players: Query<&mut crate::components::Player>,
-    vehicles: Query<&crate::components::Vehicle>,
+    mut players: Query<
+        crate::component::queries::PlayerQuery,
+        crate::component::queries::PlayerFilter,
+    >,
+    vehicles: Query<
+        crate::component::queries::VehicleQueryReadOnly,
+        crate::component::queries::VehicleFilter,
+    >,
     index: Res<crate::ecs::EntityIndex>,
     collision: NonSend<crate::ecs::state::Collision>,
     config: Res<crate::ecs::state::SimulationConfig>,
@@ -177,13 +203,13 @@ pub(crate) fn move_players(
                         .get(*entity)
                         .map_err(|_| "controlled vehicle missing")?;
                     let mut motor = sim_core::vehicle::presentation_motor(&car.state.motor);
-                    motor.position = Vec3(crate::systems::vehicle::seat(car).map(Scalar));
+                    motor.position = Vec3(crate::systems::vehicle::seat(&car).map(Scalar));
                     Ok::<_, String>(motor)
                 })
                 .transpose()?;
             player.weapon.aiming = false;
             if let Some(motor) = vehicle_motor {
-                player.state.motor = motor;
+                player.state.motor.0 = motor;
             } else if player.state.health.0 > 0
                 && player.state.mode == CharacterMode::OnFoot
                 && let Some(input) = frame.actor_inputs.get(&id)
@@ -199,7 +225,7 @@ pub(crate) fn move_players(
                         config: &config.0,
                     },
                 ) {
-                    Ok(result) => player.state.motor = result.motor,
+                    Ok(result) => player.state.motor.0 = result.motor,
                     Err(_) => frame.failed.push(peer),
                 }
             }
@@ -213,22 +239,32 @@ pub(crate) fn move_players(
 
 /// Recover overlaps only AFTER swept impacts have observed intended pedestrian motion.
 pub(crate) fn recover_pedestrians(
-    mut pedestrians: Query<(&GameId, &mut Pedestrian)>,
+    mut pedestrians: Query<
+        (
+            &GameId,
+            &mut crate::component::CharacterMovement,
+            &crate::component::Health,
+        ),
+        (
+            With<crate::component::PedestrianData>,
+            crate::component::queries::PedestrianFilter,
+        ),
+    >,
     collision: NonSend<Collision>,
     mut scratch: ResMut<Scratch>,
     mut timings: ResMut<WorldTimings>,
 ) {
     let mut actors: Vec<_> = pedestrians.iter_mut().collect();
-    actors.sort_by_key(|(id, _)| id.0.0);
-    for (_, mut ped) in actors {
-        if ped.state.health.0 == 0 {
+    actors.sort_by_key(|(id, _, _)| id.0.0);
+    for (_, mut movement, health) in actors {
+        if health.0 == 0 {
             continue;
         }
         if let Ok(position) = collision
             .0
-            .recover_character(ped.state.motor.position.0.map(|v| v.0))
+            .recover_character(movement.position.0.map(|v| v.0))
         {
-            ped.state.motor.position = protocol::Vec3(position.map(protocol::Scalar));
+            movement.position = protocol::Vec3(position.map(protocol::Scalar));
         }
     }
     if let Some(started) = scratch.movement_started.take() {
@@ -242,6 +278,7 @@ mod tests {
     use crate::{content_loader::WorldContent, systems::movement::MovementFrame};
     use std::{collections::BTreeMap, path::Path};
 
+    /// Creates the ECS actors and resources needed by this focused test.
     fn fixture() -> bevy_ecs::world::World {
         let content = WorldContent::load(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
@@ -249,7 +286,12 @@ mod tests {
         .unwrap();
         let mut core = crate::world::World::new(content).unwrap();
         // Deliberately make archetype insertion order the opposite of game-ID order.
-        let cars: Vec<_> = core.entities.view::<Vehicle>().values().cloned().collect();
+        let cars: Vec<_> = core
+            .entities
+            .view::<VehicleSnapshot>()
+            .values()
+            .cloned()
+            .collect();
         for car in &cars {
             core.entities.despawn(car.id);
         }
@@ -259,7 +301,7 @@ mod tests {
         let position = crate::world::spawn_position(&core.content, 0).unwrap();
         core.entities.insert(
             20000,
-            Pedestrian {
+            PedestrianSnapshot {
                 id: protocol::EntityId(20000),
                 state: protocol::CharacterState {
                     equipment: None,
@@ -293,6 +335,7 @@ mod tests {
         });
         world
     }
+    /// Builds the live movement schedule used by motor tests.
     fn native_schedule() -> Schedule {
         let mut schedule = Schedule::default();
         schedule.set_executor(bevy_ecs::schedule::SingleThreadedExecutor::new());
@@ -308,6 +351,7 @@ mod tests {
         );
         schedule
     }
+    /// Verifies that native motors need no legacy managers and preserve game id order.
     #[test]
     fn native_motors_need_no_legacy_managers_and_preserve_game_id_order() {
         let mut world = fixture();
@@ -318,7 +362,11 @@ mod tests {
             .resource::<crate::ecs::EntityIndex>()
             .0
             .iter()
-            .filter(|(_, entity)| world.get::<Vehicle>(**entity).is_some())
+            .filter(|(_, entity)| {
+                world
+                    .actor::<crate::component::queries::VehicleQueryReadOnly>(**entity)
+                    .is_some()
+            })
             .map(|(id, _)| *id)
             .collect();
         assert!(!expected.is_empty());
@@ -333,7 +381,9 @@ mod tests {
         assert_eq!(impacts, expected);
         // The exclusion filter must be cleared after the last car as well.
         let last_entity = world.resource::<crate::ecs::EntityIndex>().0[expected.last().unwrap()];
-        let car = world.get::<Vehicle>(last_entity).unwrap();
+        let car = world
+            .actor::<crate::component::queries::VehicleQueryReadOnly>(last_entity)
+            .unwrap();
         assert!(
             world
                 .non_send::<Collision>()
@@ -346,6 +396,7 @@ mod tests {
                 .unwrap()
         );
     }
+    /// Verifies that impact readers are independent and tick cleanup discards unread impacts.
     #[test]
     fn impact_readers_are_independent_and_tick_cleanup_discards_unread_impacts() {
         let mut world = fixture();
@@ -383,19 +434,20 @@ mod tests {
         assert!(fresh.iter().all(|impact| impact.tick == 2));
     }
 
+    /// Verifies that invalid pedestrian stops later motors without touching vehicles.
     #[test]
     fn invalid_pedestrian_stops_later_motors_without_touching_vehicles() {
         let mut world = fixture();
         let entity = world.resource::<crate::ecs::EntityIndex>().0[&20000];
         world
-            .get_mut::<Pedestrian>(entity)
+            .actor_mut::<crate::component::queries::PedestrianQuery>(entity)
             .unwrap()
             .state
             .motor
             .position
             .0[0] = protocol::Scalar(f32::NAN);
         let before: BTreeMap<_, _> = world
-            .query::<(&GameId, &Vehicle)>()
+            .query::<(&GameId, crate::component::queries::VehicleQueryReadOnly)>()
             .iter(&world)
             .map(|(id, car)| (id.0.0, car.idle_ticks))
             .collect();
@@ -403,7 +455,7 @@ mod tests {
         assert!(world.resource_mut::<TickOutcome>().finish().is_err());
         assert!(world.resource::<Messages<VehicleImpact>>().is_empty());
         let after: BTreeMap<_, _> = world
-            .query::<(&GameId, &Vehicle)>()
+            .query::<(&GameId, crate::component::queries::VehicleQueryReadOnly)>()
             .iter(&world)
             .map(|(id, car)| (id.0.0, car.idle_ticks))
             .collect();

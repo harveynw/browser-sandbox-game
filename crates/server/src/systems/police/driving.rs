@@ -8,15 +8,55 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Borrows actors needed to drive police vehicles.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DriveActors<'w, 's> {
-    cars: Query<'w, 's, (&'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries police units used by this system.
     units: Query<'w, 's, (&'static GameId, &'static mut Unit)>,
-    officers: Query<'w, 's, (&'static GameId, &'static Officer)>,
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent)>,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::OfficerQueryReadOnly,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, (&'static GameId, &'static Wanted)>,
-    peds: Query<'w, 's, (&'static GameId, &'static PedestrianComponent)>,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PedestrianQueryReadOnly,
+        ),
+        crate::component::queries::PedestrianFilter,
+    >,
 }
+/// Updates police vehicle routes and movement intent from actor snapshots.
 pub(crate) fn drive_actors(
     police: &mut PoliceSystem,
     tick: u32,
@@ -42,16 +82,16 @@ pub(crate) fn drive_actors(
         .filter_map(|s| s.player.map(|id| (id.0, (*wanted[&s.player_id()]).clone())))
         .collect();
     let mut batch = DriveBatch::default();
-    let unit_cars: BTreeMap<_, _> = cars.iter().map(|(&id, v)| (id, (*v).clone())).collect();
+    let unit_cars: BTreeMap<_, _> = cars.iter().map(|(&id, v)| (id, v.to_snapshot())).collect();
     let unit_officers: Vec<_> = officers
         .values()
-        .map(|o| (o.unit, o.mounted, o.state.clone()))
+        .map(|o| (o.unit, o.mounted, o.state.to_protocol()))
         .collect();
     let unit_players: BTreeMap<_, _> = players
         .iter()
-        .map(|(&id, p)| (id, p.state.clone()))
+        .map(|(&id, p)| (id, p.state.to_protocol()))
         .collect();
-    let unit_pedestrians: Vec<_> = peds.values().map(|p| p.state.clone()).collect();
+    let unit_pedestrians: Vec<_> = peds.values().map(|p| p.state.to_protocol()).collect();
     let observations = Observations {
         targets: &targets,
         cars: &unit_cars,
@@ -89,6 +129,7 @@ pub(crate) fn drive_actors(
     collision.exclude_vehicle(None);
     result
 }
+/// Runs vehicle driving decisions and records any simulation error.
 pub(crate) fn drive(
     mut police: ResMut<PoliceSystem>,
     mut actors: DriveActors,
@@ -113,8 +154,11 @@ pub(crate) fn drive(
 
 // Invocation-local coordination only: earlier cars reserve goals and consume the budget.
 struct DriveBatch {
+    /// Route searches still allowed in this police driving batch.
     plans_remaining: u32,
+    /// Number of police units assigned to each suspect.
     target_counts: BTreeMap<u32, usize>,
+    /// Destinations already claimed by a pursuit group in this batch.
     claimed_goals: BTreeSet<(Option<u32>, u32)>,
 }
 impl Default for DriveBatch {
@@ -126,35 +170,61 @@ impl Default for DriveBatch {
         }
     }
 }
+/// Borrows one police vehicle and its driving state for the current tick.
 struct DriveFrame<'a> {
+    /// Gameplay ID of the police vehicle being planned.
     id: u32,
+    /// Simulation tick recorded for this item.
     tick: u32,
-    car: &'a Vehicle,
+    /// Vehicle snapshot used to plan this police unit.
+    car: &'a VehicleSnapshot,
+    /// Gameplay ID of the officer's patrol vehicle.
     unit: &'a mut Unit,
 }
+/// Collects actor snapshots used to plan police vehicle movement.
 struct Observations<'a> {
+    /// Copied pursuit state indexed by suspect gameplay ID.
     targets: &'a BTreeMap<u32, Wanted>,
-    cars: &'a BTreeMap<u32, Vehicle>,
+    /// Vehicle state available to this operation.
+    cars: &'a BTreeMap<u32, VehicleSnapshot>,
+    /// Police officer state available to this operation.
     officers: &'a [(u32, bool, CharacterState)],
+    /// Player state indexed by stable gameplay ID.
     players: &'a BTreeMap<u32, CharacterState>,
+    /// Pedestrian state available to this operation.
     pedestrians: &'a [CharacterState],
+    /// Player views used for visibility and AI decisions.
     observers: &'a [Observer],
 }
 type Contact = (u32, [f32; 3], f32, Option<[f32; 3]>);
+/// Describes a police unit's selected destination and pursuit conditions.
 struct Goal<'a> {
+    /// Last known suspect position used to select this goal.
     known: Option<[f32; 3]>,
+    /// Police pursuit state available to this operation.
     wanted: Option<&'a Wanted>,
+    /// Whether the unit is searching for a suspect it cannot see.
     searching: bool,
+    /// Predicted navigation exit node and its travel cost.
     prediction: Option<(u32, f32)>,
+    /// Whether the unit must wait at its current destination.
     holding: bool,
+    /// Direct pursuit destination that can bypass graph routing.
     direct: Option<[f32; 3]>,
+    /// Collision contact reported by the motor.
     contact: Option<Contact>,
 }
+/// Describes motion used to advance gameplay decisions.
 struct Motion {
+    /// Movement input selected for the current simulation step.
     input: InputFrame,
+    /// Movement speed in metres per second.
     speed: f32,
+    /// Stable gameplay ID of the target actor.
     target: Option<[f32; 3]>,
+    /// Collision contact reported by the motor.
     contact: Option<Contact>,
+    /// Whether the unit is currently backing away from an obstacle.
     reversing: bool,
 }
 // Start with a search point in the direction the car is already facing.
@@ -165,6 +235,7 @@ const LEGS: [[f32; 3]; 4] = [
     [-48.0, 0.0, 48.0],
 ];
 
+/// Chooses a patrol, search, containment, or pursuit destination for one unit.
 fn select_goal<'a>(
     frame: &mut DriveFrame,
     police: &PoliceSystem,
@@ -381,6 +452,7 @@ fn select_goal<'a>(
         contact,
     })
 }
+/// Plans a police route within the shared search budget.
 fn plan_route(
     frame: &mut DriveFrame,
     police: &mut PoliceSystem,
@@ -477,6 +549,7 @@ fn plan_route(
         unit.next_plan = tick.saturating_add(15 + id % 5);
     }
 }
+/// Chooses steering and speed from the unit's route and pursuit goal.
 fn steer(frame: &mut DriveFrame, police: &PoliceSystem, goal: &Goal) -> Motion {
     let tick = frame.tick;
     let car = frame.car;
@@ -560,6 +633,7 @@ fn steer(frame: &mut DriveFrame, police: &PoliceSystem, goal: &Goal) -> Motion {
         reversing,
     }
 }
+/// Adjusts police motion to avoid geometry, vehicles, and pedestrians.
 fn avoid_obstacles(
     frame: &mut DriveFrame,
     collision: &mut CollisionWorld,
@@ -622,6 +696,7 @@ fn avoid_obstacles(
     motion.speed = speed;
     Ok(())
 }
+/// Tracks stalled progress and schedules a reversing manoeuvre when needed.
 fn recover(frame: &mut DriveFrame, goal: &Goal, motion: &Motion) {
     let tick = frame.tick;
     let car = frame.car;

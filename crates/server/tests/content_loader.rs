@@ -3,12 +3,17 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-struct Scratch(PathBuf);
+/// Owns a temporary content directory for tampering tests.
+struct Scratch(
+    /// Temporary directory removed when the test ends.
+    PathBuf,
+);
 impl Drop for Scratch {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
     }
 }
+/// Copies the content tree into an isolated directory for tampering tests.
 fn copy(source: &Path, target: &Path) {
     fs::create_dir_all(target).unwrap();
     for entry in fs::read_dir(source).unwrap() {
@@ -22,6 +27,7 @@ fn copy(source: &Path, target: &Path) {
         }
     }
 }
+/// Verifies that runtime loader rejects tampered missing oversized and traversal assets.
 #[test]
 fn runtime_loader_rejects_tampered_missing_oversized_and_traversal_assets() {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");

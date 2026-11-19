@@ -1,7 +1,12 @@
 use super::*;
 use protocol::EntityId;
+/// Provides a minimal position component for ECS identity tests.
 #[derive(Component, Debug, PartialEq)]
-struct Position(i32);
+struct Position(
+    /// Position value used to distinguish test components.
+    i32,
+);
+/// Verifies that identity mutation and despawn do not alias reused storage.
 #[test]
 fn identity_mutation_and_despawn_do_not_alias_reused_storage() {
     let mut store = EntityStore::new();
@@ -19,6 +24,7 @@ fn identity_mutation_and_despawn_do_not_alias_reused_storage() {
     );
     assert!(!store.despawn(EntityId(9)));
 }
+/// Verifies that ordering does not depend on spawn order.
 #[test]
 fn ordering_does_not_depend_on_spawn_order() {
     let mut store = EntityStore::new();
@@ -34,8 +40,13 @@ fn ordering_does_not_depend_on_spawn_order() {
         [2, 4, 8]
     );
 }
+/// Provides a second component for testing shared actor identity.
 #[derive(Component, Debug, PartialEq)]
-struct Controller(u32);
+struct Controller(
+    /// Controller value used to test independent component removal.
+    u32,
+);
+/// Verifies that components share identity and partial removal preserves other state.
 #[test]
 fn components_share_identity_and_partial_removal_preserves_other_state() {
     let mut store = EntityStore::new();
@@ -52,6 +63,7 @@ fn components_share_identity_and_partial_removal_preserves_other_state() {
     assert!(store.entity(EntityId(9)).is_none());
     assert!(!store.world.entities().contains(entity));
 }
+/// Verifies that ordered mutation survives archetype changes and reused slots.
 #[test]
 fn ordered_mutation_survives_archetype_changes_and_reused_slots() {
     let mut store = EntityStore::new();
@@ -82,9 +94,10 @@ fn ordered_mutation_survives_archetype_changes_and_reused_slots() {
     assert_eq!(store.get::<Controller>(EntityId(6)), Some(&Controller(1)));
     assert!(store.view::<Position>().is_empty());
 }
+/// Verifies that metadata values keep first home and share actor lifecycle.
 #[test]
 fn metadata_values_keep_first_home_and_share_actor_lifecycle() {
-    use crate::components::{DisabledVehicle, PoolMembership, VehicleHome};
+    use crate::component::{DisabledVehicle, PoolMembership, VehicleHome};
     use crate::systems::population::VehiclePool;
     let mut store = EntityStore::new();
     store.insert(8, Position(0));
@@ -104,18 +117,26 @@ fn metadata_values_keep_first_home_and_share_actor_lifecycle() {
     store.remove::<VehicleHome>(&8);
     assert!(store.entity(EntityId(8)).is_none());
 }
+/// Records phase execution order in schedule tests.
 #[derive(Resource, Default)]
-struct Trace(Vec<&'static str>);
+struct Trace(
+    /// Phase names recorded in execution order.
+    Vec<&'static str>,
+);
+/// Processes transport input and committed profile changes in admission order.
 fn admission(mut trace: ResMut<Trace>) {
     trace.0.push("admission");
 }
+/// Records a failure and preserves the state needed by later cleanup.
 fn fail(mut trace: ResMut<Trace>, mut outcome: ResMut<TickOutcome>) {
     trace.0.push("movement");
     outcome.fail("unsafe movement".into());
 }
+/// Updates private repair status and committed profile data for matching sessions.
 fn publish(mut trace: ResMut<Trace>) {
     trace.0.push("publish");
 }
+/// Verifies that ordered schedule stops later phases and returns first error.
 #[test]
 fn ordered_schedule_stops_later_phases_and_returns_first_error() {
     let mut world = World::new();

@@ -1,16 +1,22 @@
 //! Test-only convenience access to the authoritative Bevy world.
-
 use super::*;
+
 use protocol::EntityId;
+
+/// Wraps the ECS world for owned scenario fixtures.
 pub struct EntityStore {
+    /// ECS world containing the fixture's actor state.
     pub(super) world: Box<World>,
 }
+
 impl Default for EntityStore {
     fn default() -> Self {
         Self::new()
     }
 }
+
 impl EntityStore {
+    /// Creates an indexed fixture world and registers its gameplay message queues.
     pub fn new() -> Self {
         let mut world = World::new();
         world.init_resource::<EntityIndex>();
@@ -19,9 +25,12 @@ impl EntityStore {
             world: Box::new(world),
         }
     }
-    pub(crate) fn into_world(self) -> World {
+    /// Transfers the fixture's ECS world to its caller.
+    pub(crate) fn into_world(mut self) -> World {
+        crate::component::tests::install_fixture_actors(&mut self.world);
         *self.world
     }
+    /// Wraps an existing ECS world for fixture access.
     #[cfg(test)]
     pub(crate) fn from_world(world: World) -> Self {
         Self {
@@ -29,10 +38,8 @@ impl EntityStore {
         }
     }
 }
+
 impl EntityStore {
-    pub(crate) fn ecs_mut(&mut self) -> &mut World {
-        &mut self.world
-    }
     /// Test fixtures inject facts into the same Bevy messages as native systems.
     #[cfg(test)]
     pub(crate) fn write_message<M: Message>(&mut self, message: M) {
@@ -40,6 +47,7 @@ impl EntityStore {
             .write_message(message)
             .expect("gameplay message type registered");
     }
+    /// Creates an indexed fixture actor with its stable gameplay ID.
     pub fn spawn(&mut self, id: EntityId, components: impl Bundle) -> Result<Entity, String> {
         if self.world.resource::<EntityIndex>().0.contains_key(&id.0) {
             return Err(format!("duplicate game entity ID {}", id.0));
@@ -51,6 +59,7 @@ impl EntityStore {
             .insert(id.0, entity);
         Ok(entity)
     }
+    /// Finds the current ECS entity for a stable gameplay ID.
     pub fn entity(&self, id: EntityId) -> Option<Entity> {
         self.world.resource::<EntityIndex>().0.get(&id.0).copied()
     }
@@ -64,12 +73,14 @@ impl EntityStore {
         let entity = self.entity(id)?;
         self.world.get_mut::<C>(entity).map(Mut::into_inner)
     }
+    /// Finds a mutable component through the stable gameplay-ID index.
     pub fn get_mut_by_id<C: Component<Mutability = bevy_ecs::component::Mutable>>(
         &mut self,
         id: &u32,
     ) -> Option<&mut C> {
         self.get_mut::<C>(EntityId(*id))
     }
+    /// Adds or replaces an actor component without changing other actor state.
     pub fn insert<T: Component>(&mut self, id: u32, value: T) -> Option<T> {
         let entity = if let Some(entity) = self.entity(EntityId(id)) {
             entity
@@ -80,6 +91,7 @@ impl EntityStore {
         self.world.entity_mut(entity).insert(value);
         old
     }
+    /// Removes the requested component while preserving the actor's other components.
     pub fn remove<T: Component>(&mut self, id: &u32) -> Option<T> {
         let entity = self.entity(EntityId(*id))?;
         let old = self.world.entity_mut(entity).take::<T>();
@@ -88,12 +100,14 @@ impl EntityStore {
         }
         old
     }
+    /// Builds a borrowed view of the state exposed to its caller.
     pub fn view<T: Component>(&self) -> ComponentView<'_, T> {
         ComponentView {
             world: &self.world,
             marker: PhantomData,
         }
     }
+    /// Visits mutable components in stable gameplay-ID order.
     pub fn values_mut<T: Component<Mutability = bevy_ecs::component::Mutable>>(
         &mut self,
     ) -> impl Iterator<Item = &mut T> {
@@ -105,12 +119,14 @@ impl EntityStore {
         items.sort_by_key(|(id, _)| *id);
         items.into_iter().map(|(_, value)| value)
     }
+    /// Clears transient state after its current processing batch.
     pub fn clear<T: Component>(&mut self) {
         let ids: Vec<_> = self.view::<T>().keys().copied().collect();
         for id in ids {
             self.remove::<T>(&id);
         }
     }
+    /// Removes components that fail the supplied predicate.
     pub fn retain<T: Component<Mutability = bevy_ecs::component::Mutable>>(
         &mut self,
         mut keep: impl FnMut(&u32, &mut T) -> bool,
@@ -130,12 +146,14 @@ impl EntityStore {
             inner: self.view::<C>(),
         }
     }
+    /// Returns mutable access to the wrapped component value.
     pub fn value_mut<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: &u32,
     ) -> Option<&mut C::Value> {
         self.get_mut_by_id::<C>(id).map(C::value_mut)
     }
+    /// Adds a typed value component to the requested actor.
     pub fn insert_value<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: u32,
@@ -143,6 +161,7 @@ impl EntityStore {
     ) -> Option<C> {
         self.insert(id, C::new(value))
     }
+    /// Returns the actor's value, creating its component if necessary.
     pub fn value_or_insert<C: crate::ecs::values::ComponentValue>(
         &mut self,
         id: u32,
@@ -153,12 +172,14 @@ impl EntityStore {
         }
         self.value_mut::<C>(&id).expect("inserted metadata")
     }
+    /// Removes value components that fail the supplied predicate.
     pub fn retain_value<C: crate::ecs::values::ComponentValue>(
         &mut self,
         mut keep: impl FnMut(&u32, &mut C::Value) -> bool,
     ) {
         self.retain::<C>(|id, component| keep(id, component.value_mut()));
     }
+    /// Removes an actor and its stable gameplay-ID mapping.
     pub fn despawn(&mut self, id: EntityId) -> bool {
         let Some(entity) = self.world.resource_mut::<EntityIndex>().0.remove(&id.0) else {
             return false;
@@ -178,9 +199,12 @@ impl EntityStore {
 
 /// Read-only ordered component projection. This holds no entity data or second index.
 pub struct ComponentView<'w, T> {
+    /// ECS world containing the fixture's actor state.
     world: &'w World,
+    /// Associates this view with its component type without owning a value.
     marker: PhantomData<T>,
 }
+
 impl<'w, T: Component> ComponentView<'w, T> {
     pub fn get(&self, id: &u32) -> Option<&'w T> {
         self.world
@@ -213,12 +237,14 @@ impl<'w, T: Component> ComponentView<'w, T> {
         self.iter().next().is_none()
     }
 }
+
 impl<T: Component> Index<&u32> for ComponentView<'_, T> {
     type Output = T;
     fn index(&self, id: &u32) -> &T {
         self.get(id).expect("missing component")
     }
 }
+
 impl<'w, T: Component> IntoIterator for &ComponentView<'w, T> {
     type Item = (&'w u32, &'w T);
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -226,6 +252,7 @@ impl<'w, T: Component> IntoIterator for &ComponentView<'w, T> {
         self.iter().collect::<Vec<_>>().into_iter()
     }
 }
+
 impl<'w, T: Component> IntoIterator for ComponentView<'w, T> {
     type Item = (&'w u32, &'w T);
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -236,8 +263,10 @@ impl<'w, T: Component> IntoIterator for ComponentView<'w, T> {
 
 /// A read-only payload projection onto named metadata components.
 pub struct ValueView<'w, C: crate::ecs::values::ComponentValue> {
+    /// Component view wrapped by this value adapter.
     inner: ComponentView<'w, C>,
 }
+
 impl<'w, C: crate::ecs::values::ComponentValue> ValueView<'w, C> {
     pub fn get(&self, id: &u32) -> Option<&'w C::Value> {
         self.inner.get(id).map(C::value)
@@ -261,9 +290,17 @@ impl<'w, C: crate::ecs::values::ComponentValue> ValueView<'w, C> {
         self.inner.is_empty()
     }
 }
+
 impl<C: crate::ecs::values::ComponentValue> Index<&u32> for ValueView<'_, C> {
     type Output = C::Value;
     fn index(&self, id: &u32) -> &Self::Output {
         self.get(id).expect("missing entity metadata")
+    }
+}
+
+impl EntityStore {
+    pub(crate) fn live(&mut self) -> crate::component::tests::LiveActors<'_> {
+        crate::component::tests::install_fixture_actors(&mut self.world);
+        crate::component::tests::LiveActors(&mut self.world)
     }
 }

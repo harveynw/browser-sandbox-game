@@ -8,17 +8,46 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Borrows traffic state needed to plan routes.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RouteActors<'w, 's> {
-    cars: Query<'w, 's, (&'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries traffic decisions used by this system.
     brains: Query<'w, 's, (&'static GameId, &'static mut Traffic)>,
 }
+/// Borrows traffic and nearby actors needed to choose driving inputs.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DrivingActors<'w, 's> {
-    cars: Query<'w, 's, (&'static GameId, &'static Vehicle)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries traffic decisions used by this system.
     brains: Query<'w, 's, (&'static GameId, &'static mut Traffic)>,
-    peds: Query<'w, 's, &'static Pedestrian>,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
 }
+/// Plans queued traffic routes within the per-tick navigation budget.
 pub(crate) fn plan_actors(population: &mut PopulationSystem, tick: u32, actors: &mut RouteActors) {
     let cars: BTreeMap<_, _> = actors.cars.iter().map(|(id, c)| (id.0.0, c)).collect();
     let mut brains: BTreeMap<_, _> = actors
@@ -92,6 +121,7 @@ pub(crate) fn plan_actors(population: &mut PopulationSystem, tick: u32, actors: 
     }
     population.metrics.max_path_jobs_per_tick = population.metrics.max_path_jobs_per_tick.max(jobs);
 }
+/// Updates police vehicle routes and movement intent from actor snapshots.
 pub(crate) fn drive_actors(
     population: &mut PopulationSystem,
     tick: u32,
@@ -280,6 +310,7 @@ pub(crate) fn drive_actors(
     collision.exclude_vehicle(None);
     result
 }
+/// Runs bounded traffic route searches against live ECS queries.
 pub(crate) fn plan_routes(
     mut population: ResMut<PopulationSystem>,
     planning: Res<Planning>,
@@ -287,6 +318,7 @@ pub(crate) fn plan_routes(
 ) {
     plan_actors(&mut population, planning.tick, &mut actors);
 }
+/// Runs vehicle driving decisions and records any simulation error.
 pub(crate) fn drive(
     mut population: ResMut<PopulationSystem>,
     planning: Res<Planning>,

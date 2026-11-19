@@ -1,5 +1,6 @@
 use super::*;
-use server::components::Player as PlayerComponent;
+use server::component::PlayerSnapshot;
+/// Admits a guest after committing its selected T-shirt colour.
 fn join_with_colour(
     w: &mut World,
     a: &mut Profiles,
@@ -45,7 +46,7 @@ fn tshirt_colour_is_committed_and_replicated_to_other_guests_and_resyncs() {
         TshirtColour(0x1256ab)
     );
     assert_eq!(
-        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        w.core.entities.view::<PlayerSnapshot>()[&id].tshirt_colour,
         TshirtColour(0x1256ab)
     );
     t.sent.clear();
@@ -91,13 +92,13 @@ fn live_tshirt_change_refreshes_every_observer_without_losing_inputs_or_epoch() 
         .unwrap()
         .unwrap();
     assert_eq!(
-        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        w.core.entities.view::<PlayerSnapshot>()[&id].tshirt_colour,
         TshirtColour(0x1256ab)
     );
     t.sent.clear();
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.core.entities.view::<PlayerComponent>()[&id].tshirt_colour,
+        w.core.entities.view::<PlayerSnapshot>()[&id].tshirt_colour,
         TshirtColour(0x22cc66)
     );
     assert_eq!(w.sessions.peers[&p].epoch, epoch);

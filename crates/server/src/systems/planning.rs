@@ -1,7 +1,6 @@
 //! Explicit planning checkpoints. Observations are tick-local; actor state stays in components.
 use crate::{
-    components::{Pedestrian, Player, Vehicle},
-    components::{PlayerMission, PoolMembership, VehicleHome},
+    component::{PlayerMission, PoolMembership, VehicleHome},
     ecs::runtime::Scratch,
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId, TickOutcome, TickPhase},
@@ -13,20 +12,38 @@ use crate::{
         population::{Observer, VehiclePool},
     },
 };
+
 use bevy_ecs::prelude::*;
+
 use protocol::*;
+
 use std::{collections::BTreeMap, time::Instant};
+
+/// Shares the current tick and observer positions with AI planning systems.
 #[derive(Resource, Default)]
 pub(crate) struct Planning {
+    /// Simulation tick recorded for this item.
     pub tick: u32,
+    /// Player views used for visibility and AI decisions.
     pub observers: Vec<Observer>,
+    /// Time when the current phase began.
     started: Option<Instant>,
 }
+
+/// Starts the current phase and prepares its shared working state.
 pub(crate) fn begin(
     mut planning: ResMut<Planning>,
     clock: Res<Clock>,
     mut sessions: ResMut<Sessions>,
-    mut players: Query<(&GameId, &Player, &mut Wanted, &PlayerMission)>,
+    mut players: Query<
+        (
+            &GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+            &mut Wanted,
+            &PlayerMission,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
     index: Res<EntityIndex>,
     mut scratch: ResMut<Scratch>,
     mut outcome: ResMut<TickOutcome>,
@@ -98,15 +115,23 @@ pub(crate) fn begin(
         previous_peds: BTreeMap::new(),
     });
 }
+
+/// Refreshes actor collision proxies before planning queries.
 pub(crate) fn prepare_geometry(
-    cars: Query<(
-        Entity,
-        &GameId,
-        &Vehicle,
-        Option<&PoolMembership>,
-        Option<&VehicleHome>,
-    )>,
-    peds: Query<(&GameId, &Pedestrian)>,
+    cars: Query<
+        (
+            Entity,
+            &GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+            Option<&PoolMembership>,
+            Option<&VehicleHome>,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    peds: Query<
+        (&GameId, crate::component::queries::PedestrianQueryReadOnly),
+        crate::component::queries::PedestrianFilter,
+    >,
     content: Res<Content>,
     mut collision: NonSendMut<Collision>,
     mut commands: Commands,
@@ -150,7 +175,7 @@ pub(crate) fn prepare_geometry(
     if let Some(frame) = scratch.frame.as_mut() {
         frame.previous_cars = cars
             .iter()
-            .map(|(_, id, c, _, _)| (id.0.0, c.state.motor.clone()))
+            .map(|(_, id, c, _, _)| (id.0.0, c.state.motor.0.clone()))
             .collect();
         frame.previous_peds = peds
             .iter()
@@ -158,47 +183,10 @@ pub(crate) fn prepare_geometry(
             .collect();
     }
 }
+
+/// Returns and clears the first recorded tick error.
 pub(crate) fn finish(mut planning: ResMut<Planning>, mut timings: ResMut<WorldTimings>) {
     if let Some(start) = planning.started.take() {
         timings.planning.observe(start.elapsed());
-    }
-}
-pub(crate) fn spawn(commands: &mut Commands, id: u32, bundle: impl Bundle) {
-    commands.queue(move |world: &mut World| {
-        assert!(
-            !world.resource::<EntityIndex>().0.contains_key(&id),
-            "duplicate actor ID"
-        );
-        let entity = world.spawn((GameId(EntityId(id)), bundle)).id();
-        world.resource_mut::<EntityIndex>().0.insert(id, entity);
-    });
-}
-pub(crate) fn despawn(commands: &mut Commands, id: u32, entity: Entity) {
-    commands.queue(move |world: &mut World| {
-        crate::systems::lifecycle::despawn_indexed(world, entity, EntityId(id))
-    });
-}
-
-/// A director's local command staging: existing components remain borrowed in
-/// place; only newly created actors are owned until deferred spawn is applied.
-pub(crate) enum Pending<'a, T> {
-    Live(&'a mut T),
-    Spawn(T),
-}
-impl<T> std::ops::Deref for Pending<'_, T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        match self {
-            Self::Live(v) => v,
-            Self::Spawn(v) => v,
-        }
-    }
-}
-impl<T> std::ops::DerefMut for Pending<'_, T> {
-    fn deref_mut(&mut self) -> &mut T {
-        match self {
-            Self::Live(v) => v,
-            Self::Spawn(v) => v,
-        }
     }
 }

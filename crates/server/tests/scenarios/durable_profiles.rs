@@ -1,13 +1,18 @@
 use super::*;
-use server::components::Player as PlayerComponent;
-use server::components::Vehicle as VehicleComponent;
+use server::component::PlayerSnapshot;
+use server::component::VehicleSnapshot;
 use server::systems::police::Wanted as WantedComponent;
 use std::{
     thread,
     time::{Duration, Instant},
 };
-struct Database(std::path::PathBuf);
+/// Owns a temporary database path used by persistence tests.
+struct Database(
+    /// Temporary SQLite database path removed when the test ends.
+    std::path::PathBuf,
+);
 impl Database {
+    /// Creates an isolated temporary directory for the test database.
     fn new() -> Self {
         let dir = std::env::temp_dir()
             .join(server::admission::random_id("pm-world-persistence-", 16).unwrap());
@@ -20,6 +25,7 @@ impl Drop for Database {
         let _ = std::fs::remove_dir_all(self.0.parent().unwrap());
     }
 }
+/// Advances profile storage until pending operations can complete.
 fn pump(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey) {
     if w.sessions
         .peers
@@ -31,6 +37,7 @@ fn pump(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey) {
     step(w, a, t);
     thread::sleep(Duration::from_millis(1));
 }
+/// Admits a guest through the durable profile-loading path.
 fn persistent_join(
     w: &mut World,
     a: &mut Profiles,
@@ -77,6 +84,7 @@ fn persistent_join(
     ready(w, a, t, p);
     cookie
 }
+/// Verifies that SQLite repair disconnect after submission refunds once without healing car.
 #[test]
 fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() {
     let db = Database::new();
@@ -115,12 +123,12 @@ fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() 
     );
     step(&mut w, &mut a, &mut t);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&1)
+        .get_mut_by_id::<VehicleSnapshot>(&1)
         .unwrap()
         .state
         .motor = sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&1)
+        .get_mut_by_id::<VehicleSnapshot>(&1)
         .unwrap()
         .state
         .health = VehicleHealth(50);
@@ -164,7 +172,7 @@ fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() 
     for _ in 0..5 {
         pump(&mut w, &mut a, &mut t, p);
     }
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
     persistent_join(&mut w, &mut a, &mut t, p, Some(&cookie));
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
@@ -181,6 +189,7 @@ fn sqlite_repair_disconnect_after_submission_refunds_once_without_healing_car() 
     );
 }
 
+/// Verifies that SQLite repair applies after commit and acknowledged payment survives restart.
 #[test]
 fn sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart() {
     let db = Database::new();
@@ -219,12 +228,12 @@ fn sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart(
     );
     step(&mut w, &mut a, &mut t);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&1)
+        .get_mut_by_id::<VehicleSnapshot>(&1)
         .unwrap()
         .state
         .motor = sim_core::spawn_vehicle([220.0, 0.0, -180.0], 0.0).unwrap();
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&1)
+        .get_mut_by_id::<VehicleSnapshot>(&1)
         .unwrap()
         .state
         .health = VehicleHealth(50);
@@ -242,13 +251,13 @@ fn sqlite_repair_applies_after_commit_and_acknowledged_payment_survives_restart(
         keep_alive(&w, &mut t, p);
         step(&mut w, &mut a, &mut t);
     }
-    assert_eq!(w.entities.view::<VehicleComponent>()[&1].state.health.0, 50);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 50);
     assert_eq!(
         w.sessions.peers[&p].profile.as_ref().unwrap().credits.0,
         150
     );
     let until = Instant::now() + Duration::from_secs(3);
-    while w.entities.view::<VehicleComponent>()[&1].state.health.0 < 100 {
+    while w.entities.view::<VehicleSnapshot>()[&1].state.health.0 < 100 {
         assert!(Instant::now() < until);
         pump(&mut w, &mut a, &mut t, p);
     }
@@ -310,18 +319,18 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         }),
     );
     step(&mut w, &mut a, &mut t);
-    let instance = w.entities.values::<server::components::PlayerMission>()
+    let instance = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .id
         .clone();
-    let reward = w.entities.values::<server::components::PlayerMission>()
+    let reward = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
         .reward;
-    let target = w.entities.values::<server::components::PlayerMission>()
+    let target = w.entities.values::<server::component::PlayerMission>()
         [&w.sessions.peers[&p].player_id()]
         .as_ref()
         .unwrap()
@@ -334,7 +343,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -353,7 +362,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         pump(&mut w, &mut a, &mut t, p);
     }
     assert_eq!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .as_ref()
             .unwrap()
             .phase,
@@ -387,7 +396,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         1
     );
     assert!(
-        w.entities.values::<server::components::PlayerMission>()[&w.sessions.peers[&p].player_id()]
+        w.entities.values::<server::component::PlayerMission>()[&w.sessions.peers[&p].player_id()]
             .is_none()
     );
     assert_eq!(
@@ -395,7 +404,7 @@ fn sqlite_world_rewards_publish_after_commit_and_rejoin_after_fresh_world_restor
         0
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0]
+        w.entities.view::<PlayerSnapshot>()[&w.sessions.peers[&p].player.unwrap().0]
             .state
             .mode,
         CharacterMode::OnFoot

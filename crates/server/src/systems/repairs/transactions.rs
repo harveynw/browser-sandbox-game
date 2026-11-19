@@ -4,6 +4,7 @@ use super::*;
 use std::result::Result;
 type Results = BTreeMap<String, Result<ProfileView, EconomicError>>;
 
+/// Collects repair transaction completions indexed by event ID.
 pub(super) fn collect_results(profiles: &mut Profiles, tick: u32) -> Results {
     profiles
         .poll_economic(tick)
@@ -11,6 +12,7 @@ pub(super) fn collect_results(profiles: &mut Profiles, tick: u32) -> Results {
         .map(|r| (r.event, r.result))
         .collect()
 }
+/// Hides completed repair status after its display deadline.
 pub(super) fn expire_status(sessions: &mut Sessions, tick: u32) {
     for s in sessions.peers.values_mut() {
         if s.repair_clear.is_some_and(|end| tick >= end) {
@@ -20,13 +22,14 @@ pub(super) fn expire_status(sessions: &mut Sessions, tick: u32) {
         }
     }
 }
+/// Advances repair dwell, debit, or refund state using committed transaction results.
 pub(super) fn advance(
     r: &mut PendingRepair,
     profile: &str,
     eligible: bool,
     results: &mut Results,
     profiles: &mut Profiles,
-    cars: &mut BTreeMap<u32, &mut VehicleComponent>,
+    cars: &mut BTreeMap<u32, crate::component::queries::VehicleQueryItem<'_, '_>>,
 ) {
     if !eligible {
         r.invalidated = true;
@@ -49,7 +52,7 @@ pub(super) fn advance(
                 match result {
                     Ok(_) if eligible && !r.invalidated => {
                         let v = cars.get_mut(&r.car).expect("eligible repair car");
-                        v.state.health = VehicleHealth(v.template.health);
+                        v.state.health.0 = v.template.health;
                         v.idle_ticks = 0;
                         profiles.finish_repair_debit(profile, &r.event);
                         r.phase = RepairPhase::Completed;
@@ -82,6 +85,7 @@ pub(super) fn advance(
         _ => {}
     }
 }
+/// Queues the repair debit or refund once for its current phase.
 pub(super) fn submit(r: &mut PendingRepair, profile: &str, profiles: &mut Profiles, tick: u32) {
     if matches!(
         r.phase,
@@ -101,6 +105,7 @@ pub(super) fn submit(r: &mut PendingRepair, profile: &str, profiles: &mut Profil
         }
     }
 }
+/// Updates private repair status and committed profile data for matching sessions.
 pub(super) fn publish(
     r: &PendingRepair,
     profile: &str,

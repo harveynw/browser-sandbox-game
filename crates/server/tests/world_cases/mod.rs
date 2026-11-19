@@ -1,8 +1,8 @@
 use crate as server;
 use protocol::*;
-use server::components::Pedestrian as PedestrianComponent;
-use server::components::Player as PlayerComponent;
-use server::components::Vehicle as VehicleComponent;
+use server::component::PedestrianSnapshot;
+use server::component::PlayerSnapshot;
+use server::component::VehicleSnapshot;
 use server::systems::police::Unit as PoliceUnitComponent;
 use server::systems::population::Traffic as TrafficComponent;
 use server::{
@@ -19,10 +19,15 @@ use std::{
     collections::{BTreeSet, VecDeque},
     path::Path,
 };
+/// Owns scenario world, session, system, and transport state between steps.
 struct Fixture {
+    /// Owned world state used by this scenario fixture.
     core: CoreWorld,
+    /// Live session state used by this system.
     sessions: Sessions,
+    /// Gameplay system resources retained between scenario steps.
     systems: Systems,
+    /// Live network transport.
     network: Network,
 }
 impl std::ops::Deref for Fixture {
@@ -36,8 +41,11 @@ impl std::ops::DerefMut for Fixture {
         &mut self.core
     }
 }
+/// Owns world state for scenario fixtures between scheduled ticks.
 struct World {
+    /// Owned scenario state temporarily moved into a tick driver during each step.
     fixture: Option<Fixture>,
+    /// Ordered ECS schedule used to advance one tick.
     schedule: Option<bevy_ecs::prelude::Schedule>,
 }
 impl std::ops::Deref for World {
@@ -52,6 +60,7 @@ impl std::ops::DerefMut for World {
     }
 }
 impl World {
+    /// Creates an owned scenario world from validated content.
     fn new(content: WorldContent) -> Result<Self, String> {
         let mut core = CoreWorld::new(content)?;
         let mut sessions = Sessions::default();
@@ -66,6 +75,7 @@ impl World {
             schedule: None,
         })
     }
+    /// Advances one complete tick and returns borrowed profile storage to its caller.
     fn step(
         &mut self,
         network: &mut Network,
@@ -96,6 +106,7 @@ impl World {
         self.schedule = Some(schedule);
         result
     }
+    /// Requests peer cleanup and records its reason.
     fn disconnect(&mut self, peer: PeerKey, profiles: &mut Profiles) {
         let Fixture {
             core,
@@ -105,6 +116,7 @@ impl World {
         } = self.fixture.as_mut().unwrap();
         sessions.disconnect(peer, profiles, core, systems);
     }
+    /// Stops active work and drains pending persistence operations within the shutdown limit.
     fn shutdown(&mut self, profiles: &mut Profiles) -> bool {
         let Fixture {
             core,
@@ -128,15 +140,22 @@ impl World {
         drained
     }
 }
+/// Collects test output and simulates reliable delivery failures.
 #[derive(Default)]
 struct FakeTransport {
+    /// Live network transport.
     network: Network,
+    /// Transport events staged for the next test tick.
     events: VecDeque<TransportEvent>,
+    /// Number of messages successfully submitted during this drain.
     sent: Vec<(PeerKey, Delivery, ServerEnvelope)>,
+    /// Connection incarnations closed during this admission batch.
     closed: BTreeSet<PeerKey>,
+    /// Peers whose reliable output is forced to fail in this test.
     full: BTreeSet<PeerKey>,
 }
 impl FakeTransport {
+    /// Advances one complete tick and returns borrowed profile storage to its caller.
     fn step(&mut self, w: &mut World, a: &mut Profiles, now: u64) {
         for event in self.events.drain(..) {
             self.network.test_event(event);
@@ -150,12 +169,14 @@ impl FakeTransport {
         self.closed.extend(closed);
     }
 }
+/// Loads the published world content used by this test.
 fn content() -> WorldContent {
     WorldContent::load(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
     )
     .unwrap()
 }
+/// Creates the world and profile state used by scenario tests.
 fn setup() -> (World, Profiles, FakeTransport) {
     (
         World::new(content()).unwrap(),
@@ -163,15 +184,18 @@ fn setup() -> (World, Profiles, FakeTransport) {
         FakeTransport::default(),
     )
 }
+/// Looks up or creates the connection state used by this operation.
 fn peer(id: u32) -> PeerKey {
     PeerKey {
         id,
         generation: u64::from(id) + 1,
     }
 }
+/// Advances one complete tick and returns borrowed profile storage to its caller.
 fn step(w: &mut World, a: &mut Profiles, t: &mut FakeTransport) {
     t.step(w, a, u64::from(w.tick) * 34);
 }
+/// Queues or submits a message using the required delivery channel.
 fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
     let sid = w
         .sessions
@@ -189,6 +213,7 @@ fn send(w: &World, t: &mut FakeTransport, p: PeerKey, message: ClientMessage) {
         },
     });
 }
+/// Admits a test guest and completes its initial readiness handshake.
 fn join(
     w: &mut World,
     a: &mut Profiles,
@@ -219,6 +244,7 @@ fn join(
     step(w, a, t);
     cookie
 }
+/// Builds the player readiness checkpoint.
 fn ready(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey) {
     let baseline_id = BaselineId(w.sessions.peers[&p].baseline);
     send(
@@ -229,6 +255,7 @@ fn ready(w: &mut World, a: &mut Profiles, t: &mut FakeTransport, p: PeerKey) {
     );
     step(w, a, t);
 }
+/// Encodes the requested input frames into a client input batch.
 fn batch(w: &World, t: &mut FakeTransport, p: PeerKey, tick: u32, x: i16, z: i16, epoch: u32) {
     send(
         w,
@@ -247,18 +274,19 @@ fn batch(w: &World, t: &mut FakeTransport, p: PeerKey, tick: u32, x: i16, z: i16
         }),
     );
 }
+/// Verifies that loading is inert and ready starts once with ordered baseline and status.
 #[test]
 fn loading_is_inert_and_ready_starts_once_with_ordered_baseline_and_status() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(0);
     join(&mut w, &mut a, &mut t, p, None);
     let id = w.sessions.peers[&p].player.unwrap().0;
-    let initial = w.entities.view::<PlayerComponent>()[&id].state.clone();
+    let initial = w.entities.view::<PlayerSnapshot>()[&id].state.clone();
     for _ in 0..5 {
         batch(&w, &mut t, p, w.tick + 1, 0, 32767, 1);
         step(&mut w, &mut a, &mut t);
     }
-    assert_eq!(w.entities.view::<PlayerComponent>()[&id].state, initial);
+    assert_eq!(w.entities.view::<PlayerSnapshot>()[&id].state, initial);
     assert_eq!(w.sessions.peers[&p].phase, SessionPhase::Loading);
     send(
         &w,
@@ -295,6 +323,7 @@ fn loading_is_inert_and_ready_starts_once_with_ordered_baseline_and_status() {
     ));
     assert_eq!(w.sessions.peers[&p].phase, SessionPhase::Playing);
 }
+/// Verifies that duplicates conflicts stale future and epoch inputs cannot accelerate the actor.
 #[test]
 fn duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_actor() {
     let (mut w, mut a, mut t) = setup();
@@ -302,10 +331,7 @@ fn duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_acto
     join(&mut w, &mut a, &mut t, p, None);
     ready(&mut w, &mut a, &mut t, p);
     let id = w.sessions.peers[&p].player.unwrap().0;
-    let before = w.entities.view::<PlayerComponent>()[&id]
-        .state
-        .motor
-        .clone();
+    let before = w.entities.view::<PlayerSnapshot>()[&id].state.motor.clone();
     let tick = w.tick + 1;
     for _ in 0..10 {
         batch(&w, &mut t, p, tick, 0, 32767, 1);
@@ -315,7 +341,7 @@ fn duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_acto
     batch(&w, &mut t, p, tick + 9, 0, 32767, 1);
     batch(&w, &mut t, p, tick, 0, 32767, 2);
     step(&mut w, &mut a, &mut t);
-    let after = &w.entities.view::<PlayerComponent>()[&id].state.motor;
+    let after = &w.entities.view::<PlayerSnapshot>()[&id].state.motor;
     assert!((after.position.0[0].0 - before.position.0[0].0).abs() < 0.001);
     assert!(before.position.0[2].0 - after.position.0[2].0 > 0.0);
     assert!(before.position.0[2].0 - after.position.0[2].0 < 0.05);
@@ -328,7 +354,7 @@ fn duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_acto
         step(&mut w, &mut a, &mut t);
     }
     assert!(
-        w.entities.view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id]
             .state
             .motor
             .velocity
@@ -337,6 +363,7 @@ fn duplicates_conflicts_stale_future_and_epoch_inputs_cannot_accelerate_the_acto
             .all(|v| v.0.abs() < 0.001)
     );
 }
+/// Verifies that future ring is nine ticks and one frame is consumed per step.
 #[test]
 fn future_ring_is_nine_ticks_and_one_frame_is_consumed_per_step() {
     let (mut w, mut a, mut t) = setup();
@@ -354,6 +381,7 @@ fn future_ring_is_nine_ticks_and_one_frame_is_consumed_per_step() {
         assert_eq!(w.sessions.peers[&p].inputs.len(), expected);
     }
 }
+/// Verifies that resync increments epoch and visibility without moving until new readiness.
 #[test]
 fn resync_increments_epoch_and_visibility_without_moving_until_new_readiness() {
     let (mut w, mut a, mut t) = setup();
@@ -374,7 +402,7 @@ fn resync_increments_epoch_and_visibility_without_moving_until_new_readiness() {
     assert_eq!(w.sessions.peers[&p].epoch, 2);
     assert_eq!(w.sessions.peers[&p].baseline, 2);
     assert!(w.sessions.peers[&p].inputs.is_empty());
-    let position = w.entities.view::<PlayerComponent>()[&id]
+    let position = w.entities.view::<PlayerSnapshot>()[&id]
         .state
         .motor
         .position
@@ -382,7 +410,7 @@ fn resync_increments_epoch_and_visibility_without_moving_until_new_readiness() {
     batch(&w, &mut t, p, w.tick + 1, 0, 32767, 1);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id]
             .state
             .motor
             .position,
@@ -405,6 +433,7 @@ fn resync_increments_epoch_and_visibility_without_moving_until_new_readiness() {
     step(&mut w, &mut a, &mut t);
     assert_eq!(w.metrics.stale_epochs, 1);
 }
+/// Verifies that guest replacement disconnect cleanup and generation reuse are idempotent.
 #[test]
 fn guest_replacement_disconnect_cleanup_and_generation_reuse_are_idempotent() {
     let (mut w, mut a, mut t) = setup();
@@ -423,8 +452,8 @@ fn guest_replacement_disconnect_cleanup_and_generation_reuse_are_idempotent() {
     join(&mut w, &mut a, &mut t, new, Some(&cookie));
     assert!(!w.sessions.peers.contains_key(&old));
     assert!(t.closed.contains(&old));
-    assert!(!w.entities.view::<PlayerComponent>().contains_key(&first.0));
-    assert_eq!(w.entities.view::<PlayerComponent>().len(), 1);
+    assert!(!w.entities.view::<PlayerSnapshot>().contains_key(&first.0));
+    assert_eq!(w.entities.view::<PlayerSnapshot>().len(), 1);
     assert_eq!(
         w.sessions.peers[&new].profile.as_ref().unwrap().profile_id,
         profile
@@ -439,10 +468,10 @@ fn guest_replacement_disconnect_cleanup_and_generation_reuse_are_idempotent() {
         reason: "late close",
     });
     step(&mut w, &mut a, &mut t);
-    assert_eq!(w.entities.view::<PlayerComponent>().len(), 1);
+    assert_eq!(w.entities.view::<PlayerSnapshot>().len(), 1);
     send(&w, &mut t, new, ClientMessage::Leave(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(w.entities.view::<PlayerComponent>().is_empty());
+    assert!(w.entities.view::<PlayerSnapshot>().is_empty());
     assert!(w.sessions.peers.is_empty());
     let reused = PeerKey {
         id: new.id,
@@ -456,6 +485,7 @@ fn guest_replacement_disconnect_cleanup_and_generation_reuse_are_idempotent() {
     step(&mut w, &mut a, &mut t);
     assert!(w.sessions.peers.contains_key(&reused));
 }
+/// Verifies that other observers receive show then hide and reliable full removes ownership.
 #[test]
 fn other_observers_receive_show_then_hide_and_reliable_full_removes_ownership() {
     let (mut w, mut a, mut t) = setup();
@@ -469,10 +499,11 @@ fn other_observers_receive_show_then_hide_and_reliable_full_removes_ownership() 
     t.full.insert(second);
     ready(&mut w, &mut a, &mut t, second);
     assert!(!w.sessions.peers.contains_key(&second));
-    assert!(!w.entities.view::<PlayerComponent>().contains_key(&id.0));
+    assert!(!w.entities.view::<PlayerSnapshot>().contains_key(&id.0));
     assert!(t.sent.iter().any(|(p, _, m)| *p == first
         && matches!(&m.message,ServerMessage::EntityHide(s) if s.entity_id==id)));
 }
+/// Verifies that loading hello and playing timeouts remove all state.
 #[test]
 fn loading_hello_and_playing_timeouts_remove_all_state() {
     for phase in [
@@ -493,17 +524,18 @@ fn loading_hello_and_playing_timeouts_remove_all_state() {
         }
         t.step(&mut w, &mut a, 40_000);
         assert!(w.sessions.peers.is_empty());
-        assert!(w.entities.view::<PlayerComponent>().is_empty());
+        assert!(w.entities.view::<PlayerSnapshot>().is_empty());
         assert!(t.closed.contains(&p));
     }
 }
+/// Verifies that unknown peers wrong scope and invalid tickets cannot allocate actors.
 #[test]
 fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(0);
     send(&w, &mut t, p, ClientMessage::Leave(Empty {}));
     step(&mut w, &mut a, &mut t);
-    assert!(w.entities.view::<PlayerComponent>().is_empty());
+    assert!(w.entities.view::<PlayerSnapshot>().is_empty());
     t.events.push_back(TransportEvent::Opened(p));
     step(&mut w, &mut a, &mut t);
     let build = w.build();
@@ -522,7 +554,7 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
         }),
     );
     step(&mut w, &mut a, &mut t);
-    assert!(w.entities.view::<PlayerComponent>().is_empty());
+    assert!(w.entities.view::<PlayerSnapshot>().is_empty());
     assert!(w.sessions.peers.is_empty());
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::Reject(r) if r.code==RejectCode::InvalidTicket)));
     join(&mut w, &mut a, &mut t, peer(1), None);
@@ -537,8 +569,9 @@ fn unknown_peers_wrong_scope_and_invalid_tickets_cannot_allocate_actors() {
         },
     });
     step(&mut w, &mut a, &mut t);
-    assert!(w.entities.view::<PlayerComponent>().is_empty());
+    assert!(w.entities.view::<PlayerSnapshot>().is_empty());
 }
+/// Verifies that full magazine reload is rejected and duplicate requests return the cached result.
 #[test]
 fn full_magazine_reload_is_rejected_and_duplicate_requests_return_the_cached_result() {
     let (mut w, mut a, mut t) = setup();
@@ -570,13 +603,14 @@ fn full_magazine_reload_is_rejected_and_duplicate_requests_return_the_cached_res
     assert_eq!(results[0].code, ActionCode::Cooldown);
 }
 
+/// Verifies that loading sessions reserve capacity and unknown peers cannot allocate a seventeenth player.
 #[test]
 fn loading_sessions_reserve_capacity_and_unknown_peers_cannot_allocate_a_seventeenth_player() {
     let (mut w, mut a, mut t) = setup();
     for id in 0..16 {
         join(&mut w, &mut a, &mut t, peer(id), None);
     }
-    assert_eq!(w.entities.view::<PlayerComponent>().len(), 16);
+    assert_eq!(w.entities.view::<PlayerSnapshot>().len(), 16);
     assert_eq!(w.sessions.peers.len(), 16);
     assert!(
         w.sessions
@@ -586,11 +620,11 @@ fn loading_sessions_reserve_capacity_and_unknown_peers_cannot_allocate_a_sevente
     );
     t.events.push_back(TransportEvent::Opened(peer(16)));
     step(&mut w, &mut a, &mut t);
-    assert_eq!(w.entities.view::<PlayerComponent>().len(), 16);
+    assert_eq!(w.entities.view::<PlayerSnapshot>().len(), 16);
     assert!(t.closed.contains(&peer(16)));
     let positions: Vec<_> = w
         .entities
-        .view::<PlayerComponent>()
+        .view::<PlayerSnapshot>()
         .values()
         .map(|p| p.state.motor.position.clone())
         .collect();
@@ -599,6 +633,7 @@ fn loading_sessions_reserve_capacity_and_unknown_peers_cannot_allocate_a_sevente
     }
 }
 
+/// Verifies that playing observer receives split movement snapshots and fresh visibility after aoi return.
 #[test]
 fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after_aoi_return() {
     let (mut w, mut a, mut t) = setup();
@@ -640,14 +675,14 @@ fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after
         .unwrap()
         .visibility_id
         .0;
-    let origin = w.entities.view::<PlayerComponent>()
+    let origin = w.entities.view::<PlayerSnapshot>()
         [&w.sessions.peers[&observer].player.unwrap().0]
         .state
         .motor
         .position
         .clone();
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&mover)
+        .get_mut_by_id::<PlayerSnapshot>(&mover)
         .unwrap()
         .state
         .motor
@@ -658,7 +693,7 @@ fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after
     assert!(!t.sent.iter().any(|(p, _, m)| *p == observer
         && matches!(&m.message, ServerMessage::EntityHide(h) if h.entity_id.0 == mover)));
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&mover)
+        .get_mut_by_id::<PlayerSnapshot>(&mover)
         .unwrap()
         .state
         .motor
@@ -668,7 +703,7 @@ fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after
     step(&mut w, &mut a, &mut t);
     assert!(t.sent.iter().any(|(p, _, m)| *p == observer && matches!(&m.message, ServerMessage::EntityHide(h) if h.entity_id.0 == mover && h.reason == HideReason::OutOfRange)));
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&mover)
+        .get_mut_by_id::<PlayerSnapshot>(&mover)
         .unwrap()
         .state
         .motor
@@ -680,6 +715,7 @@ fn playing_observer_receives_split_movement_snapshots_and_fresh_visibility_after
     assert!(w.metrics.max_refresh_age_ticks <= 3);
 }
 
+/// Verifies that sustained input byte flood cannot expand the ring or keep an actor.
 #[test]
 fn sustained_input_byte_flood_cannot_expand_the_ring_or_keep_an_actor() {
     let (mut w, mut a, mut t) = setup();
@@ -698,10 +734,11 @@ fn sustained_input_byte_flood_cannot_expand_the_ring_or_keep_an_actor() {
         }
     }
     assert!(!w.sessions.peers.contains_key(&p));
-    assert!(w.entities.view::<PlayerComponent>().is_empty());
+    assert!(w.entities.view::<PlayerSnapshot>().is_empty());
     assert!(t.closed.contains(&p));
 }
 
+/// Builds a scoped vehicle action request for the scenario player.
 fn vehicle_action(
     w: &World,
     t: &mut FakeTransport,
@@ -721,15 +758,17 @@ fn vehicle_action(
         }),
     );
 }
+/// Places the scenario player at a valid vehicle entry position.
 fn at_door(w: &mut World, p: PeerKey, car: u32) {
-    let position = crate::systems::vehicle::entry(&w.entities.view::<VehicleComponent>()[&car]);
+    let position = crate::systems::vehicle::entry(&w.entities.view::<VehicleSnapshot>()[&car]);
     let id = w.sessions.peers[&p].player.unwrap().0;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&id)
+        .get_mut_by_id::<PlayerSnapshot>(&id)
         .unwrap()
         .state
         .motor = sim_core::spawn_character(position, 0.0).unwrap();
 }
+/// Verifies that simultaneous entry is atomic epoch scoped idempotent and disconnect releases car.
 #[test]
 fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_car() {
     let (mut w, mut a, mut t) = setup();
@@ -739,7 +778,7 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
     ready(&mut w, &mut a, &mut t, p);
     join(&mut w, &mut a, &mut t, q, None);
     ready(&mut w, &mut a, &mut t, q);
-    let car = *w.entities.view::<VehicleComponent>().keys().next().unwrap();
+    let car = *w.entities.view::<VehicleSnapshot>().keys().next().unwrap();
     at_door(&mut w, p, car);
     at_door(&mut w, q, car);
     batch(&w, &mut t, p, w.tick + 2, 0, 32767, 1);
@@ -758,11 +797,11 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
     step(&mut w, &mut a, &mut t);
     let driver = w.sessions.peers[&p].player.unwrap();
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
+        w.entities.view::<VehicleSnapshot>()[&car].state.driver_id,
         Some(driver)
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&driver.0].state.mode,
+        w.entities.view::<PlayerSnapshot>()[&driver.0].state.mode,
         CharacterMode::Driving
     );
     assert_eq!(w.sessions.peers[&p].epoch, 2);
@@ -786,7 +825,7 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
     step(&mut w, &mut a, &mut t);
     assert_eq!(w.sessions.peers[&p].epoch, 2);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car]
+        w.entities.view::<VehicleSnapshot>()[&car]
             .state
             .motor
             .speed
@@ -798,7 +837,7 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
         step(&mut w, &mut a, &mut t);
     }
     assert!(
-        w.entities.view::<VehicleComponent>()[&car]
+        w.entities.view::<VehicleSnapshot>()[&car]
             .state
             .motor
             .speed
@@ -811,11 +850,11 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ActionResult(v) if v.request_id.0==2 && v.code==ActionCode::TooFast)));
     w.disconnect(p, &mut a);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
+        w.entities.view::<VehicleSnapshot>()[&car].state.driver_id,
         None
     );
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car]
+        w.entities.view::<VehicleSnapshot>()[&car]
             .state
             .motor
             .speed
@@ -823,13 +862,14 @@ fn simultaneous_entry_is_atomic_epoch_scoped_idempotent_and_disconnect_releases_
         0.0
     );
 }
+/// Verifies that exit reclaims player with fresh epoch and old car inputs cannot move it.
 #[test]
 fn exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it() {
     let (mut w, mut a, mut t) = setup();
     let p = peer(1);
     join(&mut w, &mut a, &mut t, p, None);
     ready(&mut w, &mut a, &mut t, p);
-    let car = *w.entities.view::<VehicleComponent>().keys().next().unwrap();
+    let car = *w.entities.view::<VehicleSnapshot>().keys().next().unwrap();
     at_door(&mut w, p, car);
     vehicle_action(
         &w,
@@ -847,14 +887,14 @@ fn exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it() {
     let id = w.sessions.peers[&p].player.unwrap();
     assert_eq!(w.sessions.peers[&p].epoch, 3);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id.0].state.mode,
+        w.entities.view::<PlayerSnapshot>()[&id.0].state.mode,
         CharacterMode::OnFoot
     );
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
+        w.entities.view::<VehicleSnapshot>()[&car].state.driver_id,
         None
     );
-    let position = w.entities.view::<PlayerComponent>()[&id.0]
+    let position = w.entities.view::<PlayerSnapshot>()[&id.0]
         .state
         .motor
         .position
@@ -862,7 +902,7 @@ fn exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it() {
     batch(&w, &mut t, p, w.tick + 1, 32767, 32767, 2);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id.0]
+        w.entities.view::<PlayerSnapshot>()[&id.0]
             .state
             .motor
             .position
@@ -870,7 +910,7 @@ fn exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it() {
         position.0[0]
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id.0]
+        w.entities.view::<PlayerSnapshot>()[&id.0]
             .state
             .motor
             .position
@@ -879,6 +919,7 @@ fn exit_reclaims_player_with_fresh_epoch_and_old_car_inputs_cannot_move_it() {
     );
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message,ServerMessage::ControlChanged(v) if v.controlled_entity_id==id && v.control_epoch.0==3)));
 }
+/// Builds a scoped courier mission request for the scenario player.
 fn courier_action(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32) {
     vehicle_action(
         w,
@@ -891,14 +932,16 @@ fn courier_action(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32) {
         }),
     );
 }
+/// Moves the scenario actor to the requested position.
 fn place(w: &mut World, p: PeerKey, position: [f32; 3]) {
     let id = w.sessions.peers[&p].player.unwrap().0;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&id)
+        .get_mut_by_id::<PlayerSnapshot>(&id)
         .unwrap()
         .state
         .motor = sim_core::spawn_character(position, 0.0).unwrap();
 }
+/// Verifies that memory rewards are atomic bounded and reject event conflicts.
 #[test]
 fn memory_rewards_are_atomic_bounded_and_reject_event_conflicts() {
     let mut a = Profiles::default();
@@ -928,6 +971,7 @@ fn memory_rewards_are_atomic_bounded_and_reject_event_conflicts() {
     );
 }
 
+/// Verifies that courier completes from authoritative car motion and does not release the driver.
 #[test]
 fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driver() {
     let (mut w, mut a, mut t) = setup();
@@ -937,7 +981,7 @@ fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driv
     place(&mut w, p, [-172.0, 0.02, 180.0]);
     courier_action(&w, &mut t, p, 1);
     step(&mut w, &mut a, &mut t);
-    let car = *w.entities.view::<VehicleComponent>().keys().next().unwrap();
+    let car = *w.entities.view::<VehicleSnapshot>().keys().next().unwrap();
     at_door(&mut w, p, car);
     vehicle_action(
         &w,
@@ -951,7 +995,7 @@ fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driv
     );
     step(&mut w, &mut a, &mut t);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&car)
+        .get_mut_by_id::<VehicleSnapshot>(&car)
         .unwrap()
         .state
         .motor = sim_core::spawn_vehicle([-44.0, 0.0, 52.0], 0.0).unwrap();
@@ -962,13 +1006,14 @@ fn courier_completes_from_authoritative_car_motion_and_does_not_release_the_driv
     step(&mut w, &mut a, &mut t);
     assert_eq!(a.profile(Some(&cookie)).unwrap().credits.0, 150);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.driver_id,
+        w.entities.view::<VehicleSnapshot>()[&car].state.driver_id,
         w.sessions.peers[&p].player
     );
     assert_eq!(w.sessions.peers[&p].epoch, 2);
     assert!(t.sent.iter().any(|(target,_,m)| *target==p && matches!(&m.message,ServerMessage::PlayerStatus(v) if v.credits.0==150 && v.completed_jobs==1 && v.mission.as_ref().is_some_and(|m|m.phase==MissionPhase::Completed))));
 }
 
+/// Verifies that full city installs three public classes without spawning recovery reservations.
 #[test]
 fn full_city_installs_three_public_classes_without_spawning_recovery_reservations() {
     let content = WorldContent::load_index(
@@ -981,26 +1026,26 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
     let mut t = FakeTransport::default();
     assert_eq!(
         w.entities
-            .values::<server::components::PoolMembership>()
+            .values::<server::component::PoolMembership>()
             .len(),
         16
     );
     assert_eq!(w.entities.view::<PoliceUnitComponent>().len(), 4);
     assert!(
         w.entities
-            .view::<VehicleComponent>()
+            .view::<VehicleSnapshot>()
             .values()
             .any(|v| v.template.id == "van")
     );
     assert!(
         w.entities
-            .view::<VehicleComponent>()
+            .view::<VehicleSnapshot>()
             .values()
             .any(|v| v.template.id == "sport")
     );
     for id in w
         .entities
-        .values::<server::components::PoolMembership>()
+        .values::<server::component::PoolMembership>()
         .keys()
         .copied()
         .collect::<Vec<_>>()
@@ -1022,12 +1067,13 @@ fn full_city_installs_three_public_classes_without_spawning_recovery_reservation
         );
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<VehicleComponent>()[&id].state.driver_id,
+            w.entities.view::<VehicleSnapshot>()[&id].state.driver_id,
             w.sessions.peers[&p].player
         );
     }
 }
 
+/// Verifies that full city population uses real replication and ai seats cannot be taken.
 #[test]
 fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
@@ -1041,11 +1087,11 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         step(&mut w, &mut a, &mut t);
     }
     assert!(!w.entities.view::<TrafficComponent>().is_empty());
-    assert!(!w.entities.view::<PedestrianComponent>().is_empty());
+    assert!(!w.entities.view::<PedestrianSnapshot>().is_empty());
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::EntityShow(s) if s.descriptor.entity_kind==EntityKind::Pedestrian && matches!(s.state,EntityState::Character(_)))));
     let pedestrian_ids: BTreeSet<_> = w
         .entities
-        .view::<PedestrianComponent>()
+        .view::<PedestrianSnapshot>()
         .keys()
         .copied()
         .collect();
@@ -1054,13 +1100,13 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     crate::systems::vehicle::stop(
         &mut w
             .entities
-            .get_mut_by_id::<VehicleComponent>(&car_id)
+            .get_mut_by_id::<VehicleSnapshot>(&car_id)
             .unwrap(),
     );
     let player = w.sessions.peers[&p].player.unwrap().0;
-    let entry = crate::systems::vehicle::entry(&w.entities.view::<VehicleComponent>()[&car_id]);
+    let entry = crate::systems::vehicle::entry(&w.entities.view::<VehicleSnapshot>()[&car_id]);
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&player)
+        .get_mut_by_id::<PlayerSnapshot>(&player)
         .unwrap()
         .state
         .motor = sim_core::spawn_character(entry, 0.0).unwrap();
@@ -1078,7 +1124,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     step(&mut w, &mut a, &mut t);
     assert!(t.sent.iter().any(|(_,_,m)|matches!(&m.message,ServerMessage::ActionResult(r) if r.request_id.0==100 && r.code==ActionCode::Occupied)));
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car_id]
+        w.entities.view::<VehicleSnapshot>()[&car_id]
             .state
             .driver_id,
         None
@@ -1091,7 +1137,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     crate::systems::vehicle::stop(
         &mut w
             .entities
-            .get_mut_by_id::<VehicleComponent>(&car_id)
+            .get_mut_by_id::<VehicleSnapshot>(&car_id)
             .unwrap(),
     );
     at_door(&mut w, p, car_id);
@@ -1107,16 +1153,16 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car_id]
+        w.entities.view::<VehicleSnapshot>()[&car_id]
             .state
             .driver_id,
         Some(EntityId(player))
     );
     assert_eq!(
-        w.entities.values::<server::components::PoolMembership>()[&car_id],
+        w.entities.values::<server::component::PoolMembership>()[&car_id],
         server::systems::population::VehiclePool::Traffic
     );
-    let before = w.entities.view::<VehicleComponent>()[&car_id]
+    let before = w.entities.view::<VehicleSnapshot>()[&car_id]
         .state
         .motor
         .position
@@ -1126,7 +1172,7 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
         step(&mut w, &mut a, &mut t);
     }
     assert_ne!(
-        w.entities.view::<VehicleComponent>()[&car_id]
+        w.entities.view::<VehicleSnapshot>()[&car_id]
             .state
             .motor
             .position,
@@ -1134,21 +1180,22 @@ fn full_city_population_uses_real_replication_and_ai_seats_cannot_be_taken() {
     );
     w.disconnect(p, &mut a);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car_id]
+        w.entities.view::<VehicleSnapshot>()[&car_id]
             .state
             .driver_id,
         None
     );
     assert_eq!(
-        w.entities.values::<server::components::PoolMembership>()[&car_id],
+        w.entities.values::<server::component::PoolMembership>()[&car_id],
         server::systems::population::VehiclePool::Traffic
     );
     assert!(
         w.entities.view::<TrafficComponent>().len() <= 24
-            && w.entities.view::<PedestrianComponent>().len() <= 32
+            && w.entities.view::<PedestrianSnapshot>().len() <= 32
     );
 }
 
+/// Verifies that populated snapshots preserve budget for a complete resync baseline.
 #[test]
 fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
@@ -1202,9 +1249,10 @@ fn populated_snapshots_preserve_budget_for_a_complete_resync_baseline() {
     assert_eq!(w.sessions.peers[&p].epoch, 2);
 }
 
+/// Builds a scoped weapon fire request for the scenario player.
 fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
     if crate::systems::weapons::state::definition(
-        &w.entities.view::<PlayerComponent>()[&w.sessions.peers[&p].player.unwrap().0].weapon,
+        &w.entities.view::<PlayerSnapshot>()[&w.sessions.peers[&p].player.unwrap().0].weapon,
     )
     .automatic
     {
@@ -1232,8 +1280,7 @@ fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
         request,
         w.sessions.peers[&p].epoch,
         Action::Fire(Fire {
-            weapon_id: w.entities.view::<PlayerComponent>()
-                [&w.sessions.peers[&p].player.unwrap().0]
+            weapon_id: w.entities.view::<PlayerSnapshot>()[&w.sessions.peers[&p].player.unwrap().0]
                 .weapon
                 .equipped,
             aim_yaw: Yaw(yaw),
@@ -1241,6 +1288,7 @@ fn fire(w: &World, t: &mut FakeTransport, p: PeerKey, request: u32, yaw: f32) {
         }),
     );
 }
+/// Verifies that shots hit players and do not damage another guests occupied car.
 #[test]
 fn shots_hit_players_and_do_not_damage_another_guests_occupied_car() {
     let (mut w, mut a, mut t) = setup();
@@ -1251,7 +1299,7 @@ fn shots_hit_players_and_do_not_damage_another_guests_occupied_car() {
     join(&mut w, &mut a, &mut t, q, None);
     ready(&mut w, &mut a, &mut t, q);
     let car = 1;
-    let pos = w.entities.view::<VehicleComponent>()[&car]
+    let pos = w.entities.view::<VehicleSnapshot>()[&car]
         .state
         .motor
         .position
@@ -1260,28 +1308,28 @@ fn shots_hit_players_and_do_not_damage_another_guests_occupied_car() {
     let shooter = w.sessions.peers[&p].player.unwrap().0;
     let other = w.sessions.peers[&q].player.unwrap().0;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&other)
+        .get_mut_by_id::<PlayerSnapshot>(&other)
         .unwrap()
         .lifecycle
         .protected_until = None;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&shooter)
+        .get_mut_by_id::<PlayerSnapshot>(&shooter)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&other)
+        .get_mut_by_id::<PlayerSnapshot>(&other)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([pos[0], 0.02, pos[2] + 5.0], 0.0).unwrap();
     fire(&w, &mut t, p, 1, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other].state.health.0,
+        w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
         75
     );
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.health.0,
+        w.entities.view::<VehicleSnapshot>()[&car].state.health.0,
         100
     );
     at_door(&mut w, q, car);
@@ -1302,15 +1350,16 @@ fn shots_hit_players_and_do_not_damage_another_guests_occupied_car() {
     fire(&w, &mut t, p, 2, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<VehicleComponent>()[&car].state.health.0,
+        w.entities.view::<VehicleSnapshot>()[&car].state.health.0,
         100
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other].state.health.0,
+        w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
         75
     );
 }
 
+/// Verifies that walls block shots and pedestrians incapacitate then leave after ten seconds.
 #[test]
 fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
@@ -1325,28 +1374,25 @@ fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds()
     }
     let ped = *w
         .entities
-        .view::<PedestrianComponent>()
+        .view::<PedestrianSnapshot>()
         .keys()
         .next()
         .unwrap();
     let player = w.sessions.peers[&p].player.unwrap().0;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&player)
+        .get_mut_by_id::<PlayerSnapshot>(&player)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-222.0, 0.02, 115.0], 0.0).unwrap();
     w.entities
-        .get_mut_by_id::<PedestrianComponent>(&ped)
+        .get_mut_by_id::<PedestrianSnapshot>(&ped)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-222.0, 0.02, 65.0], 0.0).unwrap();
     fire(&w, &mut t, p, 1, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PedestrianComponent>()[&ped]
-            .state
-            .health
-            .0,
+        w.entities.view::<PedestrianSnapshot>()[&ped].state.health.0,
         100
     );
     for request in 2..=5 {
@@ -1354,12 +1400,12 @@ fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds()
             step(&mut w, &mut a, &mut t);
         }
         w.entities
-            .get_mut_by_id::<PlayerComponent>(&player)
+            .get_mut_by_id::<PlayerSnapshot>(&player)
             .unwrap()
             .state
             .motor = sim_core::spawn_character([-128.0, 0.02, 120.0], 0.0).unwrap();
         w.entities
-            .get_mut_by_id::<PedestrianComponent>(&ped)
+            .get_mut_by_id::<PedestrianSnapshot>(&ped)
             .unwrap()
             .state
             .motor = sim_core::spawn_character([-128.0, 0.02, 110.0], 0.0).unwrap();
@@ -1367,14 +1413,11 @@ fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds()
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PedestrianComponent>()[&ped]
-            .state
-            .health
-            .0,
+        w.entities.view::<PedestrianSnapshot>()[&ped].state.health.0,
         0
     );
     assert_eq!(
-        w.entities.view::<PedestrianComponent>()[&ped].phase,
+        w.entities.view::<PedestrianSnapshot>()[&ped].phase,
         server::systems::population::PedestrianPhase::Incapacitated
     );
     let downed = w.tick;
@@ -1384,14 +1427,15 @@ fn walls_block_shots_and_pedestrians_incapacitate_then_leave_after_ten_seconds()
         }
         step(&mut w, &mut a, &mut t);
     }
-    assert!(w.entities.view::<PedestrianComponent>().contains_key(&ped));
+    assert!(w.entities.view::<PedestrianSnapshot>().contains_key(&ped));
     assert_eq!(w.tick, downed + 298);
     step(&mut w, &mut a, &mut t);
-    assert!(!w.entities.view::<PedestrianComponent>().contains_key(&ped));
+    assert!(!w.entities.view::<PedestrianSnapshot>().contains_key(&ped));
     assert!(w.entities.entity(EntityId(ped)).is_none());
-    assert!(w.entities.view::<PedestrianComponent>().len() <= 32);
+    assert!(w.entities.view::<PedestrianSnapshot>().len() <= 32);
 }
 
+/// Verifies that static impacts apply once per counterpart per fifteen ticks.
 #[test]
 fn static_impacts_apply_once_per_counterpart_per_fifteen_ticks() {
     let (mut w, mut a, mut t) = setup();
@@ -1399,27 +1443,28 @@ fn static_impacts_apply_once_per_counterpart_per_fifteen_ticks() {
     join(&mut w, &mut a, &mut t, p, None);
     ready(&mut w, &mut a, &mut t, p);
     let crash = |w: &mut World| {
-        let car = w.entities.get_mut_by_id::<VehicleComponent>(&1).unwrap();
+        let car = w.entities.get_mut_by_id::<VehicleSnapshot>(&1).unwrap();
         car.state.motor = sim_core::spawn_vehicle([-222.0, 0.0, 102.1], 0.0).unwrap();
         car.state.motor.speed = Scalar(22.0);
         car.state.motor.velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
     };
     crash(&mut w);
     step(&mut w, &mut a, &mut t);
-    let first = w.entities.view::<VehicleComponent>()[&1].state.health.0;
+    let first = w.entities.view::<VehicleSnapshot>()[&1].state.health.0;
     assert!((50..100).contains(&first));
     for _ in 0..14 {
         crash(&mut w);
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<VehicleComponent>()[&1].state.health.0,
+            w.entities.view::<VehicleSnapshot>()[&1].state.health.0,
             first
         );
     }
     crash(&mut w);
     step(&mut w, &mut a, &mut t);
-    assert!(w.entities.view::<VehicleComponent>()[&1].state.health.0 < first);
+    assert!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0 < first);
 }
+/// Verifies that car contacts damage both cars but never another players occupied car.
 #[test]
 fn car_contacts_damage_both_cars_but_never_another_players_occupied_car() {
     for occupied in [false, true] {
@@ -1447,47 +1492,42 @@ fn car_contacts_damage_both_cars_but_never_another_players_occupied_car() {
             }
         }
         w.entities
-            .get_mut_by_id::<VehicleComponent>(&1)
+            .get_mut_by_id::<VehicleSnapshot>(&1)
             .unwrap()
             .state
             .motor = sim_core::spawn_vehicle([-128.0, 0.0, 130.4], 0.0).unwrap();
         w.entities
-            .get_mut_by_id::<VehicleComponent>(&2)
+            .get_mut_by_id::<VehicleSnapshot>(&2)
             .unwrap()
             .state
             .motor = sim_core::spawn_vehicle([-128.0, 0.0, 126.0], 0.0).unwrap();
         w.entities
-            .get_mut_by_id::<VehicleComponent>(&1)
+            .get_mut_by_id::<VehicleSnapshot>(&1)
             .unwrap()
             .state
             .motor
             .speed = Scalar(22.0);
         w.entities
-            .get_mut_by_id::<VehicleComponent>(&1)
+            .get_mut_by_id::<VehicleSnapshot>(&1)
             .unwrap()
             .state
             .motor
             .velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
         step(&mut w, &mut a, &mut t);
         if occupied {
-            assert_eq!(
-                w.entities.view::<VehicleComponent>()[&1].state.health.0,
-                100
-            );
-            assert_eq!(
-                w.entities.view::<VehicleComponent>()[&2].state.health.0,
-                100
-            );
-            for p in w.entities.view::<PlayerComponent>().values() {
+            assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 100);
+            assert_eq!(w.entities.view::<VehicleSnapshot>()[&2].state.health.0, 100);
+            for p in w.entities.view::<PlayerSnapshot>().values() {
                 assert_eq!(p.state.health.0, 100);
             }
         } else {
-            assert!(w.entities.view::<VehicleComponent>()[&1].state.health.0 < 100);
-            assert!(w.entities.view::<VehicleComponent>()[&2].state.health.0 < 100);
+            assert!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0 < 100);
+            assert!(w.entities.view::<VehicleSnapshot>()[&2].state.health.0 < 100);
         }
     }
 }
 
+/// Verifies that moving vehicle damages pedestrians through the world swept query.
 #[test]
 fn moving_vehicle_damages_pedestrians_through_the_world_swept_query() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
@@ -1502,16 +1542,16 @@ fn moving_vehicle_damages_pedestrians_through_the_world_swept_query() {
     }
     let ped = *w
         .entities
-        .view::<PedestrianComponent>()
+        .view::<PedestrianSnapshot>()
         .keys()
         .next()
         .unwrap();
     w.entities
-        .get_mut_by_id::<PedestrianComponent>(&ped)
+        .get_mut_by_id::<PedestrianSnapshot>(&ped)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-128.0, 0.02, 124.0], 0.0).unwrap();
-    let car = w.entities.get_mut_by_id::<VehicleComponent>(&1).unwrap();
+    let car = w.entities.get_mut_by_id::<VehicleSnapshot>(&1).unwrap();
     car.state.motor = sim_core::spawn_vehicle([-128.0, 0.0, 130.0], 0.0).unwrap();
     car.state.motor.speed = Scalar(22.0);
     car.state.motor.velocity = Vec3([Scalar(0.0), Scalar(0.0), Scalar(-22.0)]);
@@ -1519,14 +1559,11 @@ fn moving_vehicle_damages_pedestrians_through_the_world_swept_query() {
         step(&mut w, &mut a, &mut t);
     }
     assert!(
-        w.entities.view::<PedestrianComponent>()[&ped]
-            .state
-            .health
-            .0
-            < 100,
+        w.entities.view::<PedestrianSnapshot>()[&ped].state.health.0 < 100,
         "physical recovery must not erase the authoritative impact"
     );
 }
+/// Verifies that destroyed car waits for clear parking instead of spawning on a guest.
 #[test]
 fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
     let (mut w, mut a, mut t) = setup();
@@ -1539,7 +1576,7 @@ fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
     let shooter = w.sessions.peers[&p].player.unwrap().0;
     let blocker = w.sessions.peers[&q].player.unwrap().0;
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&shooter)
+        .get_mut_by_id::<PlayerSnapshot>(&shooter)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-152.0, 0.02, 186.0], 0.0).unwrap();
@@ -1550,9 +1587,9 @@ fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
             step(&mut w, &mut a, &mut t);
         }
     }
-    assert!(w.entities.view::<VehicleComponent>()[&1].state.disabled);
+    assert!(w.entities.view::<VehicleSnapshot>()[&1].state.disabled);
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&blocker)
+        .get_mut_by_id::<PlayerSnapshot>(&blocker)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-148.5, 0.02, 176.0], 0.0).unwrap();
@@ -1565,24 +1602,22 @@ fn destroyed_car_waits_for_clear_parking_instead_of_spawning_on_a_guest() {
         t.sent.clear();
     }
     assert!(
-        w.entities.view::<VehicleComponent>()[&1].state.disabled,
+        w.entities.view::<VehicleSnapshot>()[&1].state.disabled,
         "occupied parking must defer respawn"
     );
     w.entities
-        .get_mut_by_id::<PlayerComponent>(&blocker)
+        .get_mut_by_id::<PlayerSnapshot>(&blocker)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([-180.0, 0.02, 180.0], 0.0).unwrap();
     for _ in 0..31 {
         step(&mut w, &mut a, &mut t);
     }
-    assert!(!w.entities.view::<VehicleComponent>()[&1].state.disabled);
-    assert_eq!(
-        w.entities.view::<VehicleComponent>()[&1].state.health.0,
-        100
-    );
+    assert!(!w.entities.view::<VehicleSnapshot>()[&1].state.disabled);
+    assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 100);
 }
 
+/// Creates a populated city scenario with active police units.
 fn police_setup() -> (World, Profiles, FakeTransport) {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
     (
@@ -1591,6 +1626,7 @@ fn police_setup() -> (World, Profiles, FakeTransport) {
         FakeTransport::default(),
     )
 }
+/// Refreshes the session while the scenario advances through multiple ticks.
 fn keep_alive(w: &World, t: &mut FakeTransport, p: PeerKey) {
     batch(w, t, p, w.tick + 1, 0, 0, w.sessions.peers[&p].epoch);
 }
@@ -1603,6 +1639,7 @@ mod durable_profiles;
 #[path = "../scenarios/session_lifecycle.rs"]
 mod session_lifecycle;
 
+/// Verifies that delayed input burst is capped without retiring a healthy session.
 #[test]
 fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {
     let (mut w, mut a, mut t) = setup();
@@ -1626,7 +1663,7 @@ fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {
     for _ in 0..31 {
         step(&mut w, &mut a, &mut t);
     }
-    let before = w.entities.view::<PlayerComponent>()[&player]
+    let before = w.entities.view::<PlayerSnapshot>()[&player]
         .state
         .motor
         .position
@@ -1635,7 +1672,7 @@ fn delayed_input_burst_is_capped_without_retiring_a_healthy_session() {
     batch(&w, &mut t, p, w.tick + 1, 32767, 0, 1);
     step(&mut w, &mut a, &mut t);
     assert!(
-        w.entities.view::<PlayerComponent>()[&player]
+        w.entities.view::<PlayerSnapshot>()[&player]
             .state
             .motor
             .position
@@ -1652,6 +1689,7 @@ mod shirt_colour;
 
 mod chat;
 
+/// Verifies that public admission requires configured origin and issues secure same origin WebSocket.
 #[test]
 fn public_admission_requires_configured_origin_and_issues_secure_same_origin_ws() {
     let (w, _, _) = setup();
@@ -1708,6 +1746,7 @@ fn public_admission_requires_configured_origin_and_issues_secure_same_origin_ws(
     assert_eq!(ticket.body["ws_url"], "wss://game.example.test/ws");
 }
 
+/// Verifies that all weapons damage players and preserve occupied vehicle protection.
 #[test]
 fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
     for definition in weapon_catalogue() {
@@ -1719,7 +1758,7 @@ fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
         join(&mut w, &mut a, &mut t, q, None);
         ready(&mut w, &mut a, &mut t, q);
         let car = 1;
-        let pos = w.entities.view::<VehicleComponent>()[&car]
+        let pos = w.entities.view::<VehicleSnapshot>()[&car]
             .state
             .motor
             .position
@@ -1728,14 +1767,14 @@ fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
         let shooter = w.sessions.peers[&p].player.unwrap().0;
         let other = w.sessions.peers[&q].player.unwrap().0;
         w.entities
-            .get_mut_by_id::<PlayerComponent>(&other)
+            .get_mut_by_id::<PlayerSnapshot>(&other)
             .unwrap()
             .lifecycle
             .protected_until = None;
         {
             let weapon = &mut w
                 .entities
-                .get_mut_by_id::<PlayerComponent>(&shooter)
+                .get_mut_by_id::<PlayerSnapshot>(&shooter)
                 .unwrap()
                 .weapon;
             weapon.slots[definition.id.index()].owned = true;
@@ -1743,30 +1782,27 @@ fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
             weapon.equipped = definition.id;
         }
         w.entities
-            .get_mut_by_id::<PlayerComponent>(&shooter)
+            .get_mut_by_id::<PlayerSnapshot>(&shooter)
             .unwrap()
             .state
             .motor = sim_core::spawn_character([pos[0], 0.02, pos[2] + 10.0], 0.0).unwrap();
         w.entities
-            .get_mut_by_id::<PlayerComponent>(&other)
+            .get_mut_by_id::<PlayerSnapshot>(&other)
             .unwrap()
             .state
             .motor = sim_core::spawn_character([pos[0], 0.02, pos[2] + 5.0], 0.0).unwrap();
         fire(&w, &mut t, p, 1, 0.0);
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&other].state.health.0,
+            w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
             100 - definition.damage
         );
         assert_eq!(
-            w.entities.view::<VehicleComponent>()[&car].state.health.0,
+            w.entities.view::<VehicleSnapshot>()[&car].state.health.0,
             100
         );
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&shooter]
-                .state
-                .health
-                .0,
+            w.entities.view::<PlayerSnapshot>()[&shooter].state.health.0,
             100
         );
         assert!(t.sent.iter().any(|(_, _, envelope)| matches!(
@@ -1775,7 +1811,7 @@ fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
                 if shot.shooter_id.0 == shooter && shot.hit_entity_id == Some(EntityId(other))
         )));
         w.entities
-            .get_mut_by_id::<PlayerComponent>(&shooter)
+            .get_mut_by_id::<PlayerSnapshot>(&shooter)
             .unwrap()
             .weapon
             .trigger = None;
@@ -1797,16 +1833,17 @@ fn all_weapons_damage_players_and_preserve_occupied_vehicle_protection() {
         fire(&w, &mut t, p, 2, 0.0);
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<VehicleComponent>()[&car].state.health.0,
+            w.entities.view::<VehicleSnapshot>()[&car].state.health.0,
             100
         );
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&other].state.health.0,
+            w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
             100 - definition.damage
         );
     }
 }
 
+/// Verifies that equipment actions deduplicate and reject stale weapon or epoch.
 #[test]
 fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     let (mut w, mut a, mut t) = setup();
@@ -1817,7 +1854,7 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     {
         let slot = &mut w
             .entities
-            .get_mut_by_id::<PlayerComponent>(&id)
+            .get_mut_by_id::<PlayerSnapshot>(&id)
             .unwrap()
             .weapon
             .slots[1];
@@ -1837,7 +1874,7 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.equipped,
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.equipped,
         WeaponId::Rifle
     );
     vehicle_action(
@@ -1852,15 +1889,14 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.equipped,
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.equipped,
         WeaponId::Rifle
     );
     fire(&w, &mut t, p, 2, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1897,9 +1933,8 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1909,9 +1944,8 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     fire(&w, &mut t, p, 5, 0.0);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1919,7 +1953,7 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
         19
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id]
             .weapon
             .shot_sequence,
         1
@@ -1938,9 +1972,8 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     );
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1958,9 +1991,8 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     step(&mut w, &mut a, &mut t);
     ready(&mut w, &mut a, &mut t, p);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1968,9 +2000,8 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
         19
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -1978,7 +2009,7 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
         40
     );
     assert_eq!(
-        crate::replication::projection::public_state(&w.entities.view::<PlayerComponent>()[&id])
+        crate::component::snapshots::public_state(&w.entities.view::<PlayerSnapshot>()[&id])
             .equipment
             .unwrap()
             .weapon_id,
@@ -1987,6 +2018,7 @@ fn equipment_actions_deduplicate_and_reject_stale_weapon_or_epoch() {
     assert!(t.sent.iter().any(|(_,_,m)| matches!(&m.message, ServerMessage::PlayerStatus(status) if status.equipped_weapon==WeaponId::Rifle && status.inventory[1].magazine.0==19 && status.inventory[1].reserve==40)));
 }
 
+/// Verifies that automatic fire obeys server cadence lease timeout and release.
 #[test]
 fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
     let (mut w, mut a, mut t) = setup();
@@ -1997,7 +2029,7 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
     {
         let weapon = &mut w
             .entities
-            .get_mut_by_id::<PlayerComponent>(&id)
+            .get_mut_by_id::<PlayerSnapshot>(&id)
             .unwrap()
             .weapon;
         weapon.slots[2].owned = true;
@@ -2009,9 +2041,8 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -2022,9 +2053,8 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -2048,9 +2078,9 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         }),
     );
     step(&mut w, &mut a, &mut t);
-    let ammo = w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
+    let ammo = w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w
         .entities
-        .view::<PlayerComponent>()[&id]
+        .view::<PlayerSnapshot>()[&id]
         .weapon
         .equipped
         .index()]
@@ -2059,9 +2089,8 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&id].weapon.slots[w
-            .entities
-            .view::<PlayerComponent>()[&id]
+        w.entities.view::<PlayerSnapshot>()[&id].weapon.slots[w.entities.view::<PlayerSnapshot>()
+            [&id]
             .weapon
             .equipped
             .index()]
@@ -2070,11 +2099,13 @@ fn automatic_fire_obeys_server_cadence_lease_timeout_and_release() {
     );
 }
 
+/// Verifies that weapon presentation load 16 players.
 #[test]
 #[ignore = "measured synthetic 16-player weapon load; run in release with --nocapture"]
 fn weapon_presentation_load_16_players() {
     let trace_path = std::env::var("PM_ECS_TRACE").ok();
     let mut records = Vec::<serde_json::Value>::new();
+    /// Removes nonessential actors so the scenario can isolate shot geometry.
     fn scrub(value: &mut serde_json::Value) {
         match value {
             serde_json::Value::Object(fields) => {
@@ -2113,7 +2144,7 @@ fn weapon_presentation_load_16_players() {
         join(&mut w, &mut a, &mut t, p, None);
         ready(&mut w, &mut a, &mut t, p);
         let id = w.sessions.peers[&p].player.unwrap().0;
-        let player = w.entities.get_mut_by_id::<PlayerComponent>(&id).unwrap();
+        let player = w.entities.get_mut_by_id::<PlayerSnapshot>(&id).unwrap();
         player.state.motor.position = Vec3([
             Scalar(-184.0 + (p.id % 4) as f32 * 2.0),
             Scalar(0.0),
@@ -2129,7 +2160,7 @@ fn weapon_presentation_load_16_players() {
     let mut shots = BTreeSet::new();
     for frame in 0..90 {
         // Test-only replenishment sustains the advertised peak, excluding reload downtime.
-        for player in w.entities.values_mut::<PlayerComponent>() {
+        for player in w.entities.values_mut::<PlayerSnapshot>() {
             player.weapon.slots[2].magazine = 50;
         }
         if frame % 3 == 0 {
@@ -2185,6 +2216,7 @@ fn weapon_presentation_load_16_players() {
     );
 }
 
+/// Verifies that player shots respect vehicle cover and skip dead or downed targets.
 #[test]
 fn player_shots_respect_vehicle_cover_and_skip_dead_or_downed_targets() {
     for (health, mode, behind_car) in [
@@ -2200,7 +2232,7 @@ fn player_shots_respect_vehicle_cover_and_skip_dead_or_downed_targets() {
         ready(&mut w, &mut a, &mut t, p);
         join(&mut w, &mut a, &mut t, q, None);
         ready(&mut w, &mut a, &mut t, q);
-        let pos = w.entities.view::<VehicleComponent>()[&1]
+        let pos = w.entities.view::<VehicleSnapshot>()[&1]
             .state
             .motor
             .position
@@ -2214,7 +2246,7 @@ fn player_shots_respect_vehicle_cover_and_skip_dead_or_downed_targets() {
             q,
             [pos[0], 0.02, pos[2] + if behind_car { -5.0 } else { 5.0 }],
         );
-        let target = w.entities.get_mut_by_id::<PlayerComponent>(&other).unwrap();
+        let target = w.entities.get_mut_by_id::<PlayerSnapshot>(&other).unwrap();
         target.lifecycle.protected_until = None;
         target.state.health = CharacterHealth(health);
         target.state.mode = mode;
@@ -2222,23 +2254,21 @@ fn player_shots_respect_vehicle_cover_and_skip_dead_or_downed_targets() {
         step(&mut w, &mut a, &mut t);
         let eligible = !behind_car && health > 0 && mode == CharacterMode::OnFoot;
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&other].state.health.0,
+            w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
             if eligible { 0 } else { health }
         );
         assert_eq!(
-            w.entities.view::<VehicleComponent>()[&1].state.health.0,
+            w.entities.view::<VehicleSnapshot>()[&1].state.health.0,
             if eligible { 100 } else { 75 }
         );
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&shooter]
-                .state
-                .health
-                .0,
+            w.entities.view::<PlayerSnapshot>()[&shooter].state.health.0,
             100
         );
     }
 }
 
+/// Verifies that walls block player shots.
 #[test]
 fn walls_block_player_shots() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content");
@@ -2268,7 +2298,7 @@ fn walls_block_player_shots() {
     step(&mut w, &mut a, &mut t);
     let other = w.sessions.peers[&q].player_id();
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other].state.health.0,
+        w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
         100
     );
     assert!(
@@ -2280,6 +2310,7 @@ fn walls_block_player_shots() {
     );
 }
 
+/// Verifies that pvp death cancels control and respawns with full loadout and protection.
 #[test]
 fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     let (mut w, mut a, mut t) = setup();
@@ -2290,7 +2321,7 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     join(&mut w, &mut a, &mut t, q, None);
     ready(&mut w, &mut a, &mut t, q);
     let other = w.sessions.peers[&q].player_id();
-    let pos = w.entities.view::<VehicleComponent>()[&1]
+    let pos = w.entities.view::<VehicleSnapshot>()[&1]
         .state
         .motor
         .position
@@ -2299,14 +2330,14 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     place(&mut w, p, [pos[0], 0.02, pos[2] + 10.0]);
     place(&mut w, q, [pos[0], 0.02, pos[2] + 5.0]);
     let epoch = w.sessions.peers[&q].epoch;
-    let target = w.entities.get_mut_by_id::<PlayerComponent>(&other).unwrap();
+    let target = w.entities.get_mut_by_id::<PlayerSnapshot>(&other).unwrap();
     target.lifecycle.protected_until = None;
     target.state.health = CharacterHealth(10);
     target.weapon.reload_end = Some(u32::MAX);
     target.weapon.equip_end = Some(u32::MAX);
     fire(&w, &mut t, p, 1, 0.0);
     step(&mut w, &mut a, &mut t);
-    let target = &w.entities.view::<PlayerComponent>()[&other];
+    let target = &w.entities.view::<PlayerSnapshot>()[&other];
     assert_eq!(target.state.mode, CharacterMode::Downed);
     assert_eq!(target.state.health.0, 0);
     assert!(target.weapon.reload_end.is_none());
@@ -2329,20 +2360,20 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
         step(&mut w, &mut a, &mut t);
     }
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other]
+        w.entities.view::<PlayerSnapshot>()[&other]
             .state
             .motor
             .position,
         position
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other]
+        w.entities.view::<PlayerSnapshot>()[&other]
             .lifecycle
             .respawn,
         Some(until)
     );
     step(&mut w, &mut a, &mut t);
-    let target = &w.entities.view::<PlayerComponent>()[&other];
+    let target = &w.entities.view::<PlayerSnapshot>()[&other];
     assert_eq!(target.state.mode, CharacterMode::OnFoot);
     assert_eq!(target.state.health.0, 100);
     assert_eq!(target.lifecycle.protected_until, Some(w.tick + 90));
@@ -2365,7 +2396,7 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     );
 
     // Stale pre-death input cannot move the newly respawned character.
-    let position = w.entities.view::<PlayerComponent>()[&other]
+    let position = w.entities.view::<PlayerSnapshot>()[&other]
         .state
         .motor
         .position
@@ -2373,7 +2404,7 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     batch(&w, &mut t, q, w.tick + 1, 32767, 32767, epoch);
     step(&mut w, &mut a, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other]
+        w.entities.view::<PlayerSnapshot>()[&other]
             .state
             .motor
             .position
@@ -2381,7 +2412,7 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
         position.0[0]
     );
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&other]
+        w.entities.view::<PlayerSnapshot>()[&other]
             .state
             .motor
             .position
@@ -2390,6 +2421,7 @@ fn pvp_death_cancels_control_and_respawns_with_full_loadout_and_protection() {
     );
 }
 
+/// Verifies that spawn protection blocks shots until expiry or firing.
 #[test]
 fn spawn_protection_blocks_shots_until_expiry_or_firing() {
     for ends_by_firing in [false, true] {
@@ -2401,7 +2433,7 @@ fn spawn_protection_blocks_shots_until_expiry_or_firing() {
         join(&mut w, &mut a, &mut t, q, None);
         ready(&mut w, &mut a, &mut t, q);
         let other = w.sessions.peers[&q].player_id();
-        let pos = w.entities.view::<VehicleComponent>()[&1]
+        let pos = w.entities.view::<VehicleSnapshot>()[&1]
             .state
             .motor
             .position
@@ -2409,20 +2441,17 @@ fn spawn_protection_blocks_shots_until_expiry_or_firing() {
             .map(|v| v.0);
         place(&mut w, p, [pos[0], 0.02, pos[2] + 10.0]);
         place(&mut w, q, [pos[0], 0.02, pos[2] + 5.0]);
-        let expiry = w.entities.view::<PlayerComponent>()[&other]
+        let expiry = w.entities.view::<PlayerSnapshot>()[&other]
             .lifecycle
             .protected_until
             .unwrap();
         fire(&w, &mut t, p, 1, 0.0);
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&other].state.health.0,
+            w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
             100
         );
-        assert_eq!(
-            w.entities.view::<VehicleComponent>()[&1].state.health.0,
-            100
-        );
+        assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 100);
         if ends_by_firing {
             fire(&w, &mut t, q, 1, std::f32::consts::FRAC_PI_2);
             step(&mut w, &mut a, &mut t);
@@ -2433,7 +2462,7 @@ fn spawn_protection_blocks_shots_until_expiry_or_firing() {
             }
         }
         assert!(
-            w.entities.view::<PlayerComponent>()[&other]
+            w.entities.view::<PlayerSnapshot>()[&other]
                 .lifecycle
                 .protected_until
                 .is_none()
@@ -2444,16 +2473,14 @@ fn spawn_protection_blocks_shots_until_expiry_or_firing() {
         fire(&w, &mut t, p, 2, 0.0);
         step(&mut w, &mut a, &mut t);
         assert_eq!(
-            w.entities.view::<PlayerComponent>()[&other].state.health.0,
+            w.entities.view::<PlayerSnapshot>()[&other].state.health.0,
             75
         );
-        assert_eq!(
-            w.entities.view::<VehicleComponent>()[&1].state.health.0,
-            100
-        );
+        assert_eq!(w.entities.view::<VehicleSnapshot>()[&1].state.health.0, 100);
     }
 }
 
+/// Verifies that player map includes distant online players and removes disconnected players.
 #[test]
 fn player_map_includes_distant_online_players_and_removes_disconnected_players() {
     let (mut w, mut a, mut t) = setup();
@@ -2466,7 +2493,7 @@ fn player_map_includes_distant_online_players_and_removes_disconnected_players()
     let other = w.sessions.peers[&q].player_id();
     place(&mut w, q, [300.0, 0.02, 300.0]);
     w.entities
-        .get_mut::<PlayerComponent>(EntityId(other))
+        .get_mut::<PlayerSnapshot>(EntityId(other))
         .unwrap()
         .display_name = DisplayName("Distant player".into());
     send(

@@ -2,7 +2,7 @@
 use super::*;
 use crate::{admission::Profiles, replication::Replication};
 use crate::{
-    components::{PlayerMission, RecoveryReservation, SecuredVehicle},
+    component::{PlayerMission, RecoveryReservation, SecuredVehicle},
     ecs::state::{Clock, Collision, WorldIdentity},
     ecs::{EntityIndex, GameId},
     gameplay_messages::{ControlTransitionRequested, CrimeReported},
@@ -13,48 +13,67 @@ use crate::{
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Requests a player transition into or out of a vehicle.
 #[derive(Message, Clone)]
 pub(crate) struct PossessionRequested {
+    /// Connection incarnation associated with this item.
     pub peer: PeerKey,
+    /// Client action request to validate and execute.
     pub request: ActionRequest,
+    /// ECS identity captured to reject stale actor operations.
     pub entity: Option<Entity>,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Carries the cached action result of a possession request.
 #[derive(Message, Clone)]
 pub(crate) struct PossessionResult {
+    /// Connection incarnation associated with this item.
     peer: PeerKey,
+    /// Result returned to the requesting caller.
     result: ActionResult,
+    /// Simulation tick recorded for this item.
     tick: u32,
 }
+/// Borrows actors and collision state needed to change vehicle control.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct PossessionActors<'w, 's> {
+    /// Queries players used by this system.
     players: Query<
         'w,
         's,
         (
             &'static GameId,
-            &'static mut Player,
+            crate::component::queries::PlayerQuery,
             &'static WantedComponent,
         ),
+        crate::component::queries::PlayerFilter,
     >,
+    /// Queries vehicles used by this system.
     cars: Query<
         'w,
         's,
         (
             &'static GameId,
-            &'static mut VehicleComponent,
+            crate::component::queries::VehicleQuery,
             Option<&'static PoliceUnitComponent>,
             Option<&'static Traffic>,
             Option<&'static RecoveryReservation>,
             Option<&'static SecuredVehicle>,
         ),
+        crate::component::queries::VehicleFilter,
     >,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSendMut<'w, Collision>,
+    /// Writer for control-change publication requests.
     controls: MessageWriter<'w, ControlTransitionRequested>,
+    /// Writer for captured crime reports.
     crimes: MessageWriter<'w, CrimeReported>,
 }
 impl PossessionActors<'_, '_> {
+    /// Validates and applies a vehicle possession action.
     fn apply(
         &mut self,
         peer: PeerKey,
@@ -115,7 +134,7 @@ impl PossessionActors<'_, '_> {
                     return ActionCode::TooFast;
                 }
                 let feet = p.state.motor.position.0.map(|v| v.0);
-                let entry = crate::systems::vehicle::entry(car);
+                let entry = crate::systems::vehicle::entry(&car);
                 if feet
                     .iter()
                     .zip(entry)
@@ -179,7 +198,7 @@ impl PossessionActors<'_, '_> {
                 s.status_dirty = true;
                 p.state.mode = CharacterMode::Driving;
                 p.state.vehicle_id = Some(car_id);
-                p.state.motor = motor;
+                p.state.motor.0 = motor;
             }
             Action::ExitVehicle(_) => {
                 let Some(id) = p.state.vehicle_id else {
@@ -199,7 +218,7 @@ impl PossessionActors<'_, '_> {
                     return ActionCode::TooFast;
                 }
                 self.collision.0.exclude_vehicle(Some(id.0));
-                let exit = crate::systems::vehicle::safe_exit(car, &self.collision.0);
+                let exit = crate::systems::vehicle::safe_exit(&car, &self.collision.0);
                 self.collision.0.exclude_vehicle(None);
                 let Some(exit) = exit else {
                     return ActionCode::ExitBlocked;
@@ -211,7 +230,7 @@ impl PossessionActors<'_, '_> {
                 let (_, mut p, _) = self.players.get_mut(entity).unwrap();
                 p.state.mode = CharacterMode::OnFoot;
                 p.state.vehicle_id = None;
-                p.state.motor = sim_core::spawn_character(exit, yaw).expect("validated exit");
+                p.state.motor.0 = sim_core::spawn_character(exit, yaw).expect("validated exit");
             }
             _ => return ActionCode::Unavailable,
         }
@@ -225,6 +244,7 @@ impl PossessionActors<'_, '_> {
         ActionCode::Ok
     }
 }
+/// Processes possession requests against current player and vehicle identities.
 pub(crate) fn possess(
     mut requests: MessageReader<PossessionRequested>,
     mut actors: PossessionActors,
@@ -292,6 +312,7 @@ pub(crate) fn possess(
         });
     }
 }
+/// Sends possession action results to their requesting peers.
 pub(crate) fn reply_possession(
     mut messages: MessageReader<PossessionResult>,
     mut sessions: ResMut<Sessions>,
@@ -316,6 +337,7 @@ pub(crate) fn reply_possession(
         );
     }
 }
+/// Clears possession messages after their consumers finish.
 pub(crate) fn retire_possession(
     mut requests: ResMut<Messages<PossessionRequested>>,
     mut replies: ResMut<Messages<PossessionResult>>,
@@ -324,26 +346,42 @@ pub(crate) fn retire_possession(
     replies.clear();
 }
 
+/// Borrows actors and commands needed to create or retire players.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct LifecycleActors<'w, 's> {
-    players: Query<'w, 's, (Entity, &'static GameId, &'static mut Player)>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::PlayerQuery,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries vehicles used by this system.
     cars: Query<
         'w,
         's,
         (
             Entity,
             &'static GameId,
-            &'static mut VehicleComponent,
+            crate::component::queries::VehicleQuery,
             Option<&'static RecoveryReservation>,
         ),
+        crate::component::queries::VehicleFilter,
     >,
+    /// Queries police units used by this system.
     units: Query<'w, 's, &'static mut PoliceUnitComponent>,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
+/// Releases player-owned state before removing the actor.
 pub(crate) fn remove_player(id: EntityId, actors: &mut LifecycleActors) {
     for (entity, car_id, mut car, reservation) in &mut actors.cars {
         if reservation.is_some_and(|r| r.0.owner == id.0) {
-            crate::systems::planning::despawn(&mut actors.commands, car_id.0.0, entity);
+            crate::component::spawn::despawn(&mut actors.commands, car_id.0.0, entity);
         } else if car.state.driver_id == Some(id) {
             car.state.driver_id = None;
             crate::systems::vehicle::stop(&mut car);
@@ -353,9 +391,10 @@ pub(crate) fn remove_player(id: EntityId, actors: &mut LifecycleActors) {
         crate::systems::police::state::release_target(&mut unit);
     }
     if let Some((entity, _, _)) = actors.players.iter().find(|(_, actual, _)| actual.0 == id) {
-        crate::systems::planning::despawn(&mut actors.commands, id.0, entity);
+        crate::component::spawn::despawn(&mut actors.commands, id.0, entity);
     }
 }
+/// Spawns an admitted player's components and assigns its session identity.
 pub(crate) fn create_player(
     profile: &ProfileView,
     content: &crate::content_loader::WorldContent,
@@ -373,11 +412,11 @@ pub(crate) fn create_player(
     let position = spawn_position(content, slot).map_err(|_| "spawn unavailable")?;
     let motor = sim_core::spawn_character(position, content.manifest.spawns[0].yaw as f32)
         .map_err(|_| "spawn unavailable")?;
-    crate::systems::planning::spawn(
+    crate::component::spawn::spawn(
         &mut actors.commands,
         id.0,
         (
-            Player {
+            PlayerSnapshot {
                 tshirt_colour: profile.tshirt_colour,
                 weapon: crate::systems::weapons::state::loadout(),
                 lifecycle: Default::default(),
@@ -391,15 +430,17 @@ pub(crate) fn create_player(
                     mode: CharacterMode::OnFoot,
                     vehicle_id: None,
                 },
-            },
+            }
+            .into_bundle(),
             crate::systems::police::state::clear_wanted(),
             PlayerMission(None),
-            crate::components::ChatParticipant::default(),
+            crate::component::ChatParticipant::default(),
         ),
     );
     Ok(id)
 }
 
+/// Starts spawn protection when the current player first becomes ready.
 pub(crate) fn protect_on_ready(
     id: EntityId,
     tick: u32,
@@ -415,6 +456,7 @@ pub(crate) fn protect_on_ready(
     p.lifecycle.protected_until = Some(tick.saturating_add(90));
     Ok(())
 }
+/// Stops movement and clears stale control intent during resynchronisation.
 pub(crate) fn freeze_on_resync(
     id: EntityId,
     actors: &mut LifecycleActors,
@@ -440,6 +482,7 @@ pub(crate) fn freeze_on_resync(
     }
     Ok(())
 }
+/// Copies committed profile appearance to the current player actor.
 pub(crate) fn apply_appearance(
     sessions: &mut Sessions,
     profiles: &Profiles,
@@ -473,13 +516,24 @@ pub(crate) fn apply_appearance(
 /// replacement connection. Tick scoping also prevents failed-tick replay.
 #[derive(Message, Clone)]
 pub(crate) struct DisconnectRequested {
+    /// Connection incarnation associated with this item.
     pub peer: PeerKey,
+    /// Reason recorded for this disconnect.
     pub reason: &'static str,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
 }
+/// Notifies departure subscribers before retiring a disconnected player.
 pub(crate) fn disconnect_requested(
     mut requests: MessageReader<DisconnectRequested>,
-    players: Query<(Entity, &GameId, &Player)>,
+    players: Query<
+        (
+            Entity,
+            &GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
     mut sessions: ResMut<Sessions>,
     mut io: NonSendMut<crate::ecs::runtime::TickIo>,
     mut leaving: MessageWriter<crate::gameplay_messages::PlayerLeaving>,
@@ -522,14 +576,17 @@ pub(crate) fn finish_leaving(
         remove_player(message.player, &mut actors);
     }
 }
+/// Clears departure messages after actor cleanup.
 pub(crate) fn retire_leaving(
     mut messages: ResMut<Messages<crate::gameplay_messages::PlayerLeaving>>,
 ) {
     messages.clear();
 }
+/// Clears processed disconnect requests.
 pub(crate) fn retire_disconnects(mut requests: ResMut<Messages<DisconnectRequested>>) {
     requests.clear();
 }
+/// Disconnects peers whose authoritative movement step failed.
 pub(crate) fn failed_motors(
     mut scratch: ResMut<crate::ecs::runtime::Scratch>,
     mut outcome: ResMut<crate::ecs::TickOutcome>,

@@ -1,7 +1,7 @@
 //! Gameplay systems own rule-specific bookkeeping, separately from world entities.
 pub(crate) mod planning;
 #[cfg(test)]
-use crate::components::Vehicle as VehicleComponent;
+use crate::component::VehicleSnapshot;
 #[cfg(test)]
 use std::result::Result;
 pub mod chat;
@@ -32,16 +32,24 @@ use repairs::RepairSystem;
 /// Owned resource bundle used only by scenario fixtures.
 #[cfg(test)]
 pub struct Systems {
+    /// Chat history and message allocation state.
     pub chat: chat::ChatSystem,
+    /// Movement system state used by the fixture.
     pub movement: MovementSystem,
+    /// Combat event allocation state.
     pub combat: CombatSystem,
+    /// Mission state available to this operation.
     pub missions: MissionSystem,
+    /// Police response system state.
     pub police: PoliceSystem,
+    /// Ambient population system state.
     pub population: PopulationSystem,
+    /// Pending repair transaction state.
     pub repairs: RepairSystem,
 }
 #[cfg(test)]
 impl Systems {
+    /// Initialises fixture gameplay systems from the world content and parked vehicles.
     pub fn new(
         world: &mut World,
         sessions: &mut crate::sessions::Sessions,
@@ -51,7 +59,7 @@ impl Systems {
             &world.content.config,
             world
                 .entities
-                .view::<VehicleComponent>()
+                .view::<VehicleSnapshot>()
                 .keys()
                 .copied()
                 .collect::<Vec<_>>()
@@ -62,14 +70,14 @@ impl Systems {
         let police = PoliceSystem::new(&world.content.manifest);
         for id in world
             .entities
-            .view::<VehicleComponent>()
+            .view::<VehicleSnapshot>()
             .keys()
             .copied()
             .collect::<Vec<_>>()
         {
             let car = world
                 .entities
-                .view::<VehicleComponent>()
+                .view::<VehicleSnapshot>()
                 .get(&id)
                 .expect("parked vehicle");
             if world.content.manifest.parking.iter().any(|slot| {
@@ -79,7 +87,7 @@ impl Systems {
                         car.state.motor.position.0.map(|v| v.0),
                     ) < 0.1
             }) {
-                world.entities.insert(id, crate::components::SecuredVehicle);
+                world.entities.insert(id, crate::component::SecuredVehicle);
             }
         }
         let mut systems = Self {

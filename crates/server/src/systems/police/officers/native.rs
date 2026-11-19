@@ -3,21 +3,57 @@ use super::*;
 use crate::{
     ecs::state::{Clock, Collision, EntityAllocator, SimulationConfig},
     ecs::{EntityIndex, GameId},
-    systems::{
-        planning::Pending,
-        weapons::{OfficerShotRequested, OfficerWeaponTick},
-    },
+    systems::weapons::{OfficerShotRequested, OfficerWeaponTick},
 };
 use bevy_ecs::prelude::*;
+/// Borrows actors and commands needed to deploy officers from patrol vehicles.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DeployActors<'w, 's> {
+    /// Queries police units used by this system.
     units: Query<'w, 's, (&'static GameId, &'static Unit)>,
-    cars: Query<'w, 's, (&'static GameId, &'static VehicleComponent)>,
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent, &'static Wanted)>,
-    peds: Query<'w, 's, &'static PedestrianComponent>,
-    officers: Query<'w, 's, (Entity, &'static GameId, &'static mut Officer)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+            &'static Wanted,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static GameId,
+            crate::component::queries::OfficerQuery,
+        ),
+        crate::component::queries::OfficerFilter,
+    >,
+    /// Deferred ECS commands for actor lifecycle changes.
     commands: Commands<'w, 's>,
 }
+/// Deploys officers near suspects when safe vehicle exits are available.
 pub(crate) fn deploy(
     mut actors: DeployActors,
     sessions: Res<Sessions>,
@@ -46,7 +82,7 @@ pub(crate) fn deploy(
     let mut officers: BTreeMap<_, _> = actors
         .officers
         .iter_mut()
-        .map(|(_, id, o)| (id.0.0, Pending::Live(o.into_inner())))
+        .map(|(_, id, o)| (id.0.0, o.to_snapshot()))
         .collect();
     let mut removed = Vec::new();
     let active_units: BTreeSet<_> = units.keys().copied().collect();
@@ -69,7 +105,7 @@ pub(crate) fn deploy(
         .map(|(&id, u)| (id, u.target, u.role))
         .collect();
     for (id, unit_target, unit_role) in deploying_units {
-        let car = cars[&id].clone();
+        let car = cars[&id].to_snapshot();
         let Some(target) = unit_target.filter(|target| playing.contains(target)) else {
             continue;
         };
@@ -165,7 +201,7 @@ pub(crate) fn deploy(
                 u16::from(crate::systems::weapons::state::definition(&weapon).capacity) * 2;
             officers.insert(
                 id_new,
-                Pending::Spawn(Officer {
+                OfficerSnapshot {
                     unit: id,
                     mounted: false,
                     state: CharacterState {
@@ -182,29 +218,59 @@ pub(crate) fn deploy(
                     route: VecDeque::new(),
                     route_goal: None,
                     next_plan: 0,
-                }),
+                },
             );
         }
     }
 
     for id in removed {
-        crate::systems::planning::despawn(&mut actors.commands, id, identities[&id]);
+        crate::component::spawn::despawn(&mut actors.commands, id, identities[&id]);
     }
     for (id, officer) in officers {
-        if let Pending::Spawn(officer) = officer {
-            crate::systems::planning::spawn(&mut actors.commands, id, officer);
+        if let Some(&entity) = identities.get(&id) {
+            actors.officers.get_mut(entity).unwrap().2.apply(officer);
+        } else {
+            crate::component::spawn::spawn(&mut actors.commands, id, officer.into_bundle());
         }
     }
 }
 
+/// Borrows actors needed to choose officer movement and engagement actions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct DecisionActors<'w, 's> {
+    /// Queries police units used by this system.
     units: Query<'w, 's, (&'static GameId, &'static Unit)>,
-    cars: Query<'w, 's, (&'static GameId, &'static VehicleComponent)>,
-    players: Query<'w, 's, (&'static GameId, &'static PlayerComponent)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pursuit state used by this system.
     wanted: Query<'w, 's, (&'static GameId, &'static mut Wanted)>,
-    officers: Query<'w, 's, (&'static GameId, &'static mut Officer)>,
+    /// Queries police officers used by this system.
+    officers: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::OfficerQuery),
+        crate::component::queries::OfficerFilter,
+    >,
 }
+/// Chooses officer movement, cover, aiming, and proposed shots against current suspects.
 pub(crate) fn decide(
     mut actors: DecisionActors,
     police: Res<PoliceSystem>,
@@ -234,7 +300,7 @@ pub(crate) fn decide(
     let mut officers: BTreeMap<_, _> = actors
         .officers
         .iter_mut()
-        .map(|(id, o)| (id.0.0, o.into_inner()))
+        .map(|(id, o)| (id.0.0, o))
         .collect();
     let mut shots = Vec::new();
     let mut firing = BTreeSet::new();
@@ -247,8 +313,11 @@ pub(crate) fn decide(
     // These actors are read-only throughout officer decisions. Snapshot their
     // observation state before borrowing officer components for mutation.
     struct TargetView {
+        /// Authoritative simulation state for this actor.
         state: CharacterState,
+        /// Whether the actor is aiming its weapon.
         aiming: bool,
+        /// Tick when temporary spawn protection expires.
         protected_until: Option<u32>,
     }
     let players: BTreeMap<_, _> = players_view
@@ -257,7 +326,7 @@ pub(crate) fn decide(
             (
                 id,
                 TargetView {
-                    state: p.state.clone(),
+                    state: p.state.to_protocol(),
                     aiming: p.weapon.aiming,
                     protected_until: p.lifecycle.protected_until,
                 },
@@ -266,7 +335,7 @@ pub(crate) fn decide(
         .collect();
     let vehicles: BTreeMap<_, _> = cars_view
         .iter()
-        .map(|(&id, v)| (id, (*v).clone()))
+        .map(|(&id, v)| (id, v.to_snapshot()))
         .collect();
     let unit_targets: BTreeMap<_, _> = units_view.iter().map(|(&id, u)| (id, u.target)).collect();
     let wanted_observations: BTreeMap<_, _> = wanted_view
@@ -281,7 +350,7 @@ pub(crate) fn decide(
         let officer = officers.get_mut(&id).expect("officer roster");
 
         if officer.mounted && vehicles[&officer.unit].state.health.0 == 0 {
-            officer.state.health = CharacterHealth(0);
+            officer.state.health.0 = 0;
         }
         if officer.mounted || officer.state.health.0 == 0 {
             continue;
@@ -515,7 +584,7 @@ pub(crate) fn decide(
                     || distance(next, point) >= 0.9
                     || distance(next, point) >= distance(p, point)
             }) {
-                officer.state.motor = result.motor;
+                officer.state.motor.0 = result.motor;
                 occupied_positions.insert(id, next);
             } else {
                 officer.state.motor.velocity = Vec3([Scalar(0.0); 3]);

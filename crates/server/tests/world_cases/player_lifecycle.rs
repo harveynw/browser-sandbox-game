@@ -1,12 +1,15 @@
 use super::*;
+#[cfg(test)]
+use crate::component::tests::ActorWorldExt as _;
 use crate::{
-    components::{GameId, Player},
+    component::GameId,
     ecs::{checkpoints, runtime::TickIo, state::Clock},
     gameplay_messages::{PlayerBecameReady, PlayerLeaving},
     sessions::native::{DisconnectRequested, finish_leaving},
 };
 use bevy_ecs::prelude::*;
 
+/// Builds a live ECS host for lifecycle subscriber tests.
 fn host(ready_players: bool) -> (bevy_ecs::world::World, [PeerKey; 2]) {
     let (mut w, mut profiles, mut transport) = setup();
     let peers = [peer(0), peer(1)];
@@ -34,11 +37,16 @@ fn host(ready_players: bool) -> (bevy_ecs::world::World, [PeerKey; 2]) {
     (host, peers)
 }
 
+/// Records player state observed by departure subscribers before actor removal.
 #[derive(Resource, Default)]
-struct Departures(Vec<EntityId>);
+struct Departures(
+    /// Player IDs observed before their actors were removed.
+    Vec<EntityId>,
+);
+/// Records departing player state while its actor still exists.
 fn inspect_before_despawn(
     mut messages: MessageReader<PlayerLeaving>,
-    players: Query<&GameId, With<Player>>,
+    players: Query<&GameId, With<crate::component::PlayerData>>,
     sessions: Res<Sessions>,
     mut departures: ResMut<Departures>,
 ) {
@@ -53,6 +61,7 @@ fn inspect_before_despawn(
     }
 }
 
+/// Verifies that departure subscribers run before despawn and duplicate requests do not replay.
 #[test]
 fn departure_subscribers_run_before_despawn_and_duplicate_requests_do_not_replay() {
     let (mut host, [p, q]) = host(true);
@@ -76,7 +85,10 @@ fn departure_subscribers_run_before_despawn_and_duplicate_requests_do_not_replay
     }
     schedule.run(&mut host);
     assert_eq!(host.resource::<Departures>().0, [id]);
-    assert!(host.get::<Player>(entity).is_none());
+    assert!(
+        host.actor::<crate::component::queries::PlayerQueryReadOnly>(entity)
+            .is_none()
+    );
     assert!(
         !host
             .resource::<crate::ecs::EntityIndex>()
@@ -94,6 +106,7 @@ fn departure_subscribers_run_before_despawn_and_duplicate_requests_do_not_replay
     assert_eq!(departures(&host), 1);
 }
 
+/// Verifies that readiness subscriber rejects stale identity and resync and retires messages.
 #[test]
 fn readiness_subscriber_rejects_stale_identity_and_resync_and_retires_messages() {
     let (mut host, [p, _]) = host(false);

@@ -1,33 +1,43 @@
 //! Native repair validation and durable transaction progression.
 use super::*;
 use crate::{
-    components::PlayerMission,
+    component::PlayerMission,
     ecs::state::{Clock, Content},
     ecs::{GameId, TickOutcome},
 };
 use bevy_ecs::prelude::*;
 use std::result::Result;
+/// Borrows players and vehicles needed to validate and apply repairs.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RepairActors<'w, 's> {
+    /// Queries players used by this system.
     players: Query<
         'w,
         's,
         (
             &'static GameId,
-            &'static PlayerComponent,
+            crate::component::queries::PlayerQueryReadOnly,
             &'static WantedComponent,
             &'static PlayerMission,
         ),
+        crate::component::queries::PlayerFilter,
     >,
-    cars: Query<'w, 's, (&'static GameId, &'static mut VehicleComponent)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::VehicleQuery),
+        crate::component::queries::VehicleFilter,
+    >,
 }
+/// Checks the player, vehicle, zone, and pursuit conditions required for repair.
 fn eligible(
     s: &Session,
     car: u32,
     zone: &str,
     epoch: u32,
-    players: &BTreeMap<u32, &PlayerComponent>,
-    cars: &BTreeMap<u32, &mut VehicleComponent>,
+    players: &BTreeMap<u32, crate::component::queries::PlayerQueryReadOnlyItem<'_, '_>>,
+    cars: &BTreeMap<u32, crate::component::queries::VehicleQueryItem<'_, '_>>,
     wanted: &BTreeMap<u32, &WantedComponent>,
     manifest: &content::WorldManifest,
 ) -> bool {
@@ -69,6 +79,7 @@ fn eligible(
                 ) <= z.radius as f32
         })
 }
+/// Starts an eligible repair or returns the reason it cannot begin.
 pub(crate) fn request(
     repairs: &mut RepairSystem,
     s: &mut Session,
@@ -88,11 +99,7 @@ pub(crate) fn request(
         .iter()
         .map(|(id, _, w, _)| (id.0.0, w))
         .collect();
-    let cars: BTreeMap<_, _> = actors
-        .cars
-        .iter_mut()
-        .map(|(id, c)| (id.0.0, c.into_inner()))
-        .collect();
+    let cars: BTreeMap<_, _> = actors.cars.iter_mut().map(|(id, c)| (id.0.0, c)).collect();
     let missions: BTreeMap<_, _> = actors
         .players
         .iter()
@@ -188,6 +195,7 @@ pub(crate) fn request(
     repairs.pending.insert(profile, pending);
     ActionCode::Ok
 }
+/// Advances repairs using current eligibility and committed payment results.
 pub(crate) fn update_actors(
     repairs: &mut RepairSystem,
     profiles: &mut Profiles,
@@ -206,11 +214,7 @@ pub(crate) fn update_actors(
         .iter()
         .map(|(id, _, w, _)| (id.0.0, w))
         .collect();
-    let mut cars: BTreeMap<_, _> = actors
-        .cars
-        .iter_mut()
-        .map(|(id, c)| (id.0.0, c.into_inner()))
-        .collect();
+    let mut cars: BTreeMap<_, _> = actors.cars.iter_mut().map(|(id, c)| (id.0.0, c)).collect();
 
     let mut results = super::transactions::collect_results(profiles, tick);
     super::transactions::expire_status(sessions, tick);
@@ -245,6 +249,7 @@ pub(crate) fn update_actors(
     }
     Ok(())
 }
+/// Updates the current state from the latest simulation results.
 pub(crate) fn update(
     mut repairs: ResMut<RepairSystem>,
     mut actors: RepairActors,

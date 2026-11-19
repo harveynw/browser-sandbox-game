@@ -1,8 +1,9 @@
 use super::*;
-use crate::components::Player as PlayerComponent;
-use crate::components::Vehicle as VehicleComponent;
+use crate::component::PlayerSnapshot;
+use crate::component::VehicleSnapshot;
 use crate::systems::police::Unit as PoliceUnitComponent;
 
+/// Loads the authored city and creates its fixture systems.
 fn city() -> (World, Sessions, crate::systems::Systems) {
     let mut world = World::new(
         crate::content_loader::WorldContent::load_index(
@@ -31,11 +32,11 @@ fn retired_patrol_replacement_preserves_all_home_districts() {
             .unwrap()
             .0;
         w.entities.remove::<PoliceUnitComponent>(&id);
-        w.entities.remove::<VehicleComponent>(&id);
+        w.entities.remove::<VehicleSnapshot>(&id);
         w.collision
             .set_vehicle_proxies(
                 &w.entities
-                    .view::<VehicleComponent>()
+                    .view::<VehicleSnapshot>()
                     .values()
                     .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
@@ -70,6 +71,7 @@ fn retired_patrol_replacement_preserves_all_home_districts() {
 
 // Use shared vehicle physics, remain collision-safe and avoid recycling visible patrols.
 
+/// Verifies that patrols use shared motor and remain collision safe without visible recycling.
 #[test]
 fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling() {
     let (mut w, mut sessions, mut systems) = city();
@@ -84,7 +86,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
         .map(|id| {
             (
                 *id,
-                w.entities.view::<VehicleComponent>()[id]
+                w.entities.view::<VehicleSnapshot>()[id]
                     .state
                     .motor
                     .position
@@ -98,7 +100,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
         w.collision
             .set_vehicle_proxies(
                 &w.entities
-                    .view::<VehicleComponent>()
+                    .view::<VehicleSnapshot>()
                     .values()
                     .map(crate::systems::vehicle::proxy)
                     .collect::<Vec<_>>(),
@@ -110,7 +112,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
             .view::<PoliceUnitComponent>()
             .keys()
             .map(|id| Observer {
-                position: w.entities.view::<VehicleComponent>()[id]
+                position: w.entities.view::<VehicleSnapshot>()[id]
                     .state
                     .motor
                     .position
@@ -134,14 +136,14 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
             .copied()
             .collect::<Vec<_>>()
         {
-            let car = w.entities.view::<VehicleComponent>().get(&id).unwrap();
+            let car = w.entities.view::<VehicleSnapshot>().get(&id).unwrap();
             let before = car.state.motor.position.0.map(|v| v.0);
             let input = systems
                 .police
                 .vehicle_input(id, tick, car.state.motor.speed.0, &w)
                 .unwrap();
             w.collision.exclude_vehicle(Some(id));
-            let car = w.entities.get_mut_by_id::<VehicleComponent>(&id).unwrap();
+            let car = w.entities.get_mut_by_id::<VehicleSnapshot>(&id).unwrap();
             car.state.motor = sim_core::step_vehicle(
                 &car.state.motor,
                 &input,
@@ -169,7 +171,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
             w.collision
                 .set_vehicle_proxies(
                     &w.entities
-                        .view::<VehicleComponent>()
+                        .view::<VehicleSnapshot>()
                         .values()
                         .map(crate::systems::vehicle::proxy)
                         .collect::<Vec<_>>(),
@@ -192,6 +194,7 @@ fn patrols_use_shared_motor_and_remain_collision_safe_without_visible_recycling(
 
 // Distinguish hearing from sight, respect walls and range, and report fatal hits against police vehicles.
 
+/// Verifies that witnesses distinguish acoustics static occlusion range and fatal police hits.
 #[test]
 fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits() {
     let (mut w, _sessions, mut systems) = city();
@@ -223,7 +226,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
     assert!(!sight(&w.collision, left, right, 60.0));
     assert!(distance(left, right) < 80.0);
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&id)
+        .get_mut_by_id::<VehicleSnapshot>(&id)
         .unwrap()
         .state
         .motor = sim_core::spawn_vehicle(left, 0.0).unwrap();
@@ -231,7 +234,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
     let player = 999;
     w.entities.insert(
         player,
-        PlayerComponent {
+        PlayerSnapshot {
             tshirt_colour: Default::default(),
             weapon: crate::systems::weapons::state::loadout(),
             lifecycle: Default::default(),
@@ -256,7 +259,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         .collect();
     for other in others {
         w.entities
-            .get_mut_by_id::<VehicleComponent>(&other)
+            .get_mut_by_id::<VehicleSnapshot>(&other)
             .unwrap()
             .state
             .health = VehicleHealth(0);
@@ -302,7 +305,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
         1
     );
     w.entities
-        .get_mut_by_id::<VehicleComponent>(&id)
+        .get_mut_by_id::<VehicleSnapshot>(&id)
         .unwrap()
         .state
         .health = VehicleHealth(0);
@@ -318,6 +321,7 @@ fn witnesses_distinguish_acoustics_static_occlusion_range_and_fatal_police_hits(
     assert_eq!(report.kind.points(), 10);
 }
 
+/// Verifies that recovery rechecks rear clearance before reversing.
 #[test]
 fn recovery_rechecks_rear_clearance_before_reversing() {
     let (mut world, mut sessions, mut systems) = city();
@@ -327,7 +331,7 @@ fn recovery_rechecks_rear_clearance_before_reversing() {
         .keys()
         .next()
         .unwrap();
-    let car = &world.entities.view::<VehicleComponent>()[&id];
+    let car = &world.entities.view::<VehicleSnapshot>()[&id];
     let yaw = car.state.motor.yaw.0;
     let position = car.state.motor.position.0.map(|v| v.0);
     let rear = car.template.dimensions[2] as f32 / 2.0 + 0.4;
@@ -367,6 +371,7 @@ fn recovery_rechecks_rear_clearance_before_reversing() {
     );
 }
 
+/// Verifies that message reports capture evidence bound aggregation and reject replaced actors.
 #[test]
 fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors() {
     use crate::gameplay_messages::CrimeReported;
@@ -375,7 +380,7 @@ fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors
     let actor = EntityId(9999);
     core.entities.insert(
         actor.0,
-        PlayerComponent {
+        PlayerSnapshot {
             tshirt_colour: Default::default(),
             weapon: crate::systems::weapons::state::loadout(),
             lifecycle: Default::default(),
@@ -401,7 +406,7 @@ fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors
         &mut core,
     );
     core.entities
-        .get_mut::<PlayerComponent>(actor)
+        .get_mut::<PlayerSnapshot>(actor)
         .unwrap()
         .state
         .motor = sim_core::spawn_character([999.0, 0.02, 999.0], 0.0).unwrap();
@@ -451,7 +456,7 @@ fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors
     world.resource_mut::<PoliceSystem>().crimes.clear();
     let player = world
         .entity_mut(original)
-        .take::<PlayerComponent>()
+        .take::<crate::component::spawn::PlayerBundle>()
         .unwrap();
     world.despawn(original);
     let replacement = world.spawn((crate::ecs::GameId(actor), player)).id();
@@ -469,6 +474,7 @@ fn message_reports_capture_evidence_bound_aggregation_and_reject_replaced_actors
     assert!(world.resource::<PoliceSystem>().crimes.is_empty());
 }
 
+/// Verifies that driving shares two route jobs and services waiting units next tick.
 #[test]
 fn driving_shares_two_route_jobs_and_services_waiting_units_next_tick() {
     let (mut world, mut sessions, mut systems) = city();

@@ -1,5 +1,5 @@
 //! Test fixture adapters for tuple components.
-use crate::components::*;
+use crate::component::*;
 use crate::systems::{
     missions::{Mission, Reservation},
     population::VehiclePool,
@@ -13,6 +13,7 @@ pub trait ComponentValue: Component<Mutability = Mutable> {
     type Value;
     fn new(value: Self::Value) -> Self;
     fn value(&self) -> &Self::Value;
+    /// Returns mutable access to the wrapped component value.
     fn value_mut(&mut self) -> &mut Self::Value;
 }
 #[cfg(test)]
@@ -26,6 +27,7 @@ macro_rules! value_component {
             fn value(&self) -> &Self::Value {
                 &self.0
             }
+            /// Returns mutable access to the wrapped component value.
             fn value_mut(&mut self) -> &mut Self::Value {
                 &mut self.0
             }

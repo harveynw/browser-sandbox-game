@@ -17,11 +17,16 @@ use tokio::{
     time::{Instant, timeout},
 };
 
+/// Carries an HTTP status, JSON body, and optional cookie for capacity probes.
 struct Response {
+    /// HTTP status code returned by the capacity request.
     code: u16,
+    /// Decoded JSON response body.
     body: Value,
+    /// Guest cookie returned by the server, if present.
     cookie: Option<String>,
 }
+/// Sends a local HTTP request and decodes its status, JSON body, and cookie.
 async fn http(path: &str, post: bool, cookie: Option<&str>) -> Result<Response> {
     timeout(Duration::from_secs(8),async{
  let mut stream=TcpStream::connect("127.0.0.1:3001").await?;
@@ -36,6 +41,7 @@ async fn http(path: &str, post: bool, cookie: Option<&str>) -> Result<Response> 
  Ok(Response{code,body:serde_json::from_slice(&bytes[split+4..])?,cookie})
  }).await?
 }
+/// Creates a guest session and waits for a valid join ticket.
 async fn ticket() -> Result<String> {
     let mut cookie = None;
     let deadline = Instant::now() + Duration::from_secs(8);
@@ -61,40 +67,67 @@ async fn ticket() -> Result<String> {
         .ok_or("ticket")?
         .to_owned())
 }
+/// Tracks connection, movement, and traffic measurements for one capacity bot.
 #[derive(Default)]
 struct BotStats {
+    /// Number of sessions currently playing.
     playing: bool,
+    /// Total gameplay bytes sent by this capacity bot.
     up: u64,
+    /// Total gameplay bytes received by this capacity bot.
     down: u64,
+    /// Number of gameplay packets received over WebSocket.
     ws: u64,
+    /// Number of gameplay packets received over WebRTC.
     rtc: u64,
+    /// Gameplay ID assigned to this bot.
     player: u32,
+    /// Control generation used to reject stale client actions and inputs.
     epoch: u32,
+    /// Simulation tick recorded for this item.
     tick: u32,
+    /// Elapsed time to complete admission in milliseconds.
     joins_ms: f64,
+    /// Number of movement frames sent by the bot.
     frames: u64,
+    /// Cached action results indexed by client request ID.
     actions: u64,
+    /// Number of resynchronisation attempts made by the bot.
     resyncs: u64,
+    /// Total distance travelled by the bot in metres.
     distance: f64,
+    /// World position in metres.
     position: [f32; 3],
+    /// Number of entities currently visible to the bot.
     visible: usize,
+    /// Test relay used to measure or impair network delivery.
     relay: Value,
+    /// Latest measured WebRTC round-trip time in milliseconds.
     rtt_ms: f64,
+    /// Whether this bot has closed its connection.
     closed: Option<String>,
 }
 impl BotStats {
+    /// Returns collected measurements as a JSON report.
     fn report(&self) -> Value {
         json!({"playing":self.playing,"player":self.player,"epoch":self.epoch,"tick":self.tick,"up_game_bytes":self.up,"down_game_bytes":self.down,"ws_packets":self.ws,"rtc_packets":self.rtc,"join_ms":self.joins_ms,"frames":self.frames,"actions":self.actions,"resyncs":self.resyncs,"distance_m":self.distance,"position":self.position,"visible":self.visible,"relay":self.relay,"rtc_rtt_ms":self.rtt_ms,"closed":self.closed})
     }
 }
+/// Plans a capacity bot's walking route through the authored graph.
 struct Walker {
+    /// Authored road graph used to plan the bot's route.
     graph: Arc<content::RoadGraph>,
+    /// Navigation nodes remaining on the actor's route.
     route: VecDeque<u32>,
+    /// Round-robin cursor used to distribute work fairly.
     cursor: usize,
+    /// Navigation node IDs that define the walking circuit.
     targets: Vec<u32>,
+    /// Tick when the bot last planned its walking route.
     last_plan: u32,
 }
 impl Walker {
+    /// Selects a walking circuit through authored nodes for this capacity bot.
     fn new(graph: Arc<content::RoadGraph>, index: usize) -> Self {
         let mut targets = Vec::new();
         for p in [
@@ -118,6 +151,7 @@ impl Walker {
             last_plan: 0,
         }
     }
+    /// Chooses movement axes and facing for the bot's next route segment.
     fn controls(&mut self, p: [f32; 3], tick: u32) -> (i16, i16, f32) {
         let node = |id: u32| {
             self.graph
@@ -183,6 +217,7 @@ impl Walker {
         )
     }
 }
+/// Queues or submits a message using the required delivery channel.
 async fn send(
     peer: &mut Peer,
     world: &Option<OpaqueId>,
@@ -202,6 +237,7 @@ async fn send(
     stats.lock().unwrap().up += len as u64;
     Ok(())
 }
+/// Runs one capacity client and records its gameplay and transport measurements.
 async fn bot(
     index: usize,
     graph: Arc<content::RoadGraph>,
@@ -279,6 +315,7 @@ async fn bot(
     peer.close().await?;
     Ok(())
 }
+/// Runs the configured real-network capacity scenario with a populated world.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "requires separate production server and a real browser observer; defaults to a 60-minute soak"]
 async fn populated_actual_rtc_capacity() -> Result {

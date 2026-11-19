@@ -1,6 +1,6 @@
 //! Startup entity construction and authored metadata assignment.
 use crate::{
-    components::Vehicle,
+    component::VehicleSnapshot,
     ecs::{TickOutcome, state::*},
     systems::{self, population::VehiclePool},
 };
@@ -9,6 +9,7 @@ use protocol::*;
 use sim_core::CollisionQueries;
 use std::result::Result;
 
+/// Checks that authored player spawn positions support valid character motors.
 pub(crate) fn validate_spawns(
     content: &crate::content_loader::WorldContent,
     collision: &sim_core::CollisionWorld,
@@ -24,6 +25,7 @@ pub(crate) fn validate_spawns(
     Ok(())
 }
 
+/// Creates the initial authored parked vehicles.
 pub(crate) fn parked(
     content: Res<Content>,
     mut collision: NonSendMut<Collision>,
@@ -59,7 +61,7 @@ pub(crate) fn parked(
             }
             let id = EntityId(next.0);
             next.0 = next.0.checked_add(1).ok_or("entity IDs exhausted")?;
-            let car = Vehicle {
+            let car = VehicleSnapshot {
                 id,
                 state: VehicleState {
                     motor,
@@ -71,7 +73,7 @@ pub(crate) fn parked(
                 idle_ticks: 30,
             };
             proxies.push(crate::systems::vehicle::proxy(&car));
-            systems::planning::spawn(&mut commands, id.0, car);
+            crate::component::spawn::spawn(&mut commands, id.0, car.into_bundle());
             collision.0.set_vehicle_proxies(&proxies)?;
         }
         Ok(())
@@ -80,15 +82,19 @@ pub(crate) fn parked(
         outcome.fail(error);
     }
 }
+/// Marks parked vehicles with their population pool and security state.
 pub(crate) fn tag_parked(
-    cars: Query<(Entity, &Vehicle)>,
+    cars: Query<
+        (Entity, crate::component::queries::VehicleQueryReadOnly),
+        crate::component::queries::VehicleFilter,
+    >,
     content: Res<Content>,
     mut commands: Commands,
 ) {
     for (entity, car) in &cars {
         commands
             .entity(entity)
-            .insert(crate::components::PoolMembership(VehiclePool::Parked));
+            .insert(crate::component::PoolMembership(VehiclePool::Parked));
         if content.0.manifest.parking.iter().any(|slot| {
             slot.secured
                 && systems::police::distance(
@@ -98,7 +104,7 @@ pub(crate) fn tag_parked(
         }) {
             commands
                 .entity(entity)
-                .insert(crate::components::SecuredVehicle);
+                .insert(crate::component::SecuredVehicle);
         }
     }
 }

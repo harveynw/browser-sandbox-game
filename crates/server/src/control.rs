@@ -12,34 +12,57 @@ use std::{
 };
 pub const HTTP_ADDR: &str = "127.0.0.1:3001";
 pub const COOKIE: &str = "pm_guest";
+/// Summarises live server readiness and session counts.
 #[derive(Default)]
 pub struct Status {
+    /// Monotonic time of the last completed tick in milliseconds.
     pub last_tick_ms: u64,
+    /// Simulation tick recorded for this item.
     pub tick: u32,
+    /// Number of connected sessions.
     pub sessions: usize,
+    /// Number of admitted player actors.
     pub players: usize,
+    /// Number of sessions waiting for readiness.
     pub loading: usize,
+    /// Number of sessions currently playing.
     pub playing: usize,
+    /// Whether the scheduler has detected sustained excess work.
     pub overloaded: bool,
+    /// Whether the network transport remains available.
     pub transport_healthy: bool,
 }
+/// Serves HTTP control requests and maintains profile and health state.
 pub struct Control {
+    /// Allowed public HTTPS origin, if public hosting is enabled.
     pub public_origin: Option<String>,
+    /// Measurements collected for server diagnostics.
     pub metrics: Value,
+    /// Distribution of elapsed work per tick.
     tick_work: crate::performance::Histogram,
+    /// Distribution of tick work while players are present.
     populated_tick_work: crate::performance::Histogram,
+    /// Distribution of elapsed time between scheduler polls.
     scheduler_poll_gap: crate::performance::Histogram,
+    /// Profile storage and committed identity state.
     pub profiles: Profiles,
+    /// Latest server readiness and health state.
     pub status: Status,
+    /// Protocol and content version information.
     pub build: Value,
 }
 pub type SharedControl = Arc<Mutex<Control>>;
+/// Carries an HTTP status, JSON body, and optional guest cookie.
 pub struct Reply {
+    /// HTTP status code returned by the control endpoint.
     pub code: u16,
+    /// Decoded JSON response body.
     pub body: Value,
+    /// Guest cookie returned by the server, if present.
     pub cookie: Option<String>,
 }
 impl Reply {
+    /// Creates a JSON reply without setting a guest cookie.
     fn new(code: u16, body: Value) -> Self {
         Self {
             code,
@@ -47,6 +70,7 @@ impl Reply {
             cookie: None,
         }
     }
+    /// Creates an HTTP error reply with a JSON message.
     fn error(code: u16, message: &str) -> Self {
         Self::new(code, json!({"error":message}))
     }
@@ -56,20 +80,27 @@ impl Reply {
 #[serde(deny_unknown_fields)]
 struct EmptyBody {}
 
+/// Reads a requested T-shirt colour from an HTTP request.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Appearance {
+    /// T-shirt colour shown to other players.
     tshirt_colour: protocol::TshirtColour,
 }
 
+/// Reads a session's WebSocket and WebRTC probe results.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Probe {
+    /// Session identity attached to this probe report.
     session_id: String,
+    /// Whether the WebSocket probe succeeded.
     ws: bool,
+    /// Whether the WebRTC probe succeeded.
     rtc: bool,
 }
 impl Control {
+    /// Initialises HTTP control state with empty profiles and timing measurements.
     pub fn new(hello: protocol::ServerHello) -> Self {
         Self {
             public_origin: None,
@@ -82,6 +113,7 @@ impl Control {
             build: json!({"protocol_version":hello.protocol_version.0,"build_id":hello.build_id.0,"content_hash":hello.content_hash.0,"sim_config_hash":hello.sim_config_hash.0}),
         }
     }
+    /// Updates the current state from the latest simulation results.
     pub fn update(&mut self, snapshot: &Snapshot, now: u64, healthy: bool, overloaded: bool) {
         self.status = Status {
             last_tick_ms: now,
@@ -94,12 +126,14 @@ impl Control {
             transport_healthy: healthy,
         };
     }
+    /// Updates HTTP readiness and diagnostics after a completed tick.
     pub fn finish_tick(&mut self, elapsed: Duration, populated: bool) {
         self.tick_work.observe(elapsed);
         if populated {
             self.populated_tick_work.observe(elapsed);
         }
     }
+    /// Adds scheduler and tick-work samples to the timing distributions.
     pub fn record_performance(
         &mut self,
         snapshot: &Snapshot,
@@ -119,6 +153,7 @@ impl Control {
         metrics["queues"] = queues;
         self.metrics = metrics;
     }
+    /// Validates and handles an HTTP control endpoint request.
     pub fn route(
         &mut self,
         method: &str,
@@ -261,11 +296,15 @@ impl Control {
         }
     }
 }
+/// Owns the HTTP worker and its shutdown signal.
 pub struct HttpControl {
+    /// Shared signal that asks the worker to stop.
     stop: Arc<AtomicBool>,
+    /// Background worker owned by this handle.
     worker: thread::JoinHandle<()>,
 }
 impl HttpControl {
+    /// Starts the background service or live tick driver.
     pub fn start(shared: SharedControl, started: Instant) -> std::io::Result<Self> {
         // Bind synchronously so a port conflict fails startup before readiness.
         let server =
@@ -286,6 +325,7 @@ impl HttpControl {
             })?;
         Ok(Self { stop, worker })
     }
+    /// Checks whether the service remains available for its next operation.
     pub fn healthy(&self) -> bool {
         !self.worker.is_finished()
     }
@@ -295,6 +335,7 @@ impl Drop for HttpControl {
         self.stop.store(true, Ordering::Relaxed);
     }
 }
+/// Handles an HTTP connection using the shared control state.
 fn serve(mut request: tiny_http::Request, shared: &SharedControl, now: u64) {
     let header = |name: &'static str| {
         request
@@ -354,6 +395,7 @@ fn serve(mut request: tiny_http::Request, shared: &SharedControl, now: u64) {
     let _ = request.respond(response);
 }
 use std::io::Read;
+/// Extracts the guest secret from a request's Cookie header.
 fn parse_cookie(header: &str) -> Option<String> {
     let values: Vec<_> = header
         .split(';')

@@ -1,8 +1,13 @@
 //! Deterministic shot geometry used by the ordered weapon execution system.
-use crate::components::*;
 use protocol::*;
 
-pub(crate) fn shot_ray(player: &Player, aim: &Fire, tick: u32) -> ([f32; 3], [f32; 3]) {
+/// Builds a shot origin and direction from authoritative aim and deterministic spread.
+pub(crate) fn shot_ray(
+    player: &impl crate::component::snapshots::ToPlayerSnapshot,
+    aim: &Fire,
+    tick: u32,
+) -> ([f32; 3], [f32; 3]) {
+    let player = player.to_snapshot();
     let p = player.state.motor.position.0.map(|v| v.0);
     let moving = player.state.motor.velocity.0[0]
         .0

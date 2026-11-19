@@ -2,11 +2,28 @@
 use super::*;
 use crate::{ecs::GameId, systems::planning::Planning};
 use bevy_ecs::prelude::*;
+/// Borrows pedestrians and vehicles for pedestrian decisions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct PedestrianActors<'w, 's> {
-    cars: Query<'w, 's, (&'static GameId, &'static Vehicle)>,
-    peds: Query<'w, 's, (&'static GameId, &'static mut Pedestrian)>,
+    /// Queries vehicles used by this system.
+    cars: Query<
+        'w,
+        's,
+        (
+            &'static GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        ),
+        crate::component::queries::VehicleFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    peds: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PedestrianQuery),
+        crate::component::queries::PedestrianFilter,
+    >,
 }
+/// Chooses pedestrian routes, crossings, and flight inputs from actor snapshots.
 pub(crate) fn decide_actors(
     population: &mut PopulationSystem,
     tick: u32,
@@ -16,11 +33,7 @@ pub(crate) fn decide_actors(
         return;
     }
     let cars: BTreeMap<_, _> = actors.cars.iter().map(|(id, c)| (id.0.0, c)).collect();
-    let mut peds: BTreeMap<_, _> = actors
-        .peds
-        .iter_mut()
-        .map(|(id, p)| (id.0.0, p.into_inner()))
-        .collect();
+    let mut peds: BTreeMap<_, _> = actors.peds.iter_mut().map(|(id, p)| (id.0.0, p)).collect();
     let crossing_cars: Vec<_> = cars
         .values()
         .map(|v| (v.state.motor.position.0.map(|v| v.0), v.state.motor.speed.0))
@@ -108,6 +121,7 @@ pub(crate) fn decide_actors(
         ped.input = input;
     }
 }
+/// Chooses live pedestrian routes, crossings, and flight inputs at the planning cadence.
 pub(crate) fn decide(
     mut population: ResMut<PopulationSystem>,
     planning: Res<Planning>,

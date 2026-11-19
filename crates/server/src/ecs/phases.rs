@@ -17,21 +17,25 @@ pub enum TickPhase {
 /// Schedule outcome is explicit: normal gameplay errors must not become Bevy panics.
 #[derive(Resource, Default)]
 pub struct TickOutcome {
+    /// First error recorded during the current tick.
     error: Option<String>,
 }
 impl TickOutcome {
     pub(crate) fn is_healthy(&self) -> bool {
         self.error.is_none()
     }
+    /// Records a failure and preserves the state needed by later cleanup.
     pub fn fail(&mut self, error: String) {
         if self.error.is_none() {
             self.error = Some(error);
         }
     }
+    /// Returns and clears the first recorded tick error.
     pub fn finish(&mut self) -> Result<(), String> {
         self.error.take().map_or(Ok(()), Err)
     }
 }
+/// Checks whether the service remains available for its next operation.
 pub(crate) fn healthy(outcome: Res<TickOutcome>) -> bool {
     outcome.is_healthy()
 }

@@ -4,6 +4,7 @@ use super::runtime::{begin_missions, combat, missions, police, repairs};
 use super::{TickOutcome, TickPhase, runtime::Scratch, tick_schedule};
 use crate::systems::movement::motors;
 use bevy_ecs::prelude::*;
+/// Installs live tick resources and transport in the ECS world.
 pub(crate) fn initialize(host: &mut World, network: crate::transport::Network) {
     host.insert_non_send(network);
     host.init_resource::<Scratch>();
@@ -11,6 +12,7 @@ pub(crate) fn initialize(host: &mut World, network: crate::transport::Network) {
     host.init_resource::<TickOutcome>();
     host.init_resource::<crate::replication::publication::Publication>();
 }
+/// Builds the ordered live tick schedule with its gameplay checkpoints.
 pub(crate) fn build() -> Schedule {
     let mut schedule = tick_schedule();
     schedule.add_systems(

@@ -1,5 +1,6 @@
 //! Reusable schedule groups. Domain modules supply systems, not ordering.
 use bevy_ecs::{prelude::*, schedule::ScheduleConfigs, system::ScheduleSystem};
+/// Orders gameplay event consumers and clears each completed batch.
 pub(crate) fn reactions() -> ScheduleConfigs<ScheduleSystem> {
     use crate::{
         gameplay_messages::clear_batch,
@@ -13,6 +14,7 @@ pub(crate) fn reactions() -> ScheduleConfigs<ScheduleSystem> {
     )
         .chain()
 }
+/// Applies player deaths and their dependent gameplay reactions.
 pub(crate) fn death_checkpoint()
 -> bevy_ecs::schedule::ScheduleConfigs<bevy_ecs::system::ScheduleSystem> {
     use crate::{
@@ -34,6 +36,7 @@ pub(crate) fn death_checkpoint()
     )
         .chain()
 }
+/// Builds the ordered replication publication checkpoint.
 pub(crate) fn publication() -> ScheduleConfigs<ScheduleSystem> {
     use crate::{ecs::healthy, replication::publication::*};
     (
@@ -48,6 +51,7 @@ pub(crate) fn publication() -> ScheduleConfigs<ScheduleSystem> {
     )
         .chain()
 }
+/// Builds the network output checkpoint.
 pub(crate) fn egress() -> Schedule {
     use crate::replication::egress::{failed, send};
     let mut schedule = Schedule::default();
@@ -81,9 +85,11 @@ pub(crate) fn disconnects() -> ScheduleConfigs<ScheduleSystem> {
     )
         .chain()
 }
+/// Builds the player readiness checkpoint.
 pub(crate) fn ready() -> ScheduleConfigs<ScheduleSystem> {
     (crate::systems::chat::player_ready, retire_ready).chain()
 }
+/// Clears readiness messages after all subscribers have run.
 fn retire_ready(mut messages: ResMut<Messages<crate::gameplay_messages::PlayerBecameReady>>) {
     messages.clear();
 }

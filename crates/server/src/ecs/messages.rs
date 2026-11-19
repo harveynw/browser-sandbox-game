@@ -1,6 +1,7 @@
 //! Registration of the gameplay message queues owned by the ECS world.
 use crate::gameplay_messages::*;
 use bevy_ecs::prelude::*;
+/// Registers the gameplay message queues and impact cooldown resource.
 pub(crate) fn register(world: &mut World) {
     world.init_resource::<Messages<PlayerBecameReady>>();
     world.init_resource::<Messages<PlayerLeaving>>();

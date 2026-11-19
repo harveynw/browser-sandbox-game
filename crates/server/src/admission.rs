@@ -23,17 +23,27 @@ pub fn random_id(prefix: &str, bytes: usize) -> Result<String, String> {
 fn digest(secret: &str) -> String {
     content::canonical::sha256(secret.as_bytes())
 }
+/// Pairs a committed profile with its guest cookie hash.
 struct Profile {
+    /// Latest committed profile visible to the application.
     view: ProfileView,
+    /// Hash of the guest cookie that owns this profile.
     cookie_hash: String,
 }
+/// Links a one-use join ticket to its profile and expiry time.
 struct JoiningTicket {
+    /// Profile that owns this join ticket.
     profile_id: String,
+    /// Monotonic time when the join ticket expires.
     expires: u64,
 }
+/// Tracks an in-memory repair transaction awaiting completion.
 struct PendingEconomic {
+    /// Profile ID that owns this repair transaction.
     profile: String,
+    /// Whether this transaction returns a repair payment.
     refund: bool,
+    /// Tick when the delayed in-memory transaction can complete.
     ready: u32,
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -41,10 +51,14 @@ pub enum EconomicError {
     InsufficientFunds,
     Unavailable,
 }
+/// Returns the result of a completed repair transaction.
 pub struct EconomicResult {
+    /// Repair transaction ID returned with this completion.
     pub event: String,
+    /// Result returned to the requesting caller.
     pub result: Result<ProfileView, EconomicError>,
 }
+/// Manages guest identity, join tickets, and committed profile transactions.
 #[derive(Default)]
 pub struct Profiles {
     // Optional worker owning the SQLite connection; absence selects in-memory storage.

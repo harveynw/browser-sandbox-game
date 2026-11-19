@@ -16,6 +16,7 @@ const PHASES: [TickPhase; 10] = [
     TickPhase::Publish,
     TickPhase::Flush,
 ];
+/// Builds a tick driver for a focused ECS scenario.
 fn driver() -> TickDriver {
     let content = WorldContent::load(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/client/public/content"),
@@ -23,11 +24,11 @@ fn driver() -> TickDriver {
     .unwrap();
     TickDriver::new(content, Network::default()).unwrap()
 }
+/// Verifies that native startup and read only diagnostics share the live actor world.
 #[test]
 fn native_startup_and_read_only_diagnostics_share_the_live_actor_world() {
     use crate::{
-        components::PoolMembership,
-        components::Vehicle,
+        component::PoolMembership,
         ecs::{EntityIndex, GameId},
         systems::police::Unit,
     };
@@ -39,7 +40,11 @@ fn native_startup_and_read_only_diagnostics_share_the_live_actor_world() {
     let mut driver = TickDriver::new(content, Network::default()).unwrap();
     let cars: Vec<_> = driver
         .host
-        .query::<(Entity, &GameId, &Vehicle)>()
+        .query::<(
+            Entity,
+            &GameId,
+            crate::component::queries::VehicleQueryReadOnly,
+        )>()
         .iter(&driver.host)
         .map(|(e, id, _)| (e, id.0))
         .collect();
@@ -83,6 +88,7 @@ fn native_startup_and_read_only_diagnostics_share_the_live_actor_world() {
         "detailed diagnostics retain their once-per-second cadence"
     );
 }
+/// Verifies that native shutdown restores profile owner and clears scoped state.
 #[test]
 fn native_shutdown_restores_profile_owner_and_clears_scoped_state() {
     let mut driver = driver();
@@ -110,21 +116,30 @@ fn native_shutdown_restores_profile_owner_and_clears_scoped_state() {
             .is_empty()
     );
 }
+/// Records the actor IDs observed by a scheduled test query.
 #[derive(Resource, Default)]
-struct ObservedActors(Vec<(u32, usize)>);
+struct ObservedActors(
+    /// Gameplay IDs and component counts observed by the test.
+    Vec<(u32, usize)>,
+);
+/// Records the actor IDs visible to a scheduled test system.
 fn observe_actors(
-    cars: Query<&crate::components::Vehicle>,
+    cars: Query<
+        crate::component::queries::VehicleQueryReadOnly,
+        crate::component::queries::VehicleFilter,
+    >,
     clock: Res<crate::ecs::state::Clock>,
     mut observed: ResMut<ObservedActors>,
 ) {
     observed.0.push((clock.0, cars.iter().count()));
 }
+/// Verifies that scheduled queries see live actors and resources on every tick.
 #[test]
 fn scheduled_queries_see_live_actors_and_resources_on_every_tick() {
     let mut driver = driver();
     let count = driver
         .host
-        .query::<&crate::components::Vehicle>()
+        .query::<crate::component::queries::VehicleQueryReadOnly>()
         .iter(&driver.host)
         .count();
     assert!(count > 0);
@@ -143,6 +158,7 @@ fn scheduled_queries_see_live_actors_and_resources_on_every_tick() {
         [(1, count), (2, count), (3, count)]
     );
 }
+/// Verifies that live schedule runs each phase once and advances one tick.
 #[test]
 fn live_schedule_runs_each_phase_once_and_advances_one_tick() {
     let mut driver = driver();
@@ -159,6 +175,7 @@ fn live_schedule_runs_each_phase_once_and_advances_one_tick() {
         assert!(!driver.host.contains_non_send::<TickIo>());
     }
 }
+/// Verifies that every failed phase stops later work restores profiles and clears scratch.
 #[test]
 fn every_failed_phase_stops_later_work_restores_profiles_and_clears_scratch() {
     for (index, phase) in PHASES.iter().copied().enumerate() {
@@ -188,6 +205,7 @@ fn every_failed_phase_stops_later_work_restores_profiles_and_clears_scratch() {
         assert_eq!(driver.host.resource::<Scratch>().trace, PHASES);
     }
 }
+/// Verifies that tick exhaustion rejects before admission and leaves profiles owned by caller.
 #[test]
 fn tick_exhaustion_rejects_before_admission_and_leaves_profiles_owned_by_caller() {
     let mut driver = driver();

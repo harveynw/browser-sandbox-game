@@ -1,7 +1,6 @@
 //! Player respawn and protection timers, with independent consequence readers.
 use crate::{
-    components::PlayerMission,
-    components::{Pedestrian, Player},
+    component::PlayerMission,
     ecs::state::{Clock, Collision, Content},
     ecs::{EntityIndex, GameId},
     gameplay_messages::{ControlTransitionRequested, PlayerRespawned},
@@ -11,15 +10,32 @@ use bevy_ecs::prelude::*;
 use protocol::*;
 use sim_core::{CollisionQueries, QueryFilter};
 
+/// Borrows actors and geometry needed to find safe player spawn positions.
 #[derive(bevy_ecs::system::SystemParam)]
 pub(crate) struct RespawnActors<'w, 's> {
-    players: Query<'w, 's, (&'static GameId, &'static mut Player)>,
-    pedestrians: Query<'w, 's, &'static Pedestrian>,
+    /// Queries players used by this system.
+    players: Query<
+        'w,
+        's,
+        (&'static GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
+    /// Queries pedestrians used by this system.
+    pedestrians: Query<
+        'w,
+        's,
+        crate::component::queries::PedestrianQueryReadOnly,
+        crate::component::queries::PedestrianFilter,
+    >,
+    /// Maps stable gameplay IDs to current ECS entities.
     index: Res<'w, EntityIndex>,
+    /// Validated world content used by this operation.
     content: Res<'w, Content>,
+    /// Collision queries used to validate movement and placement.
     collision: NonSend<'w, Collision>,
 }
 impl RespawnActors<'_, '_> {
+    /// Finds a player spawn position that clears geometry and nearby actors.
     fn safe_spawn(&self, id: EntityId, near: [f32; 3]) -> Option<[f32; 3]> {
         let distance = |a: [f32; 3], b: [f32; 3]| (a[0] - b[0]).hypot(a[2] - b[2]);
         let mut candidates = Vec::new();
@@ -63,6 +79,7 @@ impl RespawnActors<'_, '_> {
         })
     }
 }
+/// Respawns eligible players only when a safe position is available.
 pub(crate) fn respawn_players(
     mut actors: RespawnActors,
     mut sessions: ResMut<Sessions>,
@@ -101,8 +118,8 @@ pub(crate) fn respawn_players(
         };
         let (_, mut player) = actors.players.get_mut(entity).expect("validated player");
         let sequence = player.weapon.shot_sequence;
-        player.state.motor = sim_core::spawn_character(position, 0.0).expect("safe spawn");
-        player.state.health = CharacterHealth(100);
+        player.state.motor.0 = sim_core::spawn_character(position, 0.0).expect("safe spawn");
+        player.state.health.0 = 100;
         player.state.mode = CharacterMode::OnFoot;
         player.state.vehicle_id = None;
         player.weapon = crate::systems::weapons::state::loadout();
@@ -124,6 +141,7 @@ pub(crate) fn respawn_players(
         });
     }
 }
+/// Clears mission state after a validated player respawn.
 pub(crate) fn reset_respawned_missions(
     mut messages: MessageReader<PlayerRespawned>,
     mut missions: Query<(&GameId, &mut PlayerMission)>,
@@ -141,9 +159,13 @@ pub(crate) fn reset_respawned_missions(
     }
 }
 
+/// Applies validated player deaths and starts recovery timing once.
 pub(crate) fn down_players(
     mut deaths: MessageReader<crate::gameplay_messages::PlayerDeathRequested>,
-    mut players: Query<(&GameId, &mut Player)>,
+    mut players: Query<
+        (&GameId, crate::component::queries::PlayerQuery),
+        crate::component::queries::PlayerFilter,
+    >,
     mut sessions: ResMut<Sessions>,
     clock: Res<Clock>,
     mut downed: MessageWriter<crate::gameplay_messages::PlayerDowned>,
@@ -185,6 +207,7 @@ pub(crate) fn down_players(
         }
     }
 }
+/// Fails missions after their player is downed.
 pub(crate) fn fail_downed_missions(
     mut downed: MessageReader<crate::gameplay_messages::PlayerDowned>,
     mut missions: Query<(&GameId, &mut PlayerMission)>,
@@ -204,8 +227,12 @@ pub(crate) fn fail_downed_missions(
         }
     }
 }
+/// Completes weapon timers and marks affected private status for publication.
 pub(crate) fn advance_weapon_timers(
-    mut players: Query<&mut Player>,
+    mut players: Query<
+        crate::component::queries::PlayerQuery,
+        crate::component::queries::PlayerFilter,
+    >,
     index: Res<EntityIndex>,
     clock: Res<Clock>,
     mut sessions: ResMut<Sessions>,

@@ -16,9 +16,12 @@ use std::{
     time::{Duration, Instant},
 };
 const STEP: Duration = Duration::from_nanos(1_000_000_000 / 30);
+/// Accumulates elapsed time and limits simulation catch-up work.
 #[derive(Default)]
 struct Scheduler {
+    /// Elapsed wall time still available for fixed simulation steps.
     accumulated: Duration,
+    /// Number of consecutive scheduler updates that exceeded the work limit.
     overload_streak: u32,
 }
 impl Scheduler {
@@ -41,6 +44,7 @@ impl Scheduler {
     }
 }
 
+/// Runs the module's main operation and returns its outcome.
 fn run() -> Result<(), String> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -160,6 +164,7 @@ fn game_loop(
     Ok(())
 }
 
+/// Starts the server or probe and reports any terminal error.
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
@@ -174,6 +179,7 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
+    /// Verifies that scheduler caps catchup drops wall time and keeps contiguous fixed steps.
     #[test]
     fn scheduler_caps_catchup_drops_wall_time_and_keeps_contiguous_fixed_steps() {
         let mut s = Scheduler::default();

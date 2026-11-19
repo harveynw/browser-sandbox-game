@@ -2,6 +2,7 @@ use super::*;
 use crate::{ecs::TickOutcome, ecs::runtime::Scratch, ecs::state::Clock, replication::publication};
 use bevy_ecs::prelude::Schedule;
 
+/// Creates sessions and actor state for replication publication tests.
 fn publication_fixture() -> (bevy_ecs::world::World, Schedule) {
     let (mut w, mut profiles, mut transport) = setup();
     for p in [peer(0), peer(1)] {
@@ -21,6 +22,7 @@ fn publication_fixture() -> (bevy_ecs::world::World, Schedule) {
     schedule.add_systems(crate::ecs::checkpoints::publication());
     (host, schedule)
 }
+/// Verifies that publication preserves cadence visibility order and per peer batch order.
 #[test]
 fn publication_preserves_cadence_visibility_order_and_per_peer_batch_order() {
     let (mut host, mut schedule) = publication_fixture();
@@ -107,6 +109,7 @@ fn publication_preserves_cadence_visibility_order_and_per_peer_batch_order() {
         assert!(batch_peers.windows(2).all(|pair| pair[0] <= pair[1]));
     }
 }
+/// Verifies that failed status discards all staged snapshots and does not replay next tick.
 #[test]
 fn failed_status_discards_all_staged_snapshots_and_does_not_replay_next_tick() {
     let (mut host, mut schedule) = publication_fixture();

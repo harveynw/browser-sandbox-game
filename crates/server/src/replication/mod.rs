@@ -2,11 +2,7 @@ mod control_transitions;
 pub(crate) mod egress;
 pub(crate) mod native;
 pub(crate) mod publication;
-use crate::components::Pedestrian as PedestrianComponent;
-use crate::components::Player as PlayerComponent;
-use crate::components::Vehicle as VehicleComponent;
 use crate::sessions::{Session, SessionPhase, Sessions};
-use crate::systems::police::Officer as OfficerComponent;
 use crate::systems::police::Unit as PoliceUnitComponent;
 use crate::systems::police::Wanted as WantedComponent;
 use crate::transport::*;
@@ -16,8 +12,10 @@ use crate::world::entity_position;
 use protocol::*;
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Builds protocol messages for replication.
 pub struct Replication;
 impl Replication {
+    /// Queues a scoped protocol envelope for the requested peer and delivery channel.
     pub(crate) fn queue(
         peer: PeerKey,
         sid: Option<&str>,
@@ -37,6 +35,7 @@ impl Replication {
             },
         ));
     }
+    /// Builds public entity records for replication.
     #[cfg(test)]
     pub(crate) fn entities(
         world: &mut crate::world::World,
@@ -50,11 +49,16 @@ use std::result::Result;
 /// Keep a bounded baseline/lifecycle burst available while snapshots saturate the link.
 /// This reserves tokens inside the existing 60 KiB/s, 120 KiB burst budget.
 pub const LIFECYCLE_RESERVE: usize = 64 * 1024;
+/// Limits byte throughput with a refilling token bucket.
 #[derive(Debug)]
 pub struct Budget {
+    /// Remaining capacity in the throughput budget.
     tokens: f64,
+    /// Monotonic time of the last budget refill in milliseconds.
     at: u64,
+    /// Number of tokens restored per second.
     rate: f64,
+    /// Maximum tokens retained after a refill.
     capacity: f64,
 }
 impl Default for Budget {
@@ -63,6 +67,7 @@ impl Default for Budget {
     }
 }
 impl Budget {
+    /// Creates a full token bucket with the specified refill rate and burst capacity.
     pub fn new(rate: u32, burst: u32) -> Self {
         Self {
             tokens: f64::from(burst),
@@ -71,6 +76,7 @@ impl Budget {
             capacity: f64::from(burst),
         }
     }
+    /// Consumes available budget only if the request fits the current limit.
     pub fn allow(&mut self, bytes: usize, now: u64, reserve: usize) -> bool {
         self.tokens = (self.tokens + now.saturating_sub(self.at) as f64 * self.rate / 1000.0)
             .min(self.capacity);
@@ -85,9 +91,11 @@ impl Budget {
 /// Strict rolling one-second admission cap, independent of queue draining cadence.
 #[derive(Default)]
 pub struct InputRate {
+    /// Accepted input arrival times within the rolling window.
     arrivals: std::collections::VecDeque<u64>,
 }
 impl InputRate {
+    /// Accepts an input only if fewer than 60 arrivals remain in the rolling second.
     pub fn allow(&mut self, now: u64) -> bool {
         while self
             .arrivals
@@ -104,10 +112,13 @@ impl InputRate {
     }
 }
 type CellContents = Vec<(u32, [f32; 2])>;
+/// Groups entity positions into cells for visibility queries.
 pub struct SpatialIndex {
+    /// Entity positions grouped by spatial cell.
     cells: BTreeMap<(i32, i32), CellContents>,
 }
 impl SpatialIndex {
+    /// Groups the supplied entity positions into spatial cells.
     pub fn new(points: impl Iterator<Item = (u32, [f32; 2])>) -> Self {
         let mut cells: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for (id, point) in points {
@@ -115,6 +126,7 @@ impl SpatialIndex {
         }
         Self { cells }
     }
+    /// Selects nearby entities with visibility hysteresis and a bounded result count.
     pub fn relevant(
         &self,
         center: [f32; 2],
@@ -150,9 +162,11 @@ impl SpatialIndex {
         candidates.into_iter().take(96).map(|(id, _)| id).collect()
     }
 }
+/// Maps a world position to its spatial index cell.
 fn cell(p: [f32; 2]) -> (i32, i32) {
     ((p[0] / 64.0).floor() as i32, (p[1] / 64.0).floor() as i32)
 }
+/// Builds a snapshot from the current authoritative state.
 pub fn snapshot(
     world: &str,
     session: &str,
@@ -209,17 +223,22 @@ pub fn packets(
 /// Coalesce per entity/visibility, preserving same-tick packet splits and unrelated older records.
 #[derive(Default)]
 pub struct SnapshotBuffer {
+    /// World and session identity of the buffered snapshot records.
     scope: Option<(String, String)>,
+    /// Latest pending state and tick for each entity.
     records: BTreeMap<u32, (u32, StateRecord)>,
 }
 impl SnapshotBuffer {
+    /// Returns the number of coalesced entity records awaiting delivery.
     pub fn pending_records(&self) -> usize {
         self.records.len()
     }
+    /// Clears transient state after its current processing batch.
     pub fn clear(&mut self) {
         self.scope = None;
         self.records.clear();
     }
+    /// Discards pending state for an entity that is no longer visible.
     pub fn hide(&mut self, entity: u32, visibility: u32) {
         if self
             .records
@@ -229,6 +248,7 @@ impl SnapshotBuffer {
             self.records.remove(&entity);
         }
     }
+    /// Coalesces incoming snapshot records without losing other entities' updates.
     pub fn push(&mut self, envelope: &ServerEnvelope) -> Result<bool, String> {
         let ServerMessage::Snapshot(data) = &envelope.message else {
             return Err("expected snapshot".into());
@@ -263,6 +283,7 @@ impl SnapshotBuffer {
         }
         Ok(replaced)
     }
+    /// Removes the next bounded batch of pending work.
     pub fn drain(&mut self) -> Result<Vec<Vec<u8>>, String> {
         let Some((world, session)) = self.scope.take() else {
             return Ok(Vec::new());
@@ -282,5 +303,3 @@ impl SnapshotBuffer {
         Ok(bytes)
     }
 }
-
-pub(crate) mod projection;

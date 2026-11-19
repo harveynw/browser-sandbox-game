@@ -1,5 +1,6 @@
 use super::*;
-use server::components::Player as PlayerComponent;
+use server::component::PlayerSnapshot;
+/// Verifies that chat is reliable authoritative and replayed to new players.
 #[test]
 fn chat_is_reliable_authoritative_and_replayed_to_new_players() {
     let (mut w, mut profiles, mut t) = setup();
@@ -12,7 +13,7 @@ fn chat_is_reliable_authoritative_and_replayed_to_new_players() {
     let id = w.sessions.peers[&p].player_id();
     w.core
         .entities
-        .get_mut_by_id::<PlayerComponent>(&id)
+        .get_mut_by_id::<PlayerSnapshot>(&id)
         .unwrap()
         .display_name = DisplayName("Alice".into());
     t.sent.clear();
@@ -70,6 +71,7 @@ fn chat_is_reliable_authoritative_and_replayed_to_new_players() {
     w.disconnect(p, &mut profiles);
 }
 
+/// Verifies that presence is broadcast once on ready and leave but not loading or resync.
 #[test]
 fn presence_is_broadcast_once_on_ready_and_leave_but_not_loading_or_resync() {
     let (mut w, mut profiles, mut t) = setup();
@@ -80,7 +82,7 @@ fn presence_is_broadcast_once_on_ready_and_leave_but_not_loading_or_resync() {
     let id = w.sessions.peers[&p].player_id();
     w.core
         .entities
-        .get_mut_by_id::<PlayerComponent>(&id)
+        .get_mut_by_id::<PlayerSnapshot>(&id)
         .unwrap()
         .display_name = DisplayName("Alice".into());
     ready(&mut w, &mut profiles, &mut t, p);
@@ -123,6 +125,7 @@ fn presence_is_broadcast_once_on_ready_and_leave_but_not_loading_or_resync() {
     assert_eq!(t.sent.iter().filter(|(peer,delivery,m)| *peer == q && *delivery == Delivery::Reliable && matches!(&m.message, ServerMessage::Chat(line) if line.system == Some(true) && line.text.0 == "Alice has left the game")).count(), 1);
 }
 
+/// Verifies that combat elimination message is announced once per recipient in the same tick.
 #[test]
 fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick() {
     let (mut w, mut profiles, mut t) = setup();
@@ -134,7 +137,7 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
     ready(&mut w, &mut profiles, &mut t, q);
     let shooter = w.sessions.peers[&p].player_id();
     let victim = w.sessions.peers[&q].player_id();
-    let position = w.entities.view::<VehicleComponent>()[&1]
+    let position = w.entities.view::<VehicleSnapshot>()[&1]
         .state
         .motor
         .position
@@ -144,7 +147,7 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
         let player = w
             .core
             .entities
-            .get_mut_by_id::<PlayerComponent>(&shooter)
+            .get_mut_by_id::<PlayerSnapshot>(&shooter)
             .unwrap();
         player.display_name = DisplayName("Alice".into());
         player.state.motor =
@@ -154,7 +157,7 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
         let player = w
             .core
             .entities
-            .get_mut_by_id::<PlayerComponent>(&victim)
+            .get_mut_by_id::<PlayerSnapshot>(&victim)
             .unwrap();
         player.display_name = DisplayName("Bob".into());
         player.state.health.0 = 1;
@@ -167,7 +170,7 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
     fire(&w, &mut t, p, 1, 0.0);
     step(&mut w, &mut profiles, &mut t);
     assert_eq!(
-        w.entities.view::<PlayerComponent>()[&victim].state.mode,
+        w.entities.view::<PlayerSnapshot>()[&victim].state.mode,
         CharacterMode::Downed
     );
     for target in [p, q] {
@@ -197,9 +200,10 @@ fn combat_elimination_message_is_announced_once_per_recipient_in_the_same_tick()
     );
 }
 
+/// Verifies that chat participant survives resync and rejoin gets fresh entity state.
 #[test]
 fn chat_participant_survives_resync_and_rejoin_gets_fresh_entity_state() {
-    use crate::components::ChatParticipant;
+    use crate::component::ChatParticipant;
     let (mut w, mut profiles, mut transport) = setup();
     let p = peer(0);
     let cookie = join(&mut w, &mut profiles, &mut transport, p, None);

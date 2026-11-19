@@ -1,6 +1,7 @@
 use protocol::*;
 use server::replication::*;
 use std::collections::{BTreeMap, BTreeSet};
+/// Creates an entity state record for snapshot and visibility tests.
 fn record(id: u32, visibility: u32) -> StateRecord {
     StateRecord {
         entity_id: EntityId(id),
@@ -14,6 +15,7 @@ fn record(id: u32, visibility: u32) -> StateRecord {
         }),
     }
 }
+/// Verifies that actual size splits are independent and per entity coalescing does not lose other packets.
 #[test]
 fn actual_size_splits_are_independent_and_per_entity_coalescing_does_not_lose_other_packets() {
     let world = "w".repeat(64);
@@ -65,6 +67,7 @@ fn actual_size_splits_are_independent_and_per_entity_coalescing_does_not_lose_ot
     assert_eq!(s.records.len(), 1);
     assert_eq!(s.records[0].entity_id.0, 3);
 }
+/// Verifies that spatial hysteresis self priority and visibility cap are deterministic.
 #[test]
 fn spatial_hysteresis_self_priority_and_visibility_cap_are_deterministic() {
     let index =
@@ -83,6 +86,7 @@ fn spatial_hysteresis_self_priority_and_visibility_cap_are_deterministic() {
     assert!(set.contains(&120));
     assert!(!set.contains(&1));
 }
+/// Verifies that byte budget enforces burst refill and owner reserve.
 #[test]
 fn byte_budget_enforces_burst_refill_and_owner_reserve() {
     let mut budget = Budget::new(60 * 1024, 120 * 1024);
@@ -96,6 +100,7 @@ fn byte_budget_enforces_burst_refill_and_owner_reserve() {
     assert!(!budget.allow(1, 100_000, 0));
 }
 
+/// Verifies that input rate is a strict rolling second not a refilling burst.
 #[test]
 fn input_rate_is_a_strict_rolling_second_not_a_refilling_burst() {
     let mut rate = InputRate::default();

@@ -1,4 +1,4 @@
-use crate::components::{ChatParticipant, Player as PlayerComponent};
+use crate::component::{ChatParticipant, PlayerSnapshot};
 #[cfg(test)]
 use crate::world::World;
 use crate::{
@@ -9,6 +9,7 @@ use crate::{
 use bevy_ecs::prelude::{MessageReader, Query, Res, ResMut};
 use protocol::{ChatLine, ChatText, DetailText, DisplayName, EventId, ServerMessage};
 use std::collections::VecDeque;
+/// Stores bounded chat history and allocates message IDs.
 #[derive(Default, bevy_ecs::prelude::Resource)]
 pub struct ChatSystem {
     /// The latest 32 accepted messages, replayed to newly ready players.
@@ -24,7 +25,7 @@ impl ChatSystem {
         sender: &Session,
         text: ChatText,
         now: u64,
-        player: Option<(&PlayerComponent, &mut ChatParticipant)>,
+        player: Option<(&PlayerSnapshot, &mut ChatParticipant)>,
         tick: u32,
         world_id: &str,
         sessions: &mut Sessions,
@@ -69,7 +70,7 @@ impl ChatSystem {
         &mut self,
         peer: PeerKey,
         session: &Session,
-        player: Option<(&PlayerComponent, &mut ChatParticipant)>,
+        player: Option<(&PlayerSnapshot, &mut ChatParticipant)>,
         tick: u32,
         world_id: &str,
         sessions: &mut Sessions,
@@ -101,6 +102,7 @@ impl ChatSystem {
             sessions,
         );
     }
+    /// Creates a server-authored presence message.
     fn presence(
         &mut self,
         username: DisplayName,
@@ -123,6 +125,7 @@ impl ChatSystem {
             sessions,
         );
     }
+    /// Publishes a server-authored chat message to playing sessions.
     fn system_message(
         &mut self,
         username: DisplayName,
@@ -153,6 +156,7 @@ impl ChatSystem {
             );
         }
     }
+    /// Adds a server-authored line to bounded chat history.
     fn record_system_message(
         &mut self,
         username: DisplayName,
@@ -174,16 +178,18 @@ impl ChatSystem {
         self.messages.push_back(line.clone());
         Some(line)
     }
+    /// Announces a participant's departure once.
     #[cfg(test)]
     pub(crate) fn on_left(&mut self, player: u32, world: &mut World, sessions: &mut Sessions) {
         let name = world
             .entities
-            .get::<PlayerComponent>(protocol::EntityId(player))
+            .get::<PlayerSnapshot>(protocol::EntityId(player))
             .map(|p| p.display_name.clone());
         if let Some(participant) = world.entities.get_mut_by_id::<ChatParticipant>(&player) {
             self.left(participant, name, world.tick, &world.id, sessions);
         }
     }
+    /// Publishes departure presence after validating the leaving player.
     pub(crate) fn left(
         &mut self,
         participant: &mut ChatParticipant,
@@ -203,6 +209,7 @@ impl ChatSystem {
             );
         }
     }
+    /// Queues or submits a message using the required delivery channel.
     fn send(
         &mut self,
         participant: &mut ChatParticipant,
@@ -243,6 +250,7 @@ impl ChatSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Verifies that history is bounded and rate limits belong to each participant.
     #[test]
     fn history_is_bounded_and_rate_limits_belong_to_each_participant() {
         let mut chat = ChatSystem::default();
@@ -286,6 +294,7 @@ mod tests {
     }
 }
 
+/// Adds one authoritative chat announcement for each elimination event.
 pub(crate) fn announce_eliminations(
     mut messages: MessageReader<crate::gameplay_messages::ActorEliminated>,
     mut chat: ResMut<ChatSystem>,
@@ -330,19 +339,25 @@ mod message_tests {
     use super::*;
     use crate::gameplay_messages::{ActorEliminated, CrimeReported, NoiseEmitted};
     use bevy_ecs::prelude::*;
+    /// Records independent message-reader observations in checkpoint tests.
     #[derive(Resource, Default)]
     struct Readers {
+        /// Actor identities observed by the first independent test reader.
         first: Vec<(Option<protocol::EntityId>, protocol::EntityId)>,
+        /// Number of events observed by the second independent test reader.
         second: usize,
     }
+    /// Records elimination identities using the first independent test reader.
     fn first(mut messages: MessageReader<ActorEliminated>, mut readers: ResMut<Readers>) {
         for message in messages.read() {
             readers.first.push((message.killer, message.victim));
         }
     }
+    /// Counts elimination messages using the second independent test reader.
     fn second(mut messages: MessageReader<ActorEliminated>, mut readers: ResMut<Readers>) {
         readers.second += messages.read().count();
     }
+    /// Emits a fixed elimination event for checkpoint tests.
     fn emit(mut messages: MessageWriter<ActorEliminated>) {
         messages.write(ActorEliminated {
             killer: Some(protocol::EntityId(1)),
@@ -352,9 +367,11 @@ mod message_tests {
             tick: 7,
         });
     }
+    /// Clears completed requests or retires state after its consumers finish.
     fn retire(mut messages: ResMut<Messages<ActorEliminated>>) {
         messages.clear();
     }
+    /// Creates the ECS actors and resources needed by this focused test.
     fn fixture() -> bevy_ecs::world::World {
         let mut world = bevy_ecs::world::World::new();
         crate::ecs::messages::register(&mut world);
@@ -365,6 +382,7 @@ mod message_tests {
         world.insert_resource(crate::ecs::state::WorldIdentity("test".into()));
         world
     }
+    /// Verifies that independent readers and chat receive each fact once across checkpoints.
     #[test]
     fn independent_readers_and_chat_receive_each_fact_once_across_checkpoints() {
         let mut world = fixture();
@@ -399,9 +417,16 @@ mod message_tests {
                 .all(|line| line.text.0 == "Alice eliminated Bob" && line.server_tick == 7)
         );
         // No actor entities exist: snapshots still produce valid historical announcements.
-        assert_eq!(world.query::<&PlayerComponent>().iter(&world).count(), 0);
+        assert_eq!(
+            world
+                .query::<crate::component::queries::PlayerQueryReadOnly>()
+                .iter(&world)
+                .count(),
+            0
+        );
         assert!(world.resource::<Messages<ActorEliminated>>().is_empty());
     }
+    /// Verifies that failed checkpoint discards pending facts instead of replaying them.
     #[test]
     fn failed_checkpoint_discards_pending_facts_instead_of_replaying_them() {
         let mut world = fixture();
@@ -447,11 +472,14 @@ mod message_tests {
 /// Lifecycle reactions run at explicit admission/disconnect checkpoints.
 pub(crate) fn player_ready(
     mut messages: MessageReader<crate::gameplay_messages::PlayerBecameReady>,
-    mut players: Query<(
-        &crate::components::GameId,
-        &PlayerComponent,
-        &mut ChatParticipant,
-    )>,
+    mut players: Query<
+        (
+            &crate::component::GameId,
+            crate::component::queries::PlayerQueryReadOnly,
+            &mut ChatParticipant,
+        ),
+        crate::component::queries::PlayerFilter,
+    >,
     mut chat: ResMut<ChatSystem>,
     mut sessions: ResMut<Sessions>,
     clock: Res<crate::ecs::state::Clock>,
@@ -478,7 +506,7 @@ pub(crate) fn player_ready(
         chat.on_ready(
             message.peer,
             &s,
-            Some((player, &mut participant)),
+            Some((&player.to_snapshot(), &mut participant)),
             clock.0,
             &identity.0,
             &mut sessions,
@@ -486,9 +514,10 @@ pub(crate) fn player_ready(
         sessions.peers.insert(message.peer, s);
     }
 }
+/// Releases state associated with a departing player.
 pub(crate) fn player_leaving(
     mut messages: MessageReader<crate::gameplay_messages::PlayerLeaving>,
-    mut players: Query<(&crate::components::GameId, &mut ChatParticipant)>,
+    mut players: Query<(&crate::component::GameId, &mut ChatParticipant)>,
     mut chat: ResMut<ChatSystem>,
     mut sessions: ResMut<Sessions>,
     clock: Res<crate::ecs::state::Clock>,

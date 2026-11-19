@@ -1,16 +1,17 @@
 #[cfg(test)]
+use crate::component::PlayerSnapshot;
+#[cfg(test)]
 use crate::systems::population::PopulationSystem;
 #[cfg(test)]
 use crate::world::World;
 use bevy_ecs::prelude::{MessageReader, Query, Res, ResMut, With};
 pub(crate) mod driving;
 pub(crate) mod native;
-pub(crate) mod perception;
-use crate::components::Pedestrian as PedestrianComponent;
-use crate::components::Player as PlayerComponent;
 pub(crate) mod officers;
-pub(crate) use crate::components::Officer;
-use crate::components::Vehicle;
+pub(crate) mod perception;
+#[cfg(test)]
+pub(crate) use crate::component::OfficerSnapshot;
+use crate::component::VehicleSnapshot;
 use crate::sessions::{SessionPhase, Sessions};
 use crate::systems::population::{Navigation, hidden};
 #[cfg(test)]
@@ -46,9 +47,13 @@ pub(crate) enum CrimeKind {
     Officer,
 }
 const STAR_POINTS: [u8; 3] = [1, 5, 10];
+/// Sets unit limits, search duration, and warning requirements for a heat level.
 struct ResponseProfile {
+    /// Maximum number of police units assigned at this response level.
     units: u8,
+    /// Number of ticks allowed for a police search.
     search_ticks: u32,
+    /// Whether officers must warn before engaging the suspect.
     warn_before_engagement: bool,
 }
 
@@ -71,6 +76,7 @@ const RESPONSE: [ResponseProfile; 3] = [
 ];
 
 impl CrimeKind {
+    /// Returns the heat score assigned to this crime type.
     fn points(self) -> u8 {
         match self {
             Self::Theft | Self::Shot => 1,
@@ -80,19 +86,29 @@ impl CrimeKind {
     }
 }
 
+/// Captures the type, location, and witness confirmation of a crime.
 #[derive(Clone, Copy)]
 pub(crate) struct CrimeReport {
+    /// Type of crime captured by this report.
     kind: CrimeKind,
+    /// World position in metres.
     position: [f32; 3],
+    /// Whether a police witness confirmed the crime visually.
     confirmed: bool,
 }
 
+/// Records the last observed vehicle motion for pursuit prediction.
 #[derive(Clone, Copy)]
 pub(crate) struct VehicleSighting {
+    /// Gameplay ID of the observed vehicle.
     id: u32,
+    /// Tick when police last observed this vehicle.
     tick: u32,
+    /// World position in metres.
     position: [f32; 3],
+    /// Horizontal facing angle in radians.
     yaw: f32,
+    /// Movement speed in metres per second.
     speed: f32,
 }
 
@@ -115,6 +131,7 @@ impl Role {
         }
     }
 
+    /// Selects a role-specific offset within the suspect search pattern.
     fn search_offset(self) -> usize {
         match self {
             Self::Intercept => 1,
@@ -125,6 +142,7 @@ impl Role {
 }
 
 impl VehicleSighting {
+    /// Projects a recent vehicle sighting according to the unit's pursuit role.
     fn prediction(self, tick: u32, role: Role) -> Option<([f32; 3], f32)> {
         let horizon = match role {
             Role::Intercept => 4.0,
@@ -147,6 +165,7 @@ impl VehicleSighting {
     }
 }
 
+/// Limits pursuit speed using lead speed, headway, and braking distance.
 fn approach_speed(gap: f32, brake: f32, lead_speed: f32) -> f32 {
     let headway = lead_speed * 0.8;
     let closing_gap = (gap - headway).max(0.0);
@@ -155,18 +174,28 @@ fn approach_speed(gap: f32, brake: f32, lead_speed: f32) -> f32 {
     stopping_limit.min(following_limit)
 }
 
+/// Manages crime evidence, police navigation, and unit assignments.
 #[derive(bevy_ecs::prelude::Resource)]
 pub struct PoliceSystem {
+    /// Navigation graph used by actors on foot.
     sidewalk: Navigation,
+    /// Navigation graph used by vehicles.
     road: Navigation,
+    /// Whether the world supports this police population.
     enabled: bool,
+    /// Whether the initial patrol roster has been created.
     initialized: bool,
+    /// Round-robin cursor used to distribute work fairly.
     cursor: usize,
+    /// Pending crime evidence indexed by actor and incident ID.
     crimes: BTreeMap<(u32, CrimeId), CrimeReport>,
+    /// Total number of route searches performed.
     path_jobs: u64,
+    /// Total number of police assignment changes.
     assignment_changes: u64,
 }
 impl PoliceSystem {
+    /// Creates police navigation state and enables patrols for the authored city.
     pub fn new(manifest: &content::WorldManifest) -> Self {
         Self {
             sidewalk: Navigation::new(&manifest.pedestrian_graph, true),
@@ -180,9 +209,11 @@ impl PoliceSystem {
             assignment_changes: 0,
         }
     }
+    /// Removes queued crime evidence for a retired player.
     pub(crate) fn forget_crimes(&mut self, actor: u32) {
         self.crimes.retain(|(id, _), _| *id != actor);
     }
+    /// Builds the vehicle input selected by the actor's AI state.
     #[cfg(test)]
     pub(crate) fn vehicle_input(
         &self,
@@ -198,15 +229,19 @@ impl PoliceSystem {
             .map(|unit| crate::systems::police::state::motor_input(&unit, tick, speed))
     }
 }
+/// Returns horizontal distance between two world positions in metres.
 pub(crate) fn distance(a: [f32; 3], b: [f32; 3]) -> f32 {
     (a[0] - b[0]).hypot(a[2] - b[2])
 }
+/// Returns the horizontal angle that faces from one position to another.
 fn yaw_to(a: [f32; 3], b: [f32; 3]) -> f32 {
     (-(b[0] - a[0])).atan2(-(b[2] - a[2]))
 }
+/// Normalises an angle to the signed half-turn range.
 fn wrap(yaw: f32) -> f32 {
     (yaw + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
+/// Checks range and static occlusion between two actor positions.
 fn sight(collision: &CollisionWorld, from: [f32; 3], to: [f32; 3], limit: f32) -> bool {
     if distance(from, to) > limit {
         return false;
@@ -222,6 +257,7 @@ fn sight(collision: &CollisionWorld, from: [f32; 3], to: [f32; 3], limit: f32) -
 }
 
 impl PoliceSystem {
+    /// Captures crime evidence and queues it for police processing.
     #[cfg(test)]
     pub(crate) fn report_crime(
         &mut self,
@@ -235,6 +271,7 @@ impl PoliceSystem {
             self.record_crime(actor, cause, report);
         }
     }
+    /// Aggregates crime evidence within a bounded incident map.
     fn record_crime(&mut self, actor: u32, cause: CrimeId, report: CrimeReport) {
         let key = (actor, cause);
         if self.crimes.len() >= 256 && !self.crimes.contains_key(&key) {
@@ -250,9 +287,10 @@ impl PoliceSystem {
             .or_insert(report);
     }
 
+    /// Reports police assignments, pursuits, and navigation measurements.
     pub(crate) fn diagnostics(
         &self,
-        officers: &BTreeMap<u32, &Officer>,
+        officers: &BTreeMap<u32, crate::component::queries::OfficerQueryReadOnlyItem<'_, '_>>,
         wanted: &BTreeMap<u32, &Wanted>,
         units: &BTreeMap<u32, &Unit>,
     ) -> serde_json::Value {
@@ -289,8 +327,8 @@ impl PoliceSystem {
         sessions: &mut Sessions,
         _combat: &mut CombatSystem,
     ) -> Result<(), String> {
-        let mut state =
-            bevy_ecs::system::SystemState::<native::RosterActors>::new(world.entities.ecs_mut());
+        let mut live = world.entities.live();
+        let mut state = bevy_ecs::system::SystemState::<native::RosterActors>::new(&mut live);
         let result = native::roster_actors(
             self,
             tick,
@@ -299,13 +337,12 @@ impl PoliceSystem {
             &world.content.manifest,
             &world.collision,
             &mut world.next_entity,
-            &mut state
-                .get_mut(world.entities.ecs_mut())
-                .expect("native actor queries"),
+            &mut state.get_mut(&mut live).expect("native actor queries"),
         );
-        state.apply(world.entities.ecs_mut());
+        state.apply(&mut live);
         result
     }
+    /// Runs police preparation for an owned scenario fixture.
     #[cfg(test)]
     pub(crate) fn prepare_tick(
         &mut self,
@@ -315,11 +352,9 @@ impl PoliceSystem {
         sessions: &mut Sessions,
         _population: &mut PopulationSystem,
     ) -> Result<(), String> {
-        let mut state =
-            bevy_ecs::system::SystemState::<driving::DriveActors>::new(world.entities.ecs_mut());
-        let mut actors = state
-            .get_mut(world.entities.ecs_mut())
-            .expect("native actor queries");
+        let mut live = world.entities.live();
+        let mut state = bevy_ecs::system::SystemState::<driving::DriveActors>::new(&mut live);
+        let mut actors = state.get_mut(&mut live).expect("native actor queries");
         driving::drive_actors(
             self,
             tick,
@@ -334,6 +369,7 @@ impl PoliceSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Verifies that direct chase can close on a moving compact.
     #[test]
     fn direct_chase_can_close_on_a_moving_compact() {
         assert!(approach_speed(28.0, 16.0, 22.0) > 27.0);
@@ -341,6 +377,7 @@ mod tests {
         assert_eq!(approach_speed(0.0, 16.0, 0.0), 0.0);
     }
 
+    /// Verifies that support roles project distinct exits and drop stale sightings.
     #[test]
     fn support_roles_project_distinct_exits_and_drop_stale_sightings() {
         let sighting = VehicleSighting {
@@ -358,6 +395,7 @@ mod tests {
         assert!(sighting.prediction(119, Role::Intercept).is_none());
     }
 
+    /// Verifies that causal dedup cooldown search reacquisition and decay are exact.
     #[test]
     fn causal_dedup_cooldown_search_reacquisition_and_decay_are_exact() {
         let mut w = crate::systems::police::state::clear_wanted();
@@ -408,6 +446,7 @@ mod tests {
         assert_eq!((w.heat, w.pursuit), (0, Pursuit::Clear));
         assert!(w.seen.len() <= 64);
     }
+    /// Verifies that arrest requires ninety continuous ticks and resets on any invalid tick.
     #[test]
     fn arrest_requires_ninety_continuous_ticks_and_resets_on_any_invalid_tick() {
         let mut w = crate::systems::police::state::clear_wanted();
@@ -458,14 +497,14 @@ pub(crate) fn observe_crime(
     at: [f32; 3],
     world: &World,
 ) -> Option<CrimeReport> {
-    let player = world.entities.view::<PlayerComponent>().get(&actor)?;
+    let player = world.entities.view::<PlayerSnapshot>().get(&actor)?;
     let actor_position = player
         .state
         .vehicle_id
         .and_then(|id| {
             world
                 .entities
-                .view::<crate::components::Vehicle>()
+                .view::<crate::component::VehicleSnapshot>()
                 .get(&id.0)
         })
         .map_or(player.state.motor.position.0, |car| {
@@ -481,7 +520,7 @@ pub(crate) fn observe_crime(
             .view::<Unit>()
             .keys()
             .map(|id| {
-                let car = &world.entities.view::<crate::components::Vehicle>()[id];
+                let car = &world.entities.view::<crate::component::VehicleSnapshot>()[id];
                 (
                     *id,
                     car.state.health.0,
@@ -536,10 +575,11 @@ pub(crate) fn observe_crime_snapshot(
     })
 }
 
+/// Accepts crime reports only while their actor identities remain current.
 pub(crate) fn receive_crimes(
     mut messages: MessageReader<crate::gameplay_messages::CrimeReported>,
     mut police: ResMut<PoliceSystem>,
-    actors: Query<&crate::ecs::GameId, With<PlayerComponent>>,
+    actors: Query<&crate::ecs::GameId, With<crate::component::PlayerData>>,
 ) {
     for message in messages.read() {
         // A disconnect or entity replacement cannot revive a stale report.
@@ -552,6 +592,7 @@ pub(crate) fn receive_crimes(
     }
 }
 
+/// Clears pursuit state and police assignments after a validated respawn.
 pub(crate) fn reset_respawned_players(
     mut messages: MessageReader<crate::gameplay_messages::PlayerRespawned>,
     mut actors: Query<(&crate::ecs::GameId, &mut Wanted)>,
@@ -587,11 +628,12 @@ pub(crate) fn reset_respawned_players(
 }
 
 pub(crate) mod state;
-pub use crate::components::{Unit, Wanted};
+pub use crate::component::{Unit, Wanted};
 
+/// Releases state associated with a departing player.
 pub(crate) fn player_leaving(
     mut messages: MessageReader<crate::gameplay_messages::PlayerLeaving>,
-    players: Query<&crate::components::GameId, With<PlayerComponent>>,
+    players: Query<&crate::component::GameId, With<crate::component::PlayerData>>,
     mut police: ResMut<PoliceSystem>,
     clock: Res<crate::ecs::state::Clock>,
 ) {
